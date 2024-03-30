@@ -54,8 +54,8 @@ public:
   CardItem(const std::string &uuid) : PageItem(uuid) {}
   virtual ~CardItem() {}
 
-  const uint32_t class_type() const override { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  uint32_t class_type() const override { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & CardItem::this_class_type_) == CardItem::this_class_type_;
   }
 
@@ -72,7 +72,7 @@ public:
   virtual void remove_card(Card *card);
 
 protected:
-  static const uint32_t static_class_type_() { return CardItem::this_class_type_; }
+  static uint32_t static_class_type_() { return CardItem::this_class_type_; }
 
   std::vector<Card *> cards_;
 
@@ -96,8 +96,8 @@ public:
   StatefulCardItem(const std::string &uuid, const std::string &display_name);
   virtual ~StatefulCardItem() {}
 
-  const uint32_t class_type() const override { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  uint32_t class_type() const override { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & StatefulCardItem::this_class_type_) == StatefulCardItem::this_class_type_;
   }
 
@@ -108,7 +108,7 @@ public:
   void set_device_class(const std::string &device_class);
 
 protected:
-  static const uint32_t static_class_type_() { return StatefulCardItem::this_class_type_; }
+  static uint32_t static_class_type_() { return StatefulCardItem::this_class_type_; }
 
   static void state_on_off_fn(StatefulCardItem *me);
   static void state_binary_sensor_fn(StatefulCardItem *me);

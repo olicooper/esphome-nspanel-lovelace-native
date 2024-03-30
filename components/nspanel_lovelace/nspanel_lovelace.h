@@ -95,7 +95,7 @@ protected:
   uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
 
   bool process_data_();
-  const size_t find_page_index_by_uuid_(const std::string &uuid) const;
+  size_t find_page_index_by_uuid_(const std::string &uuid) const;
   const std::string &try_replace_uuid_with_entity_id_(const std::string &uuid_or_entity_id);
   void process_command_(const std::string &message);
   void send_buffered_command_();

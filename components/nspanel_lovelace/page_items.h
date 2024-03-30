@@ -34,13 +34,13 @@ public:
       const std::string &icon_default_value, const uint16_t icon_default_color);
   virtual ~NavigationItem() {}
 
-  const uint32_t class_type() const override { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  uint32_t class_type() const override { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & NavigationItem::this_class_type_) == NavigationItem::this_class_type_;
   }
 
 protected:
-  static const uint32_t static_class_type_() { return NavigationItem::this_class_type_; }
+  static uint32_t static_class_type_() { return NavigationItem::this_class_type_; }
 
   // output: ~internalName~icon~iconColor~~
   std::string &render_(std::string &buffer) override;
@@ -55,8 +55,8 @@ private:
 
 class IconItem : 
     public PageItem,
-    public PageItem_Icon,
     public PageItem_EntityId,
+    public PageItem_Icon,
     public PageItem_DisplayName,
     public PageItem_Value {
 public:
@@ -72,13 +72,13 @@ public:
       const std::string &icon_default_value, const uint16_t icon_default_color);
   // virtual ~IconItem() {}
 
-  const uint32_t class_type() const override { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  uint32_t class_type() const override { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & IconItem::this_class_type_) == IconItem::this_class_type_;
   }
 
 protected:
-  static const uint32_t static_class_type_() { return IconItem::this_class_type_; }
+  static uint32_t static_class_type_() { return IconItem::this_class_type_; }
 
   // output: ~~icon~iconColor~displayName~optionalValue
   std::string &render_(std::string &buffer) override;
@@ -103,8 +103,8 @@ public:
       const std::string &value, const char *weather_condition);
   // virtual ~WeatherItem() {}
 
-  const uint32_t class_type() const override { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  uint32_t class_type() const override { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & WeatherItem::this_class_type_) == WeatherItem::this_class_type_;
   }
 
@@ -128,7 +128,7 @@ public:
   static std::string temperature_unit;
 
 protected:
-  static const uint32_t static_class_type_() { return WeatherItem::this_class_type_; }
+  static uint32_t static_class_type_() { return WeatherItem::this_class_type_; }
   float float_value_;
 
   // output: ~~icon~iconColor~displayName~value

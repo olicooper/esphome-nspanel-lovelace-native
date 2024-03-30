@@ -700,7 +700,7 @@ void NSPanelLovelace::check_time_() {
 
 #endif
 
-const size_t NSPanelLovelace::find_page_index_by_uuid_(const std::string &uuid) const {
+size_t NSPanelLovelace::find_page_index_by_uuid_(const std::string &uuid) const {
   size_t index = 0;
   for (auto &p : this->pages_) {
     if (p->get_uuid() == uuid)

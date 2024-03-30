@@ -70,8 +70,8 @@ protected:
   virtual void on_item_added_(PageItem *) {}
 
   std::string uuid_;
-  std::string title_;
   const char *type_;
+  std::string title_;
   bool hidden_;
   uint16_t sleep_timeout_;
 

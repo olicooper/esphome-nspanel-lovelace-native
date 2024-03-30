@@ -50,8 +50,8 @@ public:
   PageItem(const PageItem &other);
   virtual ~PageItem() {}
 
-  virtual const uint32_t class_type() const { return this->this_class_type_; }
-  static const bool is_instance_of(PageItem *item) {
+  virtual uint32_t class_type() const { return this->this_class_type_; }
+  static bool is_instance_of(PageItem *item) {
     return (item->class_type() & PageItem::this_class_type_) == PageItem::this_class_type_;
   }
   
@@ -64,7 +64,7 @@ public:
 
 protected:
   // dynamic_cast is not available, so this is used to determine the type instead
-  static const uint32_t static_class_type_() { return PageItem::this_class_type_; }
+  static uint32_t static_class_type_() { return PageItem::this_class_type_; }
 
   virtual uint16_t get_render_buffer_reserve_() const { return 15; }
   
@@ -143,7 +143,7 @@ public:
 
   const std::string &get_icon_value() const { return this->icon_value_; }
   bool is_icon_value_overridden() const { return this->icon_value_overridden_; }
-  const uint16_t get_icon_color() const { return this->icon_color_; }
+  uint16_t get_icon_color() const { return this->icon_color_; }
   std::string get_icon_color_str() const {
     return std::to_string(this->icon_color_);
   }
@@ -157,12 +157,12 @@ public:
 protected:
   // mdi:0625 (help-circle-outline)
   std::string icon_default_value_;
-  bool icon_value_overridden_;
-  std::string icon_value_;
   // default HA blue
   uint16_t icon_default_color_;
-  bool icon_color_overridden_;
+  std::string icon_value_;
   uint16_t icon_color_;
+  bool icon_value_overridden_;
+  bool icon_color_overridden_;
 
   // output: icon~iconColor
   std::string &render_(std::string &buffer) override;

@@ -34,13 +34,20 @@ public:
   };
 
   DayOfWeekMap() :
-      sunday_(dow_names.at(0)), sunday_overridden_(false),
-      monday_(dow_names.at(1)), monday_overridden_(false),
-      tuesday_(dow_names.at(2)), tuesday_overridden_(false),
-      wednesday_(dow_names.at(3)), wednesday_overridden_(false),
-      thursday_(dow_names.at(4)), thursday_overridden_(false),
-      friday_(dow_names.at(5)), friday_overridden_(false),
-      saturday_(dow_names.at(6)), saturday_overridden_(false) {}
+      sunday_overridden_(false),
+      monday_overridden_(false),
+      tuesday_overridden_(false),
+      wednesday_overridden_(false),
+      thursday_overridden_(false),
+      friday_overridden_(false),
+      saturday_overridden_(false),
+      sunday_(dow_names.at(0)),
+      monday_(dow_names.at(1)),
+      tuesday_(dow_names.at(2)),
+      wednesday_(dow_names.at(3)),
+      thursday_(dow_names.at(4)),
+      friday_(dow_names.at(5)),
+      saturday_(dow_names.at(6)) {}
 
   void set_sunday(const std::array<const char *, 2> &sunday) {
     this->sunday_ = sunday;
@@ -137,6 +144,10 @@ public:
   }
 
 private:
+  bool sunday_overridden_, monday_overridden_, tuesday_overridden_,
+    wednesday_overridden_, thursday_overridden_, friday_overridden_, 
+    saturday_overridden_;
+
   std::array<const char *, 2> sunday_;
   std::array<const char *, 2> monday_;
   std::array<const char *, 2> tuesday_;
@@ -144,10 +155,6 @@ private:
   std::array<const char *, 2> thursday_;
   std::array<const char *, 2> friday_;
   std::array<const char *, 2> saturday_;
-
-  bool sunday_overridden_, monday_overridden_, tuesday_overridden_,
-    wednesday_overridden_, thursday_overridden_, friday_overridden_, 
-    saturday_overridden_;
 };
 
 struct Icon {

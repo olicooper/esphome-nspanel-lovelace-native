@@ -368,6 +368,8 @@ async def to_code(config):
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)
     await uart.register_uart_device(nspanel, config)
+    cg.add_define("USE_NSPANEL_LOVELACE")
+    cg.add_global(nspanel_lovelace_ns.using)
 
     if CONF_SLEEP_TIMEOUT in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))

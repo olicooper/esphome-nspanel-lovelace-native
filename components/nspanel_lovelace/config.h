@@ -1,5 +1,7 @@
 #pragma once
 
+#define NSPANEL_LOVELACE_BUILD_VERSION "0.1.0 (beta)"
+
 #include <stdint.h>
 
 namespace esphome {

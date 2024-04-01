@@ -360,6 +360,12 @@ void NSPanelLovelace::process_command_(const std::string &message) {
     // restore dimmode state
     this->set_display_dim();
     this->render_page_(render_page_option::screensaver);
+#ifdef USE_TIME
+    // If the TFT is reset then the time needs reconfiguring
+    if (this->time_configured_) {
+      this->update_datetime();
+    }
+#endif
   }
 
   this->incoming_msg_callback_.call(message);
@@ -676,6 +682,7 @@ void NSPanelLovelace::setup_time_() {
     this->set_interval("check_time", 1000, [this] {
       this->check_time_();
     });
+    this->time_configured_ = true;
   } else {
     ESP_LOGW(TAG, "time_id not configured, default time displayed");
   }

@@ -120,6 +120,7 @@ protected:
   optional<time::RealTimeClock *> time_id_{};
   std::string date_format_, time_format_;
   uint8_t now_minute_, now_hour_;
+  bool time_configured_;
 #endif
 
   uint8_t display_active_dim_ = 100;

@@ -8,17 +8,25 @@ import logging
 from typing import Union
 import os, json
 
-from esphome.components import uart, time
+from esphome.components import uart, time, esp32
 from esphome.const import (
     CONF_ID,
     CONF_TRIGGER_ID,
     CONF_TIME_ID,
+    CONF_ESPHOME,
+    CONF_PLATFORMIO_OPTIONS
 )
 
-# json library: bblanchon/ArduinoJson
-AUTO_LOAD = ["text_sensor", "json"]
 CODEOWNERS = ["@olicooper"]
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
+
+def AUTO_LOAD():
+    val = ["text_sensor", "json"]
+    # NOTE: Cannot support PSRAM on arduino due to non-default pin configuration
+    if core.CORE.using_esp_idf:
+        val.append("psram")
+        return val
+    return val
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -272,7 +280,7 @@ CONFIG_SCHEMA = cv.All(
     })
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
-    cv.only_with_arduino,
+    cv.only_on_esp32,
     validate_config
 )
 
@@ -370,6 +378,37 @@ async def to_code(config):
     await uart.register_uart_device(nspanel, config)
     cg.add_define("USE_NSPANEL_LOVELACE")
     cg.add_global(nspanel_lovelace_ns.using)
+
+    # NSPanel has non-standard PSRAM pins which are not
+    # modifiable when building for Arduino
+    if core.CORE.using_esp_idf:
+        # FIXME: This doesnt work (sdkconfig file doesnt change), 'to_code' priority wrong?
+        # esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CLK_IO", '5')
+        # esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CS_IO", '18')
+        # todo: this is an arduino define, is this okay to keep using?
+        cg.add_define("BOARD_HAS_PSRAM")
+
+    enable_tft_upload = True
+    if 'build_flags' in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]:
+        if [s for s in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]
+            ['build_flags'] if 'DISABLE_NSPANEL_TFT_UPLOAD' in s]:
+            enable_tft_upload = False
+
+    # TODO: check that upload_tft() function is not used anywhere
+    if enable_tft_upload:
+        # FIXME when using add_define, the code wont build because of
+        #       an undefined reference to 'upload_tft' during linking
+        # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
+        # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
+        core.CORE.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
+        if core.CORE.using_arduino:
+            cg.add_library("WiFiClientSecure", None)
+            cg.add_library("HTTPClient", None)
+        elif core.CORE.using_esp_idf:
+            esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
+            esp32.add_idf_sdkconfig_option(
+                "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
+            )
 
     if CONF_SLEEP_TIMEOUT in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
@@ -553,8 +592,6 @@ async def to_code(config):
         cg.add(cg.RawStatement("}"))
 
 
-    cg.add_library("WiFiClientSecure", None)
-    cg.add_library("HTTPClient", None)
     cg.add_define("USE_NSPANEL_LOVELACE")
 
 

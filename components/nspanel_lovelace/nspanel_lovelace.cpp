@@ -9,6 +9,7 @@
 #include <time.h>
 #include <vector>
 #include <utility>
+#include <esp_heap_caps.h>
 // #include <esp32/rom/rtc.h>
 // #include <esp_system.h>
 // #include <regex>
@@ -25,22 +26,31 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-// // Use PSRAM for ArduinoJson
-// // see: https://arduinojson.org/v6/how-to/use-external-ram-on-esp32/#how-to-use-the-psram-with-arduinojson
-// struct SpiRamAllocator {
-//   void* allocate(size_t size) {
-//     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-//   }
+// Use PSRAM for ArduinoJson (if available, otherwise use normal malloc)
+// see: https://arduinojson.org/v6/how-to/use-external-ram-on-esp32/#how-to-use-the-psram-with-arduinojson
+struct SpiRamAllocator {
+  void* allocate(size_t size) {
+   if (psram_available())
+     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+   else
+     return malloc(size);
+  }
 
-//   void deallocate(void* pointer) {
-//     heap_caps_free(pointer);
-//   }
+  void deallocate(void* pointer) {
+    if (psram_available())
+      heap_caps_free(pointer);
+    else
+      return free(pointer);
+  }
 
-//   void* reallocate(void* ptr, size_t new_size) {
-//     return heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM);
-//   }
-// };
-// using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
+  void* reallocate(void* ptr, size_t new_size) {
+    if (psram_available())
+      return heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM);
+    else
+      return realloc(ptr, new_size);
+  }
+};
+using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
 
 static const char *const TAG = "nspanel_lovelace";
 
@@ -82,8 +92,6 @@ void NSPanelLovelace::setup() {
   //   delay(50);
   // }
 
-  // ESP_LOGD(TAG, "Used PSRAM: %d", get_psram_used());
-
   if (!this->weather_entity_id_.empty()) {
     // state provides the information for the icon
     this->subscribe_homeassistant_state(
@@ -101,9 +109,11 @@ void NSPanelLovelace::setup() {
 }
 
 void NSPanelLovelace::loop() {
+#ifdef USE_NSPANEL_TFT_UPLOAD
   if (this->is_updating_ || this->reparse_mode_) {
     return;
   }
+#endif
 
   // Monitor for commands arriving from the screen over UART
   uint8_t d;
@@ -159,7 +169,7 @@ void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t p
         auto& entity_id = card_item->get_entity_id();
         this->card_entities_.push_back(card_item);
         ESP_LOGV(TAG, "Adding item id:%s, entity_id:%s", 
-            card_item->get_uuid(), entity_id);
+            card_item->get_uuid().c_str(), entity_id.c_str());
 
         if (card_item->is_type(entity_type::light)) {
           this->subscribe_homeassistant_state(
@@ -504,8 +514,10 @@ void NSPanelLovelace::send_nextion_command_(const std::string &command) {
 }
 
 void NSPanelLovelace::process_display_command_queue_() {
+#ifdef USE_NSPANEL_TFT_UPLOAD
   // don't execute custom commands when the screen is updating - UI updates could spoil the upload
   if (this->is_updating_) return;
+#endif
   // nothing to process
   if (this->command_buffer_.empty() && this->command_queue_.empty()) return;
 
@@ -553,6 +565,7 @@ void NSPanelLovelace::send_display_command(const char *command) {
   this->send_buffered_command_();
 }
 
+#ifdef USE_NSPANEL_TFT_UPLOAD
 uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag) {
   uint16_t ret;
   uint8_t c = 0;
@@ -613,11 +626,15 @@ void NSPanelLovelace::exit_reparse_mode_() {
   this->send_nextion_command_("recmod=1");
   reparse_mode_ = false;
 }
+#endif // USE_NSPANEL_TFT_UPLOAD
 
 void NSPanelLovelace::init_display_(int baud_rate) {
   // hopefully on NSPanel it should always be an ESP32ArduinoUARTComponent instance
+#ifdef USE_ESP_IDF
+  auto *uart = reinterpret_cast<uart::IDFUARTComponent*>(this->parent_);
+#else
   auto *uart = reinterpret_cast<uart::ESP32ArduinoUARTComponent*>(this->parent_);
-  // auto *uart = reinterpret_cast<uart::IDFUARTComponent*>(this->parent_);
+#endif
   uart->set_baud_rate(baud_rate);
   uart->setup();
 }
@@ -1057,31 +1074,27 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
   // todo: check if we are on the screensaver otherwise don't update
   // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
-  ArduinoJson::StaticJsonDocument<128> filter;
-  // ESP_LOGD(TAG, "Used PSRAM: %d", get_psram_used());
-  // SpiRamJsonDocument filter(256);
-  // ArduinoJson::JsonObject filter_0 = filter.createNestedObject();
+
+  ArduinoJson::StaticJsonDocument<200> filter;
   filter[0]["datetime"] = true;
   filter[0]["condition"] = true;
   filter[0]["temperature"] = true;
 
   if (filter.overflowed()) {
-    ESP_LOGW(TAG, "Weather unparsable: overflowed");
+    ESP_LOGW(TAG, "Weather unparsable: filter overflowed");
     return;
   }
   
   // Note: Unfortunately the json received is nearly 6KB!
   //       We filter the variables to consume less but it is still a lot,
   //       so we need to allocate an appropriate amount of memory to read it.
-  // SpiRamJsonDocument doc(6144);
-  ArduinoJson::DynamicJsonDocument doc(6144);
+  SpiRamJsonDocument doc(psram_available() ? 7680 : 6144);
   ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(
     doc, (char *)forecast_json.data(), DeserializationOption::Filter(filter));
-  // ESP_LOGD(TAG, "Used PSRAM: %d", get_psram_used());
   App.feed_wdt();
 
   if (error || doc.overflowed()) {
-    ESP_LOGW(TAG, "Weather unparsable: %s", error ? error.c_str() : "overflow");
+    ESP_LOGW(TAG, "Weather unparsable: %s", error ? error.c_str() : "doc overflow");
     return;
   }
 

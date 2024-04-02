@@ -11,7 +11,11 @@ esphome:
 esp32:
   board: esp32dev
   framework:
-    type: arduino
+    type: esp-idf
+    sdkconfig_options:
+      # These are required to allow access to the PSRAM
+      CONFIG_D0WD_PSRAM_CLK_IO: '5'
+      CONFIG_D0WD_PSRAM_CS_IO: '18'
 
 external_components:
   - source: components

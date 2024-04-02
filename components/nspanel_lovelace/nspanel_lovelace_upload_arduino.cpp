@@ -1,3 +1,6 @@
+#ifdef USE_NSPANEL_TFT_UPLOAD
+#ifdef USE_ARDUINO
+
 #include "nspanel_lovelace.h"
 
 #include <stdio.h>
@@ -120,15 +123,15 @@ int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url,
   return range_end + 1;
 }
 
-void NSPanelLovelace::upload_tft(const std::string &url) {
+bool NSPanelLovelace::upload_tft(const std::string &url) {
   if (this->is_updating_) {
     ESP_LOGD(TAG, "Currently updating");
-    return;
+    return false;
   }
 
   if (!network::is_connected()) {
     ESP_LOGD(TAG, "network is not connected");
-    return;
+    return false;
   }
 
   if (!this->reparse_mode_) {
@@ -147,7 +150,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
     ESP_LOGD(TAG, "connection failed");
     ExternalRAMAllocator<uint8_t> allocator(ExternalRAMAllocator<uint8_t>::ALLOW_FAILURE);
     allocator.deallocate(this->transfer_buffer_, this->transfer_buffer_size_);
-    return;
+    return false;
   } else {
     ESP_LOGD(TAG, "Connected");
   }
@@ -173,7 +176,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
   }
 
   if ((code != 200 && code != 206) || tries > 5) {
-    this->upload_end_();
+    return this->upload_end_(false);
   }
 
   String content_range_string = http.header("Content-Range");
@@ -184,7 +187,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
 
   if (this->content_length_ < 4096) {
     ESP_LOGE(TAG, "Failed to get file size");
-    this->upload_end_();
+    return this->upload_end_(false);
   }
 
   ESP_LOGD(TAG, "Updating Nextion");
@@ -223,7 +226,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
     ESP_LOGD(TAG, "preparation for tft update done");
   } else {
     ESP_LOGD(TAG, "preparation for tft update failed %d \"%s\"", response[0], response.c_str());
-    this->upload_end_();
+    return this->upload_end_(false);
   }
 
   // Nextion wants 4096 bytes at a time. Make chunk_size a multiple of 4096
@@ -248,7 +251,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
       this->transfer_buffer_ = allocator.allocate(chunk_size);
 
       if (!this->transfer_buffer_)
-        this->upload_end_();
+        return this->upload_end_(false);
     }
 
     this->transfer_buffer_size_ = chunk_size;
@@ -263,7 +266,7 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
     result = this->upload_by_chunks_(&http, url, result);
     if (result < 0) {
       ESP_LOGD(TAG, "Error updating Nextion!");
-      this->upload_end_();
+      return this->upload_end_(false);
     }
     App.feed_wdt();
     // NOLINTNEXTLINE(readability-static-accessed-through-instance)
@@ -271,15 +274,20 @@ void NSPanelLovelace::upload_tft(const std::string &url) {
   }
   ESP_LOGD(TAG, "Successfully updated Nextion!");
 
-  this->upload_end_();
+  return this->upload_end_(true);
 }
 
-void NSPanelLovelace::upload_end_() {
+bool NSPanelLovelace::upload_end_(bool successful) {
+  if (!successful) return successful;
   ESP_LOGD(TAG, "Restarting Nextion");
   this->soft_reset_display();
   delay(1500);  // NOLINT
   ESP_LOGD(TAG, "Restarting esphome");
   ESP.restart();  // NOLINT(readability-static-accessed-through-instance)
+  return successful;
 }
 }  // namespace nspanel_lovelace
 }  // namespace esphome
+
+#endif // USE_ARDUINO
+#endif // USE_NSPANEL_TFT_UPLOAD

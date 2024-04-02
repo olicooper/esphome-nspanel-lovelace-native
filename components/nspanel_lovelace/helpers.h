@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 // #include <esp.h>
+#include <esp_heap_caps.h>
 #include <string>
 #include <map>
 #include <math.h>
@@ -56,11 +57,6 @@ inline const char* value_or_empty(const char* s) {
 inline bool starts_with(const std::string &input, const std::string &value) {
   return input.rfind(value, 0) == 0;
 }
-
-// Arduino functions found in: 'cores/esp32/esp.cpp' and 'cores/esp32/esp32-hal-psram.cpp'
-// inline static uint32_t get_psram_used() {
-//   return (ESP.getPsramSize() - ESP.getFreePsram());
-// }
 
 inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
 	// note: don't need to know the timezone
@@ -160,6 +156,16 @@ std::string string_sprintf(const char *format, Args... args) {
   std::string str(buf);
   delete[] buf;
   return str;
+}
+
+inline bool psram_available() {
+  return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) > 0 && 
+      heap_caps_get_free_size(MALLOC_CAP_SPIRAM) > 0;
+}
+
+inline size_t psram_used() {
+  return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - 
+      heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 }
 
 } // namespace nspanel_lovelace

@@ -1,25 +1,30 @@
 #pragma once
 
-#include <HTTPClient.h>
-// #include <esp_http_client.h>
 #include <memory>
 #include <queue>
 #include <stdint.h>
 #include <utility>
 #include <vector>
 
-#include "esphome/components/uart/uart.h"
-#include "esphome/components/api/custom_api_device.h"
+#include "esphome/core/defines.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
-#include "esphome/core/defines.h"
-#include "esphome/components/uart/uart_component_esp32_arduino.h"
-// #include "esphome/components/uart/uart_component_esp_idf.h"
 #include "esphome/core/preferences.h"
+#include "esphome/components/uart/uart.h"
+#include "esphome/components/api/custom_api_device.h"
+
+#ifdef USE_ESP_IDF
+#include "esphome/components/uart/uart_component_esp_idf.h"
+#else
+#ifdef USE_NSPANEL_TFT_UPLOAD
+#include <HTTPClient.h>
+#endif
+#include "esphome/components/uart/uart_component_esp32_arduino.h"
+#endif
 
 #ifdef USE_TIME
-#include "esphome/components/time/real_time_clock.h"
 #include "esphome/core/time.h"
+#include "esphome/components/time/real_time_clock.h"
 #endif
 
 #include "config.h"
@@ -76,11 +81,13 @@ public:
 
   void add_incoming_msg_callback(std::function<void(std::string)> callback) { this->incoming_msg_callback_.add(std::move(callback)); }
 
+#ifdef USE_NSPANEL_TFT_UPLOAD
   /**
    * Upload the tft file and softreset the Nextion.
    * If the upload fails for any reason, a power cycle of the display and re-upload will be needed
    */
-  void upload_tft(const std::string &url);
+  bool upload_tft(const std::string &url);
+#endif
 
 protected:
   bool restore_state_();
@@ -88,11 +95,13 @@ protected:
   ESPPreferenceObject pref_;
 
   void init_display_(int baud_rate);
+#ifdef USE_NSPANEL_TFT_UPLOAD
+  uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
   void start_reparse_mode_();
   void exit_reparse_mode_();
+#endif
   void send_nextion_command_(const std::string &command);
 
-  uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
 
   bool process_data_();
   size_t find_page_index_by_uuid_(const std::string &uuid) const;
@@ -169,27 +178,22 @@ protected:
   std::vector<uint8_t> buffer_;
   std::string command_buffer_;
 
+#ifdef USE_NSPANEL_TFT_UPLOAD
   bool is_updating_ = false;
   bool reparse_mode_ = false;
-
+  int content_length_ = 0;
+  int tft_size_ = 0;
+#ifdef USE_ESP_IDF
+  int upload_range_(const std::string &url, int range_start);
+#else // USE_ARDUINO
   uint8_t *transfer_buffer_ = nullptr;
   size_t transfer_buffer_size_;
   bool upload_first_chunk_sent_ = false;
-
-  /**
-   * will request chunk_size chunks from the web server
-   * and send each to the nextion
-   * @param int contentLength Total size of the file
-   * @param uint32_t chunk_size
-   * @return true if success, false for failure.
-   */
-  int content_length_ = 0;
-  int tft_size_ = 0;
   int upload_by_chunks_(HTTPClient *http, const std::string &url, int range_start);
-
-  void upload_end_();
+#endif
+  bool upload_end_(bool successful);
+#endif // USE_NSPANEL_TFT_UPLOAD
 };
-
 
 }  // namespace nspanel_lovelace
 }  // namespace esphome

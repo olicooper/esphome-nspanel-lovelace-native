@@ -500,7 +500,7 @@ void NSPanelLovelace::render_light_detail_update_(StatefulCardItem *entity) {
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  ESP_LOGCONFIG(TAG, "\tTotals: pages:%u,items:%u,card items:%u", 
+  ESP_LOGCONFIG(TAG, "\tState: page_count:%u,item_count:%u,card_item_count:%u", 
       this->pages_.size(), 
       this->page_items_.size(), 
       this->card_entities_.size());

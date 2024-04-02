@@ -48,7 +48,7 @@ void EntitiesCardEntityItem::state_generic_fn(StatefulCardItem *me) {
 }
 void EntitiesCardEntityItem::state_on_off_fn(StatefulCardItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
-  me_->value_ = (me_->state_ == "on" ? "1" : "0");
+  me_->value_ = (me_->state_ == generic_type::on ? "1" : "0");
   StatefulCardItem::state_on_off_fn(me);
 }
 void EntitiesCardEntityItem::state_button_fn(StatefulCardItem *me) {

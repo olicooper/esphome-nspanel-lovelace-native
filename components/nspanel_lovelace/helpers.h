@@ -11,6 +11,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <time.h>
+#include <vector>
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -92,7 +93,7 @@ inline uint16_t rgb_dec565(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 // note: h,s,v should all be between 0 and 1
-inline std::array<uint8_t, 3> hsv2rgb(double h, double s, double v) {
+inline std::vector<uint8_t> hsv2rgb(double h, double s, double v) {
   if (s <= 0.0) {
     auto val = static_cast<uint8_t>(round(v * 255));
     return {val,val,val};
@@ -126,7 +127,7 @@ inline std::array<uint8_t, 3> hsv2rgb(double h, double s, double v) {
 }
 
 // note: x,y should be between 0 and 1, wh (width/height) default is 160
-inline std::array<uint8_t, 3> xy_to_rgb(double x, double y, float wh) {
+inline std::vector<uint8_t> xy_to_rgb(double x, double y, float wh) {
   double r = wh / 2;
   x = round((x - r) / r * 100) / 100;
   y = round((r - y) / r * 100) / 100;
@@ -142,6 +143,64 @@ inline double scale_value(double val, std::array<double, 2> scale_from, std::arr
   return
       ((val - scale_from[0]) / (scale_from[1] - scale_from[0])) * 
       (scale_to[1] - scale_to[0]) + scale_to[0];
+}
+
+inline bool contains_value(const std::vector<std::string> &array, const char *value) {
+  for (auto& item : array) {
+    if (item == value) return true;
+  }
+  return false;
+}
+
+inline bool contains_value(const std::string &str, const char *value) {
+  return str.find(value, 0) != std::string::npos;
+}
+
+inline bool char_printable(const char value) {
+  return value >= 0x20 && value <= 0x7e;
+}
+
+inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array) {
+  size_t pos_start = 0, pos_end = 0;
+  std::string item;
+  while ((pos_end = str.find(delimiter, pos_start)) != std::string::npos) {
+    item = str.substr(pos_start, pos_end - pos_start);
+    pos_start = pos_end + 1;
+    if (!item.empty()) { array.push_back(item); }
+  }
+  if (!item.empty()) { array.push_back(str.substr(pos_start)); }
+}
+
+inline std::string to_string(const std::vector<std::string> &array, 
+    char delimiter = ',', const char prepend_char = '\0', 
+    const char append_char = '\0') {
+  std::string output;
+  if (!char_printable(delimiter)) return output;
+
+  if (char_printable(prepend_char)) {
+    output.append(1, prepend_char);
+  }
+  for (size_t i = 0; i < array.size(); i++) {
+    output.append(array.at(i));
+    if (i < array.size() - 1) {
+      output.append(1, delimiter);
+    }
+  }
+  if (char_printable(append_char)) {
+    output.append(1, append_char);
+  }
+  return output;
+}
+
+inline std::string to_string(const std::vector<uint8_t> &array, 
+    char delimiter = ',', const char prepend_char = '\0', 
+    const char append_char = '\0') {
+  std::vector<std::string> str_array;
+  str_array.reserve(array.size());
+  for (auto &&value : array) {
+    str_array.push_back(std::to_string(value));
+  }
+  return to_string(str_array, delimiter, prepend_char, append_char);
 }
 
 // see: https://stackoverflow.com/a/32821650/2634818

@@ -202,16 +202,17 @@ void StatefulCardItem::set_attribute(const char *attr, const std::string &value)
     return;
   }
   if (attr == ha_attr_type::brightness) {
-    attributes_[attr] = std::to_string(scale_value(std::stoi(value), {0, 255}, {0, 100}));
+    attributes_[attr] = std::to_string(static_cast<int>(round(
+        scale_value(std::stoi(value), {0, 255}, {0, 100}))));
   } else if (attr == ha_attr_type::color_temp) {
     auto minstr = this->get_attribute(ha_attr_type::min_mireds);
     auto maxstr = this->get_attribute(ha_attr_type::max_mireds);
     uint16_t min_mireds = minstr.empty() ? 153 : std::stoi(minstr);
     uint16_t max_mireds = maxstr.empty() ? 500 : std::stoi(maxstr);
-    attributes_[attr] = std::to_string(scale_value(
+    attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
         std::stoi(value),
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
-        {0, 100}));
+        {0, 100}))));
   } else {
     attributes_[attr] = value;
   }
@@ -266,9 +267,9 @@ void StatefulCardItem::state_on_off_fn(StatefulCardItem *me) {
     return;
   }
 
-  if (me->state_ == "on") {
+  if (me->state_ == generic_type::on) {
     me->icon_color_ = 64909u; // yellow
-  } else if (me->state_ == "off") {
+  } else if (me->state_ == generic_type::off) {
     me->icon_color_ = 17299u; // blue
   } else {
     me->icon_color_ = 38066u; // grey
@@ -277,7 +278,7 @@ void StatefulCardItem::state_on_off_fn(StatefulCardItem *me) {
 
 void StatefulCardItem::state_binary_sensor_fn(StatefulCardItem *me) {
   const char *icon = nullptr;
-  if (me->state_ == "on") {
+  if (me->state_ == generic_type::on) {
     if (!me->icon_color_overridden_)
       me->icon_color_ = 64909u; // yellow
     if (!me->icon_value_overridden_) {
@@ -286,7 +287,7 @@ void StatefulCardItem::state_binary_sensor_fn(StatefulCardItem *me) {
     }
   } else {
     if (!me->icon_color_overridden_) {
-      if (me->state_ == "off")
+      if (me->state_ == generic_type::off)
         me->icon_color_ = 17299u; // blue
       else
         me->icon_color_ = 38066u; // grey

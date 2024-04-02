@@ -137,9 +137,13 @@ protected:
   
   void call_ha_service_(const char* entity_type, const char* action, const std::string& entity_id);
   void call_ha_service_(const char* entity_type, const char* action, const std::map<std::string, std::string> &data);
+  void call_ha_service_(const char* entity_type, const char* action, 
+      const std::map<std::string, std::string> &data, const std::map<std::string, std::string> &data_template);
   void on_entity_state_update_(std::string entity_id, std::string state);
   void on_entity_attr_unit_of_measurement_update_(std::string entity_id, std::string unit_of_measurement);
   void on_entity_attr_device_class_update_(std::string entity_id, std::string device_class);
+  void on_entity_attr_supported_color_modes_update_(std::string entity_id, std::string supported_color_modes);
+  void on_entity_attr_color_mode_update_(std::string entity_id, std::string color_mode);
   void on_entity_attr_brightness_update_(std::string entity_id, std::string brightness);
   void on_entity_attr_color_temp_update_(std::string entity_id, std::string color_temp);
   void on_entity_attr_min_mireds_update_(std::string entity_id, std::string min_mireds);

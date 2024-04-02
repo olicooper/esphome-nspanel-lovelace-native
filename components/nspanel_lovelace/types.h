@@ -177,6 +177,14 @@ struct compare_char_str {
   }
 };
 
+struct generic_type {
+  static constexpr const char* enable = "enable";
+  static constexpr const char* disable = "disable";
+  static constexpr const char* unknown = "unknown";
+  static constexpr const char* on = "on";
+  static constexpr const char* off = "off";
+};
+
 typedef std::map<const char*, const char*, compare_char_str> char_map;
 typedef std::map<const char*, Icon, compare_char_str> char_icon_map;
 typedef std::map<const char*, std::array<const char *, 2>, compare_char_str> char_list_map;
@@ -410,13 +418,26 @@ struct ha_action_type {
 };
 
 struct ha_attr_type {
+  static constexpr const char* entity_id = "entity_id";
   static constexpr const char* state = "state";
   static constexpr const char* device_class = "device_class";
   static constexpr const char* unit_of_measurement = "unit_of_measurement";
   static constexpr const char* brightness = "brightness";
-  static constexpr const char* color_temp = "color_temp";
   static constexpr const char* min_mireds = "min_mireds";
   static constexpr const char* max_mireds = "max_mireds";
+  static constexpr const char* supported_color_modes = "supported_color_modes";
+  static constexpr const char* color_mode = "color_mode";
+  static constexpr const char* color_temp = "color_temp";
+  static constexpr const char* rgb_color = "rgb_color";
+};
+
+struct ha_attr_color_mode {
+  static constexpr const char* onoff = "onoff";
+  static constexpr const char* color_temp = ha_attr_type::color_temp;
+  static constexpr const char* xy = "xy";
+  static constexpr const char* hs = "hs";
+  static constexpr const char* rgb = "rgb";
+  static constexpr const char* rgbw = "rgbw";
 };
 
 enum datetime_mode {

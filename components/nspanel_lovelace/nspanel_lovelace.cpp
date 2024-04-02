@@ -174,15 +174,12 @@ void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t p
         if (card_item->is_type(entity_type::light)) {
           this->subscribe_homeassistant_state(
               &NSPanelLovelace::on_entity_state_update_, entity_id);
+          // need to subscribe to brightness to know if brightness is supported
           this->subscribe_homeassistant_state(
               &NSPanelLovelace::on_entity_attr_brightness_update_, entity_id, ha_attr_type::brightness);
-          // todo: only subscribe if light supports color_temp,min_mireds,max_mireds
+          // selectively subscribe to light attributes based on the supported color modes
           this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_color_temp_update_, entity_id, ha_attr_type::color_temp);
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_min_mireds_update_, entity_id, ha_attr_type::min_mireds);
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_max_mireds_update_, entity_id, ha_attr_type::max_mireds);
+                &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, entity_id, ha_attr_type::supported_color_modes);
         }
         if (card_item->is_type(entity_type::switch_) ||
             card_item->is_type(entity_type::input_boolean) ||
@@ -342,14 +339,7 @@ void NSPanelLovelace::process_command_(const std::string &message) {
 
   std::vector<std::string> tokens;
   tokens.reserve(5);
-  size_t pos_start = 0, pos_end = 0;
-  std::string token;
-  while ((pos_end = message.find(',', pos_start)) != std::string::npos) {
-    token = message.substr(pos_start, pos_end - pos_start);
-    pos_start = pos_end + 1;
-    if (!token.empty()) { tokens.push_back(token); }
-  }
-  if (!token.empty()) { tokens.push_back(message.substr(pos_start)); }
+  split_str(',', message, tokens);
   if (tokens.size() < 2 || tokens.at(0) != "event") { return; }
 
   // note: from luibackend/mqtt.py
@@ -472,6 +462,25 @@ void NSPanelLovelace::render_popup_page_update_(StatefulCardItem *entity) {
 void NSPanelLovelace::render_light_detail_update_(StatefulCardItem *entity) {
   if (entity == nullptr) return;
 
+  auto supported_modes = entity->get_attribute(ha_attr_type::supported_color_modes);
+  bool enable_color_wheel = entity->get_state() == generic_type::on &&
+      (contains_value(supported_modes, ha_attr_color_mode::xy) || 
+      contains_value(supported_modes, ha_attr_color_mode::hs) ||
+      contains_value(supported_modes, ha_attr_color_mode::rgb) ||
+      contains_value(supported_modes, ha_attr_color_mode::rgbw));
+
+  std::string color_mode = entity->get_attribute(ha_attr_type::color_mode);
+  std::string color_temp = generic_type::disable;
+  if (contains_value(supported_modes, ha_attr_color_mode::color_temp)) {
+    if (color_mode == ha_attr_color_mode::color_temp) {
+      color_temp = entity->get_attribute(ha_attr_type::color_temp, generic_type::disable);
+    } else {
+      color_temp = generic_type::unknown;
+    }
+  } else {
+    color_temp = generic_type::disable;
+  }
+
   this->command_buffer_
       // entityUpdateDetail~
       .assign("entityUpdateDetail").append(1, SEPARATOR)
@@ -480,13 +489,13 @@ void NSPanelLovelace::render_light_detail_update_(StatefulCardItem *entity) {
       // icon_color~
       .append(entity->get_icon_color_str()).append(1, SEPARATOR)
       // switch_val~
-      .append(std::to_string(entity->get_state() == "on" ? 1 : 0)).append(1, SEPARATOR)
+      .append(std::to_string(entity->get_state() == generic_type::on ? 1 : 0)).append(1, SEPARATOR)
       // brightness~ (0-100)
-      .append(entity->get_attribute(ha_attr_type::brightness, "disable")).append(1, SEPARATOR)
+      .append(entity->get_attribute(ha_attr_type::brightness, generic_type::disable)).append(1, SEPARATOR)
       // todo: color_temp~ (color temperature value or 'disable')
-      .append(entity->get_attribute(ha_attr_type::color_temp, "disable")).append(1, SEPARATOR)
+      .append(color_temp).append(1, SEPARATOR)
       // todo: color~ ('enable' or 'disable')
-      .append("enable").append(1, SEPARATOR)
+      .append(enable_color_wheel ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
       // color_translation~
       .append("Colour").append(1, SEPARATOR)
       // color_temp_translation~
@@ -494,7 +503,8 @@ void NSPanelLovelace::render_light_detail_update_(StatefulCardItem *entity) {
       // brightness_translation~
       .append("Brightness").append(1, SEPARATOR)
       // effect_supported ('enable' or 'disable')
-      .append("disable");
+      // todo: requires parsing 'enabled_features' attribute
+      .append(generic_type::disable);
 }
 
 void NSPanelLovelace::dump_config() {
@@ -898,9 +908,10 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {"entity_id", entity_id},
+        // todo: wont compile without explicit string conversion!?
+        {std::string(ha_attr_type::entity_id), entity_id},
         // scale 0-100 to ha brightness range
-        {"brightness", std::to_string(
+        {ha_attr_type::brightness, std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100}, {0, 255})
           )).c_str()}
@@ -923,16 +934,37 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {"entity_id", entity_id},
+        {ha_attr_type::entity_id, entity_id},
         // scale 0-100 from slider to color range of the light
-        {"color_temp", std::to_string(
+        {ha_attr_type::color_temp, std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100},
             {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
           )).c_str()}
       }});
   } else if (button_type == button_type::colorWheel) {
-    // todo
+    if (value.empty()) return;
+
+    std::vector<std::string> xy_tokens;
+    split_str('|', value, xy_tokens);
+    if (xy_tokens.size() != 3) return;
+
+    std::string rgb_str = to_string(
+        xy_to_rgb(
+          std::stod(xy_tokens[0]),
+          std::stod(xy_tokens[1]),
+          std::stod(xy_tokens[2])
+        ), ',', '[', ']');
+
+    this->call_ha_service_(
+      entity_type, 
+      ha_action_type::turn_on, 
+      {{
+        {ha_attr_type::entity_id, entity_id}
+      }},
+      {{
+        {ha_attr_type::rgb_color, rgb_str.c_str()}
+      }});
   }
 }
 
@@ -964,19 +996,43 @@ StatefulCardItem* NSPanelLovelace::get_entity_by_id_(const std::string &entity_i
 
 void NSPanelLovelace::call_ha_service_(
     const char *entity_type, const char *action, const std::string &entity_id) {
-  this->call_ha_service_(entity_type, action, {{"entity_id", entity_id}});
+  this->call_ha_service_(entity_type, action, {{ha_attr_type::entity_id, entity_id}});
 }
 
 void NSPanelLovelace::call_ha_service_(
     const char *entity_type, const char *action,
     const std::map<std::string, std::string> &data) {
-  auto service = std::string(entity_type).append(1, '.').append(action);
-  auto it = data.find("entity_id");
+  // this->call_homeassistant_service(service, data);
+  this->call_ha_service_(entity_type, action, data, {});
+}
+
+void NSPanelLovelace::call_ha_service_(
+    const char *entity_type, const char *action,
+    const std::map<std::string, std::string> &data,
+    const std::map<std::string, std::string> &data_template) {
+  api::HomeassistantServiceResponse resp;
+  resp.service.append(entity_type).append(1, '.').append(action);
+
+  auto it = data.find(ha_attr_type::entity_id);
   if (it == data.end())
-    ESP_LOGD(TAG, "Call HA: %s -> %s", service.c_str(), it->second.c_str());
+    ESP_LOGD(TAG, "Call HA: %s -> %s", resp.service.c_str(), it->second.c_str());
   else
-    ESP_LOGD(TAG, "Call HA: %s", service.c_str());
-  this->call_homeassistant_service(service, data);
+    ESP_LOGD(TAG, "Call HA: %s", resp.service.c_str());
+
+  for (auto &it : data) {
+    api::HomeassistantServiceMap kv;
+    kv.key = it.first;
+    kv.value = it.second;
+    resp.data.push_back(kv);
+  }
+  for (auto &it : data_template) {
+    api::HomeassistantServiceMap kv;
+    kv.key = it.first;
+    kv.value = it.second;
+    resp.data_template.push_back(kv);
+  }
+
+  api::global_api_server->send_homeassistant_service_call(resp);
 }
 
 void NSPanelLovelace::on_entity_state_update_(std::string entity_id, std::string state) {
@@ -987,6 +1043,30 @@ void NSPanelLovelace::on_entity_attr_unit_of_measurement_update_(std::string ent
 }
 void NSPanelLovelace::on_entity_attr_device_class_update_(std::string entity_id, std::string device_class) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::device_class, device_class);
+}
+void NSPanelLovelace::on_entity_attr_supported_color_modes_update_(std::string entity_id, std::string supported_color_modes) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::supported_color_modes, supported_color_modes);
+
+  if (supported_color_modes.empty()) return;
+  if (supported_color_modes.length() == 1 && 
+      contains_value(supported_color_modes, ha_attr_color_mode::onoff)) {
+    return;
+  }
+
+  this->subscribe_homeassistant_state(
+      &NSPanelLovelace::on_entity_attr_color_mode_update_, entity_id, ha_attr_type::color_mode);
+
+  if (contains_value(supported_color_modes, ha_attr_color_mode::color_temp)) {
+    this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_min_mireds_update_, entity_id, ha_attr_type::min_mireds);
+    this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_max_mireds_update_, entity_id, ha_attr_type::max_mireds);
+    this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_color_temp_update_, entity_id, ha_attr_type::color_temp);
+  }
+}
+void NSPanelLovelace::on_entity_attr_color_mode_update_(std::string entity_id, std::string color_mode) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::color_mode, color_mode);
 }
 void NSPanelLovelace::on_entity_attr_brightness_update_(std::string entity_id, std::string brightness) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::brightness, brightness);

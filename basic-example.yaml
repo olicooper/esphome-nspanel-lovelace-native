@@ -2,6 +2,9 @@
 # This includes some commented out configuration items showing what other functionality is available
 # Available icons can be found in 'components\nspanel_lovelace\icons.json'. Icon colors range from 0 to 65535.
 
+# NOTE: This project is in the beta stage so the configuration is subject to change without notice.
+#       Please check your own configuration againist the latest example when updating.
+
 esphome:
   name: nspanel
   name_add_mac_suffix: true
@@ -14,6 +17,8 @@ esp32:
     type: esp-idf
     sdkconfig_options:
       # These are required to allow access to the PSRAM
+      # NOTE: This is temporary and will be removed in a 
+      #       future release when the build script is improved
       CONFIG_D0WD_PSRAM_CLK_IO: '5'
       CONFIG_D0WD_PSRAM_CS_IO: '18'
 

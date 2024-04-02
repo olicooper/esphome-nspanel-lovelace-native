@@ -1,4 +1,4 @@
-# ESPHome Native Component for NSPanel
+# ESPHome Native Component for NSPanel (beta)
 
 This project is designed to utilise the UI provided by [NSPanel Lovelace UI](https://github.com/joBr99/nspanel-lovelace-ui), but use a native [ESPHome](https://github.com/esphome/esphome) component for the backend. My core goals for the project were to:
 - Reduce bandwidth consumption - by utilising the efficient TCP communication implemented by ESPHome.
@@ -21,9 +21,17 @@ A basic configuration can be [found here](basic-example.yaml) which shows the fe
 # Help Needed!
 
 As much as I love embedded programming, I am unable to dedicate the time required to make this project great without the help of others.
-This is a beta project which is not fully functional yet. It has taken a lot of time and effort to get the project to this point and it will take a lot more time to get the project past beta.
+This is a **beta project** which is not fully functional yet and is subject to change without notice. It has taken a lot of time and effort to get the project to this point and it will take a lot more time to get the project past beta.
 
 There are many UI components missing and the [python build script](components/nspanel_lovelace/__init__.py) is in dire need of refactoring (I butchered it together to get it working but PRs to the ESPHome repo are required to provide more flexibility over code generation).
+
+Currently the following features work:
+- Screensaver with time, date and weather display
+- Support for `cardGrid`, `cardEntities`, `cardQR`
+- Most entity types should display on cards. Lights, switches and scenes have been tested to work, with additional support for the `popupLight` page.
+
+There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardAlarm`, `cardPower` etc. but these are planned for the future.
+Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.
 
 PRs to expand the functionality or fix bugs are very welcome!
 

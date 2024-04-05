@@ -1,5 +1,7 @@
 #pragma once
 
+#include "defines.h"
+
 #include <memory>
 #include <queue>
 #include <stdint.h>
@@ -37,10 +39,10 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-struct NSPanelRestoreState {
+PACK(struct NSPanelRestoreState {
   uint8_t display_active_dim_ = 100;
   uint8_t display_inactive_dim_ = 50;
-} __attribute__((packed));
+});
 
 class NSPanelLovelace : public Component, public uart::UARTDevice, protected api::CustomAPIDevice {
 public:

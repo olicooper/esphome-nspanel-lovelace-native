@@ -13,14 +13,14 @@ namespace nspanel_lovelace {
  * =============== PageItem ===============
  */
 
-const uint32_t PageItem::this_class_type_ = 1<<0;
-
 PageItem::PageItem(const std::string &uuid) :
     uuid_(uuid) {}
 
 // Copy constructor overridden so the uuid and render_buffer is cleared
 PageItem::PageItem(const PageItem &other) :
     uuid_(""), render_buffer_(""), render_invalid_(true) {}
+
+void PageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 const std::string &PageItem::render() {
   // only re-render if values have changed

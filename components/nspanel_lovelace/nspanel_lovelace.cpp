@@ -19,9 +19,11 @@
 #include "esphome/components/json/json_util.h"
 
 #include "config.h"
-#include "pages.h"
 #include "cards.h"
 #include "card_items.h"
+#include "pages.h"
+#include "page_item_visitor.h"
+#include "page_visitor.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -156,10 +158,10 @@ void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t p
   for (auto &item : page->get_items()) {
     auto &item_uuid = item->get_uuid();
     // ensure no duplicates are added
-    if (StatefulCardItem::is_instance_of(item.get())) {
+    if (page_item_cast<StatefulCardItem>(item.get())) {
       found = false;
-      for (auto &card_item : this->card_entities_) {
-        if (card_item->get_uuid() == item_uuid) {
+      for (auto &item : this->card_entities_) {
+        if (item->get_uuid() == item_uuid) {
           found = true;
           break;
         }
@@ -436,11 +438,12 @@ void NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
     // Only search for entities in the current page to reduce processing time
     for (auto &item : this->current_page_->get_items()) {
       if (item->get_uuid() != uuid) continue;
-      if (!StatefulCardItem::is_instance_of(item.get())) {
+      if (auto card_item = page_item_cast<StatefulCardItem>(item.get())) {
+        this->cached_entity_ = card_item;
+        break;
+      } else {
         return;
       }
-      this->cached_entity_ = static_cast<StatefulCardItem*>(item.get());
-      break;
     }
   }
   
@@ -1091,9 +1094,11 @@ void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, 
   } else if (attr == ha_attr_type::unit_of_measurement) {
     // todo: move this to a generic attribute?
     // note: only entitiesCard can display the unit_of_measurement
-    if (!EntitiesCardEntityItem::is_instance_of(entity)) return;
-    static_cast<EntitiesCardEntityItem*>(entity)
-      ->set_value_postfix(attr_value);
+    if (auto item = page_item_cast<EntitiesCardEntityItem>(entity)) {
+      item->set_value_postfix(attr_value);
+    } else {
+      return;
+    }
   } else {
     entity->set_attribute(attr, attr_value);
   }

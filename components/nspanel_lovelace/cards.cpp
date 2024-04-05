@@ -10,8 +10,22 @@ namespace esphome {
 namespace nspanel_lovelace {
 
 /*
+ * =============== GridCard ===============
+ */
+
+void GridCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
+/*
+ * =============== EntitiesCard ===============
+ */
+
+void EntitiesCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
+/*
  * =============== QRCard ===============
  */
+
+void QRCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
 std::string &QRCard::render(std::string &buffer) {
   buffer.assign(this->get_render_instruction())

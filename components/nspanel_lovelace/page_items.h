@@ -2,8 +2,9 @@
 
 #include "config.h"
 #include "helpers.h"
-#include "types.h"
 #include "page_item_base.h"
+#include "page_item_visitor.h"
+#include "types.h"
 #include <array>
 #include <functional>
 #include <string>
@@ -34,19 +35,11 @@ public:
       const std::string &icon_default_value, const uint16_t icon_default_color);
   virtual ~NavigationItem() {}
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & NavigationItem::this_class_type_) == NavigationItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
 protected:
-  static uint32_t static_class_type_() { return NavigationItem::this_class_type_; }
-
   // output: ~internalName~icon~iconColor~~
   std::string &render_(std::string &buffer) override;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 /*
@@ -72,19 +65,11 @@ public:
       const std::string &icon_default_value, const uint16_t icon_default_color);
   // virtual ~IconItem() {}
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & IconItem::this_class_type_) == IconItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
 protected:
-  static uint32_t static_class_type_() { return IconItem::this_class_type_; }
-
   // output: ~~icon~iconColor~displayName~optionalValue
   std::string &render_(std::string &buffer) override;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 /*
@@ -103,10 +88,7 @@ public:
       const std::string &value, const char *weather_condition);
   // virtual ~WeatherItem() {}
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & WeatherItem::this_class_type_) == WeatherItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
   void set_icon_by_weather_condition(const std::string &condition);
   bool set_value(const std::string &value) override;
@@ -128,14 +110,10 @@ public:
   static std::string temperature_unit;
 
 protected:
-  static uint32_t static_class_type_() { return WeatherItem::this_class_type_; }
   float float_value_;
 
   // output: ~~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 } // namespace nspanel_lovelace

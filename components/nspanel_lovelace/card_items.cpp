@@ -14,17 +14,11 @@ namespace nspanel_lovelace {
  * =============== GridCardEntityItem ===============
  */
 
-const uint32_t GridCardEntityItem::this_class_type_ = 
-    // PageItem | CardItem | StatefulCardItem | GridCardEntityItem
-    (1<<0) | (1<<1) | (1<<2) | (1<<6);
+void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 /*
  * =============== EntitiesCardEntityItem ===============
  */
-
-const uint32_t EntitiesCardEntityItem::this_class_type_ =
-    // PageItem | CardItem | StatefulCardItem | EntitiesCardEntityItem
-    (1<<0) | (1<<1) | (1<<2) | (1<<7);
 
 EntitiesCardEntityItem::EntitiesCardEntityItem(
     const std::string &uuid, const std::string &entity_id) :
@@ -41,6 +35,8 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
   this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
+
+void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulCardItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);

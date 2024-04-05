@@ -1,8 +1,8 @@
 #include "card_base.h"
 
+#include "config.h"
 #include "page_base.h"
 #include "page_item_base.h"
-#include "config.h"
 #include <cstring>
 #include <stdint.h>
 #include <string>
@@ -27,16 +27,17 @@ Card::Card(
 
 Card::~Card() {
   for (auto& item : this->items_) {
-    if (CardItem::is_instance_of(item.get())) {
-      static_cast<CardItem*>(item.get())->remove_card(this);
+    if (auto card_item = page_item_cast<CardItem>(item.get())) {
+      card_item->remove_card(this);
     }
   }
 }
 
+void Card::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
 void Card::on_item_added_(PageItem *item) {
-  // cannot use dynamic_cast (not available) error: 'dynamic_cast' not permitted with -fno-rtti
-  if (CardItem::is_instance_of(item)) {
-    static_cast<CardItem*>(item)->add_card(this);
+  if (auto card_item = page_item_cast<CardItem>(item)) {
+    card_item->add_card(this);
   }
 }
 
@@ -66,9 +67,7 @@ std::string &Card::render(std::string &buffer) {
  * =============== CardItem ===============
  */
 
-const uint32_t CardItem::this_class_type_ = 
-    // PageItem | CardItem
-    (1<<0) | (1<<1);
+void CardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 bool CardItem::has_card(Page *card) const {
   return this->find_card(card) != nullptr;
@@ -97,10 +96,6 @@ void CardItem::remove_card(Card *card) {
  * =============== StatefulCardItem ===============
  */
 
-const uint32_t StatefulCardItem::this_class_type_ = 
-    // PageItem | CardItem | StatefulCardItem
-    (1<<0) | (1<<1) | (1<<2);
-
 StatefulCardItem::StatefulCardItem(
     const std::string &uuid) :
     CardItem(uuid), PageItem_Type(this), PageItem_EntityId(this), PageItem_Icon(this),
@@ -110,6 +105,8 @@ StatefulCardItem::StatefulCardItem(
     const std::string &uuid, const std::string &display_name) :
     CardItem(uuid), PageItem_Type(this), PageItem_EntityId(this), PageItem_Icon(this),
     PageItem_DisplayName(this, display_name), PageItem_State(this, "unknown") {}
+
+void StatefulCardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void StatefulCardItem::set_entity_id(const std::string &entity_id) {
   PageItem_EntityId::set_entity_id(entity_id);

@@ -10,6 +10,8 @@ namespace nspanel_lovelace {
  * =============== Screensaver ===============
  */
 
+void Screensaver::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
 // output: weatherUpd~5x[type~internalName~icon~iconColor~displayName~value]
 std::string &Screensaver::render(std::string &buffer) {
   buffer.assign(this->get_render_instruction());

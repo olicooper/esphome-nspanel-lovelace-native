@@ -15,10 +15,6 @@ namespace nspanel_lovelace {
  * =============== NavigationItem ===============
  */
 
-const uint32_t NavigationItem::this_class_type_ =
-    // PageItem | NavigationItem
-    (1<<0) | (1<<3);
-
 NavigationItem::NavigationItem(
     const std::string &uuid, const std::string &navigation_uuid) : 
     PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
@@ -42,6 +38,8 @@ NavigationItem::NavigationItem(
     PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
     PageItem_Icon(this, icon_default_value, icon_default_color) {}
 
+void NavigationItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
 std::string &NavigationItem::render_(std::string &buffer) {
   // note: should be able to skip type field but it doesn't render if I do
   // type~
@@ -58,10 +56,6 @@ std::string &NavigationItem::render_(std::string &buffer) {
 /*
  * =============== IconItem ===============
  */
-
-const uint32_t IconItem::this_class_type_ =
-    // PageItem | IconItem
-    (1<<0) | (1<<4);
 
 IconItem::IconItem(const std::string &uuid, const std::string &entity_id) : 
     PageItem(uuid), PageItem_EntityId(this, entity_id),
@@ -85,6 +79,8 @@ IconItem::IconItem(
     PageItem_Icon(this, icon_default_value, icon_default_color),
     PageItem_DisplayName(this), PageItem_Value(this) {}
 
+void IconItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
 std::string &IconItem::render_(std::string &buffer) {
   // skip: type~internalName~
   buffer.assign(2, SEPARATOR);
@@ -100,10 +96,6 @@ std::string &IconItem::render_(std::string &buffer) {
  * =============== WeatherItem ===============
  */
 
-const uint32_t WeatherItem::this_class_type_ =
-    // PageItem | WeatherItem
-    (1<<0) | (1<<5);
-
 WeatherItem::WeatherItem(const std::string &uuid) :
     PageItem(uuid), PageItem_Icon(this, 63878u), // change the default icon color: #ff3131 (red)
     PageItem_DisplayName(this), PageItem_Value(this, "0.0"), 
@@ -118,6 +110,8 @@ WeatherItem::WeatherItem(
     PageItem_Value(this, value) {
   this->set_icon_by_weather_condition(weather_condition);
 }
+
+void WeatherItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 // valid conditions are found in weather_type
 void WeatherItem::set_icon_by_weather_condition(const std::string &condition) {

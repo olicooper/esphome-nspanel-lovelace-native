@@ -1,8 +1,9 @@
 #pragma once
 
 #include "config.h"
-#include "types.h"
 #include "helpers.h"
+#include "page_item_visitor.h"
+#include "types.h"
 #include <array>
 #include <map>
 #include <functional>
@@ -50,10 +51,7 @@ public:
   PageItem(const PageItem &other);
   virtual ~PageItem() {}
 
-  virtual uint32_t class_type() const { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & PageItem::this_class_type_) == PageItem::this_class_type_;
-  }
+  virtual void accept(PageItemVisitor& visitor);
   
   const std::string &get_uuid() const { return this->uuid_; }
   virtual void set_uuid(const std::string &uuid) { this->uuid_ = uuid; }
@@ -63,9 +61,6 @@ public:
   virtual const std::string &render();
 
 protected:
-  // dynamic_cast is not available, so this is used to determine the type instead
-  static uint32_t static_class_type_() { return PageItem::this_class_type_; }
-
   virtual uint16_t get_render_buffer_reserve_() const { return 15; }
   
   // output: internalName (uuid)
@@ -74,9 +69,6 @@ protected:
   std::string uuid_;
   std::string render_buffer_;
   bool render_invalid_ = true;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 /*

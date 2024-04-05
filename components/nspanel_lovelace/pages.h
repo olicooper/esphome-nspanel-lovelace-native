@@ -3,6 +3,7 @@
 #include "config.h"
 #include "page_base.h"
 #include "page_items.h"
+#include "page_visitor.h"
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -17,6 +18,8 @@ namespace nspanel_lovelace {
 class Screensaver : public Page {
 public:
   Screensaver(const std::string &uuid) : Page(page_type::screensaver, uuid) {}
+
+  void accept(PageVisitor& visitor) override;
 
   std::unique_ptr<IconItem> left_icon;
   std::unique_ptr<IconItem> right_icon;

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "types.h"
 #include "card_base.h"
+#include "page_visitor.h"
+#include "types.h"
 #include <stdint.h>
 #include <string>
 
@@ -22,6 +23,8 @@ public:
       const std::string &uuid, const std::string &title, 
       const uint16_t sleep_timeout) :
       Card(page_type::cardGrid, uuid, title, sleep_timeout) {}
+
+  void accept(PageVisitor& visitor) override;
 };
 
 /*
@@ -36,6 +39,8 @@ public:
       Card(page_type::cardEntities, uuid, title) {}
   EntitiesCard(const std::string &uuid, const std::string &title, const uint16_t sleep_timeout) :
       Card(page_type::cardEntities, uuid, title, sleep_timeout) {}
+
+  void accept(PageVisitor& visitor) override;
 };
 
 /*
@@ -52,6 +57,8 @@ public:
       const std::string &uuid, const std::string &title, 
       const uint16_t sleep_timeout) :
       Card(page_type::cardQR, uuid, title, sleep_timeout) {}
+
+  void accept(PageVisitor& visitor) override;
 
   const std::string &get_qr_text() const { return this->qr_text_; }
   void set_qr_text(const std::string &qr_text) { this->qr_text_ = qr_text; }

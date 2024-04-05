@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "page_item_base.h"
+#include "page_visitor.h"
 #include <algorithm>
 #include <memory>
 #include <stdint.h>
@@ -25,6 +26,8 @@ public:
       const uint16_t sleep_timeout);
   Page(const Page &other);
   virtual ~Page() {}
+
+  virtual void accept(PageVisitor& visitor);
 
   const std::string &get_uuid() const { return this->uuid_; }
   const std::string &get_title() const { return this->title_; }
@@ -55,10 +58,7 @@ public:
         "TPageItem must derive from esphome::nspanel_lovelace::PageItem");
     if ((items_.size() - 1) < index) 
       return nullptr;
-    auto item = items_.at(index).get();
-    if (!TPageItem::is_instance_of(item)) 
-      return nullptr;
-    return static_cast<TPageItem*>(item);
+    return page_item_cast<TPageItem>(items_.at(index).get());
   }
 
   virtual const char *get_render_instruction() const = 0;

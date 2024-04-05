@@ -4,6 +4,8 @@
 #include "page_base.h"
 #include "page_item_base.h"
 #include "page_items.h"
+#include "page_item_visitor.h"
+#include "page_visitor.h"
 #include <functional>
 #include <memory>
 #include <stdint.h>
@@ -25,6 +27,8 @@ public:
   Card(const char *type, const std::string &uuid, const std::string &title);
   Card(const char *type, const std::string &uuid, const std::string &title, const uint16_t sleep_timeout);
   virtual ~Card();
+
+  void accept(PageVisitor& visitor) override;
 
   std::unique_ptr<NavigationItem> nav_left;
   std::unique_ptr<NavigationItem> nav_right;
@@ -54,10 +58,7 @@ public:
   CardItem(const std::string &uuid) : PageItem(uuid) {}
   virtual ~CardItem() {}
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & CardItem::this_class_type_) == CardItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
   bool has_card(Page *card) const;
   const Card *find_card(Page *card) const;
@@ -72,12 +73,7 @@ public:
   virtual void remove_card(Card *card);
 
 protected:
-  static uint32_t static_class_type_() { return CardItem::this_class_type_; }
-
   std::vector<Card *> cards_;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 /*
@@ -96,10 +92,7 @@ public:
   StatefulCardItem(const std::string &uuid, const std::string &display_name);
   virtual ~StatefulCardItem() {}
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & StatefulCardItem::this_class_type_) == StatefulCardItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
   void set_entity_id(const std::string &entity_id) override;
   bool set_type(const char *type) override;
@@ -108,8 +101,6 @@ public:
   void set_device_class(const std::string &device_class);
 
 protected:
-  static uint32_t static_class_type_() { return StatefulCardItem::this_class_type_; }
-
   static void state_on_off_fn(StatefulCardItem *me);
   static void state_binary_sensor_fn(StatefulCardItem *me);
   static void state_cover_fn(StatefulCardItem *me);
@@ -124,9 +115,6 @@ protected:
   // A function which modifies the entity when the state changes
   std::function<void(StatefulCardItem *)> on_state_callback_;
   std::string device_class_;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 } // namespace nspanel_lovelace

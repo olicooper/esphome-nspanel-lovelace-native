@@ -1,6 +1,7 @@
 #pragma once
 
 #include "card_base.h"
+#include "page_item_visitor.h"
 #include <stdint.h>
 #include <string>
 
@@ -26,17 +27,8 @@ public:
     this->set_entity_id(entity_id);
     this->render_buffer_.reserve(this->get_render_buffer_reserve_());
   }
-  
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & GridCardEntityItem::this_class_type_) == GridCardEntityItem::this_class_type_;
-  }
 
-protected:
-  static uint32_t static_class_type_() { return GridCardEntityItem::this_class_type_; }
-
-private:
-  static const uint32_t this_class_type_;
+  void accept(PageItemVisitor& visitor) override;
 };
 
 /*
@@ -52,18 +44,13 @@ public:
       const std::string &uuid, const std::string &entity_id,
       const std::string &display_name);
 
-  uint32_t class_type() const override { return this->this_class_type_; }
-  static bool is_instance_of(PageItem *item) {
-    return (item->class_type() & EntitiesCardEntityItem::this_class_type_) == EntitiesCardEntityItem::this_class_type_;
-  }
+  void accept(PageItemVisitor& visitor) override;
 
   const std::string &get_value() const { return this->value_; }
   bool set_type(const char *type) override;
   void set_state(const std::string &state) override;
 
 protected:
-  static uint32_t static_class_type_() { return EntitiesCardEntityItem::this_class_type_; }
-
   static void state_generic_fn(StatefulCardItem *me);
   static void state_on_off_fn(StatefulCardItem *me);
   static void state_button_fn(StatefulCardItem *me);
@@ -73,9 +60,6 @@ protected:
   // output: type~internalName~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
-
-private:
-  static const uint32_t this_class_type_;
 };
 
 } // namespace nspanel_lovelace

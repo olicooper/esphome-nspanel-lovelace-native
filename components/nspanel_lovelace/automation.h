@@ -1,8 +1,12 @@
 #pragma once
 
 #include <utility>
+#ifdef TEST_ENV
+#include "mock_esphome_core.h"
+#else
 #include "esphome/core/component.h"
 #include "esphome/core/automation.h"
+#endif
 
 #include "nspanel_lovelace.h"
 

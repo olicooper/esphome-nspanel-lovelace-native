@@ -8,16 +8,22 @@
 #include <utility>
 #include <vector>
 
+#ifdef TEST_ENV
+#include "logging.h"
+#include "mock_esphome_core.h"
+#include "mock_idf.h"
+#else
 #include "esphome/core/defines.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/api/custom_api_device.h"
+#endif
 
 #ifdef USE_ESP_IDF
 #include "esphome/components/uart/uart_component_esp_idf.h"
-#else
+#elif defined(USE_ARDUINO)
 #ifdef USE_NSPANEL_TFT_UPLOAD
 #include <HTTPClient.h>
 #endif

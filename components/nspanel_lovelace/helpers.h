@@ -5,7 +5,11 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#ifdef TEST_ENV
+#include "mock_idf.h"
+#else
 #include <esp_heap_caps.h>
+#endif
 #include <map>
 #include <math.h>
 #include <stdint.h>

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <cstring>
+#include <stdint.h>
 #include <string>
 #include <utility>
-#include <stdint.h>
-#include "esphome/core/hal.h"
+
 #include "config.h"
 #include "helpers.h"
 

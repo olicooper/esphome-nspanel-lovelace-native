@@ -53,12 +53,19 @@ public:
 
 // If a page item belongs to the 'card' page type and can exist outside of a
 // specific card, then it should derive from CardItem and not PageItem.
-class CardItem : public PageItem {
+class CardItem : 
+    public StatefulPageItem,
+    public PageItem_DisplayName {
 public:
-  CardItem(const std::string &uuid) : PageItem(uuid) {}
+  CardItem(const std::string &uuid) :
+    StatefulPageItem(uuid), PageItem_DisplayName(this) {}
+  CardItem(const std::string &uuid, const std::string &display_name) :
+    StatefulPageItem(uuid), PageItem_DisplayName(this, display_name) {}
   virtual ~CardItem() {}
 
   void accept(PageItemVisitor& visitor) override;
+
+  void set_entity_id(const std::string &entity_id) override;
 
   bool has_card(Page *card) const;
   const Card *find_card(Page *card) const;
@@ -74,47 +81,10 @@ public:
 
 protected:
   std::vector<Card *> cards_;
-};
-
-/*
- * =============== StatefulCardItem ===============
- */
-
-class StatefulCardItem :
-    public CardItem,
-    public PageItem_Type,
-    public PageItem_EntityId,
-    public PageItem_Icon,
-    public PageItem_DisplayName,
-    public PageItem_State {
-public:
-  StatefulCardItem(const std::string &uuid);
-  StatefulCardItem(const std::string &uuid, const std::string &display_name);
-  virtual ~StatefulCardItem() {}
-
-  void accept(PageItemVisitor& visitor) override;
-
-  void set_entity_id(const std::string &entity_id) override;
-  bool set_type(const char *type) override;
-  void set_state(const std::string &state) override;
-  void set_attribute(const char *attr, const std::string &value) override;
-  void set_device_class(const std::string &device_class);
-
-protected:
-  static void state_on_off_fn(StatefulCardItem *me);
-  static void state_binary_sensor_fn(StatefulCardItem *me);
-  static void state_cover_fn(StatefulCardItem *me);
-  // static void state_button_fn(StatefulCardItem *me);
-  // static void state_scene_fn(StatefulCardItem *me);
-  // static void state_script_fn(StatefulCardItem *me);
 
   // output: type~internalName~icon~iconColor~displayName~
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
-
-  // A function which modifies the entity when the state changes
-  std::function<void(StatefulCardItem *)> on_state_callback_;
-  std::string device_class_;
 };
 
 } // namespace nspanel_lovelace

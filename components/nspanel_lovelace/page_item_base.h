@@ -241,5 +241,44 @@ protected:
   std::string &render_(std::string &buffer) override;
 };
 
+/*
+ * =============== StatefulPageItem ===============
+ */
+
+class StatefulPageItem :
+    public PageItem,
+    public PageItem_Type,
+    public PageItem_EntityId,
+    public PageItem_Icon,
+    public PageItem_State {
+public:
+  StatefulPageItem(const std::string &uuid);
+  virtual ~StatefulPageItem() {}
+
+  void accept(PageItemVisitor& visitor) override;
+
+  void set_entity_id(const std::string &entity_id) override;
+  bool set_type(const char *type) override;
+  void set_state(const std::string &state) override;
+  void set_attribute(const char *attr, const std::string &value) override;
+  void set_device_class(const std::string &device_class);
+
+protected:
+  static void state_on_off_fn(StatefulPageItem *me);
+  static void state_binary_sensor_fn(StatefulPageItem *me);
+  static void state_cover_fn(StatefulPageItem *me);
+  // static void state_button_fn(StatefulPageItem *me);
+  // static void state_scene_fn(StatefulPageItem *me);
+  // static void state_script_fn(StatefulPageItem *me);
+
+  // output: type~internalName~icon~iconColor~
+  std::string &render_(std::string &buffer) override;
+  uint16_t get_render_buffer_reserve_() const override;
+
+  // A function which modifies the entity when the state changes
+  std::function<void(StatefulPageItem *)> on_state_callback_;
+  std::string device_class_;
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

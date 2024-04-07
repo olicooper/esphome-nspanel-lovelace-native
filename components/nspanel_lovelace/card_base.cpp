@@ -92,236 +92,30 @@ void CardItem::remove_card(Card *card) {
     cards_.end());
 }
 
-/*
- * =============== StatefulCardItem ===============
- */
+void CardItem::set_entity_id(const std::string &entity_id) {
+  StatefulPageItem::set_entity_id(entity_id);
 
-StatefulCardItem::StatefulCardItem(
-    const std::string &uuid) :
-    CardItem(uuid), PageItem_Type(this), PageItem_EntityId(this), PageItem_Icon(this),
-    PageItem_DisplayName(this), PageItem_State(this, "unknown") {}
+  if (this->entity_id_.empty() || !this->display_name_.empty()) return;
 
-StatefulCardItem::StatefulCardItem(
-    const std::string &uuid, const std::string &display_name) :
-    CardItem(uuid), PageItem_Type(this), PageItem_EntityId(this), PageItem_Icon(this),
-    PageItem_DisplayName(this, display_name), PageItem_State(this, "unknown") {}
-
-void StatefulCardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
-
-void StatefulCardItem::set_entity_id(const std::string &entity_id) {
-  PageItem_EntityId::set_entity_id(entity_id);
-
-  if (!this->entity_id_.empty() && 
-      this->set_type(get_entity_type(this->entity_id_))) {
-
-    if (this->display_name_.empty())
-      // todo: should be blank instead?
-      this->set_display_name(this->entity_id_);
-
-    // extract the text from iText entities
-    if (this->is_type(entity_type::itext)) {
-      auto pos = this->entity_id_.rfind('.', strlen(entity_type::itext) + 1);
-      if (pos != std::string::npos && pos < this->entity_id_.length()) {
-        this->set_state(this->entity_id_.substr(pos + 1));
-      }
-    }
-  }
+  // todo: should be blank instead?
+  this->set_display_name(this->entity_id_);
 }
 
-bool StatefulCardItem::set_type(const char *type) {
-  if (type == nullptr || type[0] == '\0') {
-    return false;
-  }
-  this->type_ = type;
-
-  if (type == entity_type::delete_) {
-    this->render_type_ = nullptr;
-    return true;
-  }
-
-  auto it = ENTITY_RENDER_TYPE_MAP.find(this->type_);
-  if (it != ENTITY_RENDER_TYPE_MAP.end()) {
-    this->render_type_ = it->second;
-  } else {
-    this->render_type_ = entity_render_type::text;
-  }
-
-  if (this->type_ != entity_type::sensor) {
-    auto icon_value = get_icon_by_name(ENTITY_ICON_MAP, this->type_);
-    if (icon_value != nullptr) {
-      this->icon_value_ = this->icon_default_value_ = icon_value;
-    }
-  }
-  this->icon_value_overridden_ = false;
-
-  if (this->type_ == entity_type::light ||
-      this->type_ == entity_type::switch_ ||
-      this->type_ == entity_type::input_boolean ||
-      this->type_ == entity_type::automation ||
-      this->type_ == entity_type::fan) {
-    this->on_state_callback_ = StatefulCardItem::state_on_off_fn;
-  } else if (this->type_ == entity_type::binary_sensor) {
-    this->on_state_callback_ = StatefulCardItem::state_binary_sensor_fn;
-  } else if (this->type_ == entity_type::cover) {
-    this->on_state_callback_ = StatefulCardItem::state_cover_fn;
-  } /* else if (
-      this->type_ == entity_type::button ||
-      this->type_ == entity_type::input_button) {
-    this->on_state_callback_ = StatefulCardItem::state_button_fn;
-  } else if (this->type_ == entity_type::scene) {
-    this->on_state_callback_ = StatefulCardItem::state_scene_fn;
-  } else if (this->type_ == entity_type::script) {
-    this->on_state_callback_ = StatefulCardItem::state_script_fn;
-  }*/
-
-  this->set_render_invalid();
-
-  // also need to make sure the state is updated based on the new 'type'
-  if (this->on_state_callback_) {
-    this->on_state_callback_(this);
-  }
-  return true;
-}
-
-void StatefulCardItem::set_state(const std::string &state) {
-  this->state_ = state;
-
-  this->set_render_invalid();
-
-  if (this->on_state_callback_) {
-    this->on_state_callback_(this);
-  }
-}
-
-void StatefulCardItem::set_attribute(const char *attr, const std::string &value) {
-  if (value.empty() || value == "None" || value == "none") {
-    attributes_.erase(attr);
-    return;
-  }
-  if (attr == ha_attr_type::brightness) {
-    attributes_[attr] = std::to_string(static_cast<int>(round(
-        scale_value(std::stoi(value), {0, 255}, {0, 100}))));
-  } else if (attr == ha_attr_type::color_temp) {
-    auto minstr = this->get_attribute(ha_attr_type::min_mireds);
-    auto maxstr = this->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = minstr.empty() ? 153 : std::stoi(minstr);
-    uint16_t max_mireds = maxstr.empty() ? 500 : std::stoi(maxstr);
-    attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
-        std::stoi(value),
-        {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
-        {0, 100}))));
-  } else {
-    attributes_[attr] = value;
-  }
-}
-
-void StatefulCardItem::set_device_class(const std::string &device_class) {
-  this->device_class_ = device_class;
-
-  this->set_render_invalid();
-
-  if (!this->icon_value_overridden_) {
-    if (this->type_ == entity_type::sensor) {
-      this->icon_default_value_ = u8"\uE5D5"; // default: alert-circle-outline
-      auto icon = get_icon_by_name(SENSOR_ICON_MAP, this->device_class_);
-      this->icon_value_ = (icon == nullptr ? this->icon_default_value_ : icon);
-    }
-  }
-
-  if (this->on_state_callback_) {
-    this->on_state_callback_(this);
-  }
-}
-
-std::string &StatefulCardItem::render_(std::string &buffer) {
-  buffer.clear();
-  // type~
-  PageItem_Type::render_(buffer).append(1, SEPARATOR);
+std::string &CardItem::render_(std::string &buffer) {
+  StatefulPageItem::render_(buffer);
   if (this->entity_id_ == entity_type::delete_)
-    // internalName(delete)~
-    buffer.append(this->entity_id_).append(1, SEPARATOR);
+    buffer.append(1, SEPARATOR);
   else
-    // internalName(uuid)~
-    PageItem::render_(buffer).append(1, SEPARATOR);
-  // iconValue~iconColor~
-  PageItem_Icon::render_(buffer).append(1, SEPARATOR);
-  // displayName~
-  return PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
+    // displayName~
+    PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
+  return buffer;
 }
   
-uint16_t StatefulCardItem::get_render_buffer_reserve_() const {
+uint16_t CardItem::get_render_buffer_reserve_() const {
   // try to guess the required size of the buffer to reduce heap fragmentation
-  return (this->type_ == nullptr ? 0 : strlen(this->type_)) + 
-      this->uuid_.length() + 6 +
-      this->get_icon_color_str().length() + 
-      this->display_name_.length() +
-      // icon is 4 char long + separator chars
-      10;
+  return StatefulPageItem::get_render_buffer_reserve_() + 
+      this->display_name_.length() + 1;
 }
-
-void StatefulCardItem::state_on_off_fn(StatefulCardItem *me) {
-  if (me->icon_color_overridden_) {
-    return;
-  }
-
-  if (me->state_ == generic_type::on) {
-    me->icon_color_ = 64909u; // yellow
-  } else if (me->state_ == generic_type::off) {
-    me->icon_color_ = 17299u; // blue
-  } else {
-    me->icon_color_ = 38066u; // grey
-  }
-}
-
-void StatefulCardItem::state_binary_sensor_fn(StatefulCardItem *me) {
-  const char *icon = nullptr;
-  if (me->state_ == generic_type::on) {
-    if (!me->icon_color_overridden_)
-      me->icon_color_ = 64909u; // yellow
-    if (!me->icon_value_overridden_) {
-      icon = get_icon_by_name(SENSOR_ON_ICON_MAP, me->device_class_);
-      me->icon_value_ = icon == nullptr ? u8"\uE132" : icon; // default: checkbox-marked-circle
-    }
-  } else {
-    if (!me->icon_color_overridden_) {
-      if (me->state_ == generic_type::off)
-        me->icon_color_ = 17299u; // blue
-      else
-        me->icon_color_ = 38066u; // grey
-    }
-    if (!me->icon_value_overridden_) {
-      icon = get_icon_by_name(SENSOR_OFF_ICON_MAP, me->device_class_);
-      me->icon_value_ = icon == nullptr ? u8"\uE43C" : icon; // default: radiobox-blank
-    }
-  }
-}
-
-void StatefulCardItem::state_cover_fn(StatefulCardItem *me) {
-  if (!me->icon_color_overridden_) {
-    if (me->state_ == "closed")
-      me->icon_color_ = 17299u; // blue
-    else if (me->state_ == "open")
-      me->icon_color_ = 64909u; // yellow
-    else 
-      me->icon_color_ = 38066u; // grey
-  }
-  
-  if (!me->icon_value_overridden_) {
-    auto icons = get_icon_by_name(COVER_MAP, me->device_class_);
-    if (icons != nullptr) {
-      if (me->state_ == "closed")
-        me->icon_value_ = icons->at(1);
-      else
-        me->icon_value_ = icons->at(0);
-    }
-  }
-}
-
-// clang-format off
-// void StatefulCardItem::state_button_fn(StatefulCardItem *me) {}
-// void StatefulCardItem::state_scene_fn(StatefulCardItem *me) {}
-// void StatefulCardItem::state_script_fn(StatefulCardItem *me) {}
-// clang-format on
 
 } // namespace nspanel_lovelace
 } // namespace esphome

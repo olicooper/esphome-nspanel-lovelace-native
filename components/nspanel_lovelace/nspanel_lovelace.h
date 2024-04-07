@@ -112,8 +112,8 @@ protected:
   void send_buffered_command_();
   void process_display_command_queue_();
   void process_button_press_(std::string &entity_id, const std::string &button_type, const std::string &value = "", bool called_from_timeout = false);
-  StatefulCardItem* get_entity_by_id_(const std::string &entity_id);
-  StatefulCardItem* get_entity_by_uuid_(const std::string &uuid);
+  StatefulPageItem* get_entity_by_id_(const std::string &entity_id);
+  StatefulPageItem* get_entity_by_uuid_(const std::string &uuid);
 
   void render_page_(size_t index);
   void render_page_(render_page_option d);
@@ -121,8 +121,8 @@ protected:
   void render_item_update_(Page *page);
   void render_popup_page_(const std::string &internal_id);
   void render_popup_page_update_(const std::string &internal_id);
-  void render_popup_page_update_(StatefulCardItem *entity);
-  void render_light_detail_update_(StatefulCardItem *entity);
+  void render_popup_page_update_(StatefulPageItem *entity);
+  void render_light_detail_update_(StatefulPageItem *entity);
 
 #ifdef USE_TIME
   void setup_time_();
@@ -176,8 +176,8 @@ protected:
   Screensaver* screensaver_ = nullptr;
   std::vector<std::shared_ptr<Page>> pages_;
   std::vector<std::shared_ptr<PageItem>> page_items_;
-  std::vector<std::shared_ptr<StatefulCardItem>> card_entities_;
-  StatefulCardItem* cached_entity_ = nullptr;
+  std::vector<std::shared_ptr<StatefulPageItem>> stateful_page_items_;
+  StatefulPageItem* cached_page_item_ = nullptr;
 
   CallbackManager<void(std::string)> incoming_msg_callback_;
 

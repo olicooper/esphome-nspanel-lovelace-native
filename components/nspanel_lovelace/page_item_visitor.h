@@ -14,7 +14,7 @@ class NavigationItem;
 class IconItem;
 class WeatherItem;
 class CardItem;
-class StatefulCardItem;
+class StatefulPageItem;
 class GridCardEntityItem;
 class EntitiesCardEntityItem;
 
@@ -25,7 +25,7 @@ public:
   virtual bool visit(IconItem &) = 0;
   virtual bool visit(WeatherItem &) = 0;
   virtual bool visit(CardItem &) = 0;
-  virtual bool visit(StatefulCardItem &) = 0;
+  virtual bool visit(StatefulPageItem &) = 0;
   virtual bool visit(GridCardEntityItem &) = 0;
   virtual bool visit(EntitiesCardEntityItem &) = 0;
 };
@@ -37,7 +37,7 @@ public:
   virtual bool visit(IconItem &);
   virtual bool visit(WeatherItem &);
   virtual bool visit(CardItem &);
-  virtual bool visit(StatefulCardItem &);
+  virtual bool visit(StatefulPageItem &);
   virtual bool visit(GridCardEntityItem &);
   virtual bool visit(EntitiesCardEntityItem &);
 };

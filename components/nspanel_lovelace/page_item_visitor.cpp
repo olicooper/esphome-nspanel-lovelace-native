@@ -17,20 +17,20 @@ bool InheritancePageItemVisitor::visit(WeatherItem &item) {
   return visit(static_cast<PageItem &>(item));
 }
 bool InheritancePageItemVisitor::visit(CardItem &item) {
-  return visit(static_cast<PageItem &>(item));
-}
-bool InheritancePageItemVisitor::visit(StatefulCardItem &item) {
-  return visit(static_cast<CardItem &>(item)) ||
+  return visit(static_cast<StatefulPageItem &>(item)) ||
           visit(static_cast<PageItem &>(item));
 }
+bool InheritancePageItemVisitor::visit(StatefulPageItem &item) {
+  return visit(static_cast<PageItem &>(item));
+}
 bool InheritancePageItemVisitor::visit(GridCardEntityItem &item) {
-  return visit(static_cast<StatefulCardItem &>(item)) ||
-          visit(static_cast<CardItem &>(item)) ||
+  return visit(static_cast<CardItem &>(item)) ||
+          visit(static_cast<StatefulPageItem &>(item)) ||
           visit(static_cast<PageItem &>(item));
 }
 bool InheritancePageItemVisitor::visit(EntitiesCardEntityItem &item) {
-  return visit(static_cast<StatefulCardItem &>(item)) ||
-          visit(static_cast<CardItem &>(item)) ||
+  return visit(static_cast<CardItem &>(item)) ||
+          visit(static_cast<StatefulPageItem &>(item)) ||
           visit(static_cast<PageItem &>(item));
 }
 

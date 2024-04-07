@@ -22,7 +22,7 @@ void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this)
 
 EntitiesCardEntityItem::EntitiesCardEntityItem(
     const std::string &uuid, const std::string &entity_id) :
-    StatefulCardItem(uuid), PageItem_Value(this) {
+    CardItem(uuid), PageItem_Value(this) {
   this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
@@ -30,7 +30,7 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 EntitiesCardEntityItem::EntitiesCardEntityItem(
     const std::string &uuid, const std::string &entity_id,
     const std::string &display_name) :
-    StatefulCardItem(uuid, display_name),
+    CardItem(uuid, display_name),
     PageItem_Value(this) {
   this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
@@ -38,31 +38,31 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
-void EntitiesCardEntityItem::state_generic_fn(StatefulCardItem *me) {
+void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   me_->value_ = me_->state_;
 }
-void EntitiesCardEntityItem::state_on_off_fn(StatefulCardItem *me) {
+void EntitiesCardEntityItem::state_on_off_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   me_->value_ = (me_->state_ == generic_type::on ? "1" : "0");
-  StatefulCardItem::state_on_off_fn(me);
+  StatefulPageItem::state_on_off_fn(me);
 }
-void EntitiesCardEntityItem::state_button_fn(StatefulCardItem *me) {
+void EntitiesCardEntityItem::state_button_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   me_->value_ = "Press";
   // value_ = get_translation(self._locale, "frontend.ui.card.button.press")
 }
-void EntitiesCardEntityItem::state_scene_fn(StatefulCardItem *me) {
+void EntitiesCardEntityItem::state_scene_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   me_->value_ = "Activate";
 }
-void EntitiesCardEntityItem::state_script_fn(StatefulCardItem *me) {
+void EntitiesCardEntityItem::state_script_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   me_->value_ = "Run";
 }
 
 bool EntitiesCardEntityItem::set_type(const char *type) {
-  if (!StatefulCardItem::set_type(type))
+  if (!StatefulPageItem::set_type(type))
     return false;
 
   if (this->type_ == entity_type::light ||
@@ -105,13 +105,13 @@ void EntitiesCardEntityItem::set_state(const std::string &state) {
 }
 
 std::string &EntitiesCardEntityItem::render_(std::string &buffer) {
-  StatefulCardItem::render_(buffer);
+  CardItem::render_(buffer);
   return PageItem_Value::render_(buffer);
 }
 
 uint16_t EntitiesCardEntityItem::get_render_buffer_reserve_() const {
   // try to guess the required size of the buffer to reduce heap fragmentation
-  return StatefulCardItem::get_render_buffer_reserve_() +
+  return CardItem::get_render_buffer_reserve_() +
          this->value_.length() + this->value_postfix_.length() + 1;
 }
 

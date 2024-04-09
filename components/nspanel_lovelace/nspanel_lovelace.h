@@ -104,6 +104,7 @@ protected:
 #endif
   void send_nextion_command_(const std::string &command);
 
+  void add_page_item(const std::shared_ptr<PageItem> &item);
 
   bool process_data_();
   size_t find_page_index_by_uuid_(const std::string &uuid) const;

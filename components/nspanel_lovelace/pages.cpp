@@ -12,22 +12,51 @@ namespace nspanel_lovelace {
 
 void Screensaver::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
-// output: weatherUpd~5x[type~internalName~icon~iconColor~displayName~value]
+void Screensaver::set_icon_left(std::shared_ptr<StatusIconItem> &left_icon) {
+  this->left_icon = left_icon;
+  this->left_icon->add_page(this);
+}
+void Screensaver::set_icon_right(std::shared_ptr<StatusIconItem> &right_icon) {
+  this->right_icon = right_icon;
+  this->right_icon->add_page(this);
+}
+
+// output: weatherUpd~(5x)[type~internalName~icon~iconColor~displayName~value]
 std::string &Screensaver::render(std::string &buffer) {
   buffer.assign(this->get_render_instruction());
-      // .append(1, SEPARATOR)
-      // .append(this->get_title())
-      // .append(1, SEPARATOR)
-      // .append(this->left_icon->render())
-      // .append(1, SEPARATOR)
-      // .append(this->right_icon->render())
-      // .append(1, SEPARATOR);
 
   for (auto &item : this->items_) {
     buffer.append(1, SEPARATOR).append(item->render());
   }
   
   return buffer;
+}
+
+// output: statusUpdate~icon1~icon1Color~icon2~icon2Color~icon1AltFont~icon2AltFont
+std::string &Screensaver::render_status_update(std::string &buffer) {
+  std::string alt_font;
+  buffer.assign("statusUpdate").append(1, SEPARATOR);
+  
+  if (this->left_icon) {
+    buffer.append(this->left_icon->render()).append(1, SEPARATOR);
+    if (this->left_icon->get_alt_font()) {
+      alt_font.append(1, '1');
+    }
+  } else {
+    buffer.append(2, SEPARATOR);
+  }
+  alt_font.append(1, SEPARATOR);
+
+  if (this->right_icon) {
+    buffer.append(this->right_icon->render()).append(1, SEPARATOR);
+    if (this->right_icon->get_alt_font()) {
+      alt_font.append(1, '1');
+    }
+  } else {
+    buffer.append(2, SEPARATOR);
+  }
+  
+  return buffer.append(alt_font);
 }
 
 } // namespace nspanel_lovelace

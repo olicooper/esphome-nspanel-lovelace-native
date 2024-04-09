@@ -135,16 +135,22 @@ def valid_uuid(value):
         f'Value must be 30 characters or less in length and contain only numbers, letters and underscores e.g. "living_room_light_1"'
     )
 
-def valid_entity_id(value):
+def valid_entity_id(entity_type_whitelist: list[str] = None):
     """Validate that a given config value is a valid entity_id."""
-    value = cv.string_strict(value)
-    if not value:
-        return value
-    if re.match(ENTITY_ID_RE, value):
-        return value
-    raise cv.Invalid(
-        f'entity_id "{value}" must match the format "[entity type].[entity name]" and contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1"'
-    )
+    def validator(value):
+        value = cv.string_strict(value)
+        if not value:
+            return value
+        if re.match(ENTITY_ID_RE, value):
+            if entity_type_whitelist is None or [w for w in entity_type_whitelist if value.startswith(w)]:
+                return value
+            raise cv.Invalid(
+                f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_whitelist}"
+            )
+        raise cv.Invalid(
+            f'entity_id "{value}" must match the format "[entity type].[entity name]" and contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1"'
+        )
+    return validator
 
 def valid_clock_format(property_name):
     def validator(value):
@@ -187,7 +193,7 @@ SCHEMA_ICON = cv.Any(
 )
 
 SCHEMA_STATUS_ICON = cv.Schema({
-    cv.Optional(CONF_ENTITY_ID): valid_entity_id,
+    cv.Optional(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
     cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
@@ -197,13 +203,13 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
-    cv.Optional(CONF_SCREENSAVER_WEATHER_ENTITY_ID): valid_entity_id,
+    cv.Optional(CONF_SCREENSAVER_WEATHER_ENTITY_ID): valid_entity_id(),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
 
 SCHEMA_CARD_ENTITY = cv.Schema({
-    cv.Required(CONF_ENTITY_ID): valid_entity_id,
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
     cv.Optional(CONF_ICON): SCHEMA_ICON,
 })
@@ -273,7 +279,7 @@ GridCard = nspanel_lovelace_ns.class_("GridCard")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
 
 NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
-IconItem = nspanel_lovelace_ns.class_("IconItem")
+StatusIconItem = nspanel_lovelace_ns.class_("StatusIconItem")
 WeatherItem = nspanel_lovelace_ns.class_("WeatherItem")
 EntitiesCardEntityItem = nspanel_lovelace_ns.class_("EntitiesCardEntityItem")
 GridCardEntityItem = nspanel_lovelace_ns.class_("GridCardEntityItem")
@@ -338,21 +344,21 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, id_prefix: s
 
         cg.add(card_class.add_item(entity_class))
 
-def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str):
+def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
     entity_id = icon_config.get(CONF_ENTITY_ID, "")
     default_icon_value = r'u8"\u{0}"'.format(get_icon_hex(default_icon_value))
     attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
     # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
     # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-    basicstr = f'{unique_ptr.template(icon_class)}(new {icon_class}("{get_new_uuid()}", "{entity_id}"'
+    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", "{entity_id}"'
     if isinstance(attrs["value"], str) and isinstance(attrs["color"], int):
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u))')
+        return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
     elif isinstance(attrs["value"], str):
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]}))')
+        return cg.RawStatement(f'{basicstr}, {attrs["value"]})')
     elif isinstance(attrs["color"], int):
-        return cg.RawStatement(f'{basicstr}, {default_icon_value}, {attrs["color"]}u))')
+        return cg.RawStatement(f'{basicstr}, {default_icon_value}, {attrs["color"]}u)')
     else:
-        return cg.RawStatement(f'{basicstr}, {default_icon_value}))')
+        return cg.RawStatement(f'{basicstr}, {default_icon_value})')
 
 async def to_code(config):
     nspanel = cg.new_Pvariable(config[CONF_ID])
@@ -450,22 +456,30 @@ async def to_code(config):
             f"{make_shared.template(screensaver_info[1]).__call__(screensaver_uuid)}"))
 
         if CONF_SCREENSAVER_STATUS_ICON_LEFT in screensaver_config:
+            left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
             screensaver_left_icon = get_status_icon_statement(
-                screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT], 
-                IconItem,
-                'arrow-left-bold')
+                left_icon_config, 
+                StatusIconItem)
             iconleft_variable = screensaver_info[0] + "_iconleft"
             cg.add(cg.RawExpression(f"auto {iconleft_variable} = {screensaver_left_icon}"))
-            cg.add(screensaver_class.set_icon_left(cg.global_ns.class_(iconleft_variable)))
+            iconleft_variable_class = cg.global_ns.class_(iconleft_variable)
+            iconleft_variable_class.op = '->'
+            if left_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
+                cg.add(iconleft_variable_class.set_alt_font(True))
+            cg.add(screensaver_class.set_icon_left(iconleft_variable_class))
 
         if CONF_SCREENSAVER_STATUS_ICON_RIGHT in screensaver_config:
+            right_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_RIGHT]
             screensaver_right_icon = get_status_icon_statement(
-                screensaver_config[CONF_SCREENSAVER_STATUS_ICON_RIGHT], 
-                IconItem,
-                'arrow-right-bold')
+                right_icon_config, 
+                StatusIconItem)
             iconright_variable = screensaver_info[0] + "_iconright"
             cg.add(cg.RawExpression(f"auto {iconright_variable} = {screensaver_right_icon}"))
-            cg.add(screensaver_class.set_icon_right(cg.global_ns.class_(iconright_variable)))
+            iconright_variable_class = cg.global_ns.class_(iconright_variable)
+            iconright_variable_class.op = '->'
+            if right_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
+                cg.add(iconright_variable_class.set_alt_font(True))
+            cg.add(screensaver_class.set_icon_right(iconright_variable_class))
 
         if CONF_SCREENSAVER_WEATHER_ENTITY_ID in screensaver_config:
             cg.add(nspanel.set_weather_entity_id(screensaver_config[CONF_SCREENSAVER_WEATHER_ENTITY_ID]))

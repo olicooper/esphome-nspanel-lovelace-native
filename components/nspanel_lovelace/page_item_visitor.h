@@ -11,7 +11,7 @@ namespace nspanel_lovelace {
 
 class PageItem;
 class NavigationItem;
-class IconItem;
+class StatusIconItem;
 class WeatherItem;
 class CardItem;
 class StatefulPageItem;
@@ -22,7 +22,7 @@ class PageItemVisitor {
 public:
   virtual bool visit(PageItem &) = 0;
   virtual bool visit(NavigationItem &) = 0;
-  virtual bool visit(IconItem &) = 0;
+  virtual bool visit(StatusIconItem &) = 0;
   virtual bool visit(WeatherItem &) = 0;
   virtual bool visit(CardItem &) = 0;
   virtual bool visit(StatefulPageItem &) = 0;
@@ -34,7 +34,7 @@ class InheritancePageItemVisitor : public PageItemVisitor {
 public:
   virtual bool visit(PageItem &);
   virtual bool visit(NavigationItem &);
-  virtual bool visit(IconItem &);
+  virtual bool visit(StatusIconItem &);
   virtual bool visit(WeatherItem &);
   virtual bool visit(CardItem &);
   virtual bool visit(StatefulPageItem &);

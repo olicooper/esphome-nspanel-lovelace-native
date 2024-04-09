@@ -10,8 +10,9 @@ bool InheritancePageItemVisitor::visit(PageItem &item) { return false; }
 bool InheritancePageItemVisitor::visit(NavigationItem &item) {
   return visit(static_cast<PageItem &>(item));
 }
-bool InheritancePageItemVisitor::visit(IconItem &item) {
-  return visit(static_cast<PageItem &>(item));
+bool InheritancePageItemVisitor::visit(StatusIconItem &item) {
+  return visit(static_cast<StatefulPageItem &>(item)) ||
+          visit(static_cast<PageItem &>(item));
 }
 bool InheritancePageItemVisitor::visit(WeatherItem &item) {
   return visit(static_cast<PageItem &>(item));

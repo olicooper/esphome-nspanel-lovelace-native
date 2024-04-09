@@ -228,7 +228,7 @@ protected:
 
 class PageItem_State : public IRender, public ISetRenderInvalid {
 public:
-  PageItem_State(IHaveRenderInvalid *const child) : ISetRenderInvalid(child) {}
+  PageItem_State(IHaveRenderInvalid *const child);
   PageItem_State(IHaveRenderInvalid *const child, const std::string &state);
 
   const std::string &get_state() const { return this->state_; }
@@ -270,6 +270,13 @@ class StatefulPageItem :
     public PageItem_State {
 public:
   StatefulPageItem(const std::string &uuid);
+  StatefulPageItem(
+      const std::string &uuid, const std::string &icon_default_value);
+  StatefulPageItem(
+      const std::string &uuid, const uint16_t icon_default_color);
+  StatefulPageItem(
+      const std::string &uuid, const std::string &icon_default_value, 
+      const uint16_t icon_default_color);
   virtual ~StatefulPageItem() {}
 
   void accept(PageItemVisitor& visitor) override;

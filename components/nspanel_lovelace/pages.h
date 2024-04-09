@@ -4,6 +4,7 @@
 #include "page_base.h"
 #include "page_items.h"
 #include "page_visitor.h"
+#include <memory>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -21,18 +22,16 @@ public:
 
   void accept(PageVisitor& visitor) override;
 
-  std::unique_ptr<IconItem> left_icon;
-  std::unique_ptr<IconItem> right_icon;
+  std::shared_ptr<StatusIconItem> left_icon;
+  std::shared_ptr<StatusIconItem> right_icon;
 
-  void set_icon_left(std::unique_ptr<IconItem> &left_icon) {
-    this->left_icon.swap(left_icon);
-  }
-  void set_icon_right(std::unique_ptr<IconItem> &right_icon) {
-    this->right_icon.swap(right_icon);
-  }
+  void set_icon_left(std::shared_ptr<StatusIconItem> &left_icon);
+  void set_icon_right(std::shared_ptr<StatusIconItem> &right_icon);
   
   const char *get_render_instruction() const override { return "weatherUpdate"; };
   std::string &render(std::string &buffer) override;
+
+  virtual std::string &render_status_update(std::string &buffer);
 };
 
 } // namespace nspanel_lovelace

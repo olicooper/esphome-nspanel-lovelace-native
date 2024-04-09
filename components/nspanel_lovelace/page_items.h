@@ -43,32 +43,34 @@ protected:
 };
 
 /*
- * =============== IconItem ===============
+ * =============== StatusIconItem ===============
  */
 
-class IconItem : 
-    public PageItem,
-    public PageItem_EntityId,
-    public PageItem_Icon,
-    public PageItem_DisplayName,
-    public PageItem_Value {
+class StatusIconItem : public StatefulPageItem {
 public:
-  IconItem(const std::string &uuid, const std::string &entity_id);
-  IconItem(
+  StatusIconItem(const std::string &uuid);
+  StatusIconItem(const std::string &uuid, const std::string &entity_id);
+  StatusIconItem(
       const std::string &uuid, const std::string &entity_id, 
       const std::string &icon_default_value);
-  IconItem(
+  StatusIconItem(
       const std::string &uuid, const std::string &entity_id, 
       const uint16_t icon_default_color);
-  IconItem(
+  StatusIconItem(
       const std::string &uuid, const std::string &entity_id, 
       const std::string &icon_default_value, const uint16_t icon_default_color);
-  // virtual ~IconItem() {}
+  virtual ~StatusIconItem() {}
 
   void accept(PageItemVisitor& visitor) override;
 
+  bool get_alt_font() const { return this->alt_font_; }
+  
+  void set_alt_font(bool large) { this->alt_font_ = large; }
+
 protected:
-  // output: ~~icon~iconColor~displayName~optionalValue
+  bool alt_font_;
+
+  // output: icon~iconColor
   std::string &render_(std::string &buffer) override;
 };
 

@@ -43,8 +43,9 @@ void NavigationItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 std::string &NavigationItem::render_(std::string &buffer) {
   // note: should be able to skip type field but it doesn't render if I do
   // type~
-  buffer.assign(entity_type::button).append(1, SEPARATOR);
+  buffer.append(entity_type::button).append(1, SEPARATOR);
   // internalName(navigate.uuid.[page uuid])~
+  // NOTE: entity_id_ contains the uuid of the item to navigate to
   buffer.append(entity_type::navigate_uuid)
     .append(1,'.').append(entity_id_).append(1, SEPARATOR);
   // icon~iconColor
@@ -54,42 +55,49 @@ std::string &NavigationItem::render_(std::string &buffer) {
 }
 
 /*
- * =============== IconItem ===============
+ * =============== StatusIconItem ===============
  */
 
-IconItem::IconItem(const std::string &uuid, const std::string &entity_id) : 
-    PageItem(uuid), PageItem_EntityId(this, entity_id),
-    PageItem_Icon(this), PageItem_DisplayName(this), PageItem_Value(this) {}
-IconItem::IconItem(
-    const std::string &uuid, const std::string &entity_id, 
+StatusIconItem::StatusIconItem(const std::string &uuid) :
+    StatefulPageItem(uuid), alt_font_(false) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+StatusIconItem::StatusIconItem(
+    const std::string &uuid, const std::string &entity_id) :
+    StatefulPageItem(uuid), alt_font_(false) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+StatusIconItem::StatusIconItem(
+    const std::string &uuid, const std::string &entity_id,
     const std::string &icon_default_value) :
-    PageItem(uuid), PageItem_EntityId(this, entity_id),
-    PageItem_Icon(this, icon_default_value),
-    PageItem_DisplayName(this), PageItem_Value(this) {}
-IconItem::IconItem(
-    const std::string &uuid, const std::string &entity_id, 
+    StatefulPageItem(uuid, icon_default_value),
+    alt_font_(false) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+StatusIconItem::StatusIconItem(
+    const std::string &uuid, const std::string &entity_id,
     const uint16_t icon_default_color) :
-    PageItem(uuid), PageItem_EntityId(this, entity_id), 
-    PageItem_Icon(this, icon_default_color),
-    PageItem_DisplayName(this), PageItem_Value(this) {}
-IconItem::IconItem(
-    const std::string &uuid, const std::string &entity_id, 
+    StatefulPageItem(uuid, icon_default_color),
+    alt_font_(false) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+StatusIconItem::StatusIconItem(
+    const std::string &uuid, const std::string &entity_id,
     const std::string &icon_default_value, const uint16_t icon_default_color) :
-    PageItem(uuid), PageItem_EntityId(this, entity_id), 
-    PageItem_Icon(this, icon_default_value, icon_default_color),
-    PageItem_DisplayName(this), PageItem_Value(this) {}
+    StatefulPageItem(uuid, icon_default_value, icon_default_color),
+    alt_font_(false) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
-void IconItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+void StatusIconItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
-std::string &IconItem::render_(std::string &buffer) {
-  // skip: type~internalName~
-  buffer.assign(2, SEPARATOR);
-  // icon~iconColor~
-  PageItem_Icon::render_(buffer).append(1, SEPARATOR);
-  // displayName~
-  PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
-  // value
-  return PageItem_Value::render_(buffer);
+std::string &StatusIconItem::render_(std::string &buffer) {
+  // icon~iconColor
+  return PageItem_Icon::render_(buffer);
 }
 
 /*
@@ -133,7 +141,7 @@ bool WeatherItem::set_value(const std::string &value) {
 
 std::string &WeatherItem::render_(std::string &buffer) {
   // skip: type,internalName
-  buffer.assign(2, SEPARATOR);
+  buffer.append(2, SEPARATOR);
   PageItem_Icon::render_(buffer).append(1, SEPARATOR);
   PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
   // allow the value to be fomatted based on locale instead of using the raw string value

@@ -137,6 +137,10 @@ void NSPanelLovelace::loop() {
 void NSPanelLovelace::set_screensaver(const std::shared_ptr<Screensaver> &screensaver) {
   this->screensaver_ = screensaver.get();
   this->add_page(screensaver, 0);
+  if (this->screensaver_->left_icon)
+    this->add_page_item(this->screensaver_->left_icon);
+  if (this->screensaver_->right_icon)
+    this->add_page_item(this->screensaver_->right_icon);
 }
 
 void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t position) {
@@ -156,65 +160,68 @@ void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t p
   }
   
   for (auto &item : page->get_items()) {
-    auto &item_uuid = item->get_uuid();
-    // ensure no duplicates are added
-    if (page_item_cast<StatefulPageItem>(item.get())) {
-      found = false;
-      for (auto &item : this->stateful_page_items_) {
-        if (item->get_uuid() == item_uuid) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        auto& page_item = (const std::shared_ptr<StatefulPageItem>&)item;
-        auto& entity_id = page_item->get_entity_id();
-        this->stateful_page_items_.push_back(page_item);
-        ESP_LOGV(TAG, "Adding item id:%s, entity_id:%s", 
-            page_item->get_uuid().c_str(), entity_id.c_str());
+    this->add_page_item(item);
+  }
+}
 
-        if (page_item->is_type(entity_type::light)) {
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_state_update_, entity_id);
-          // need to subscribe to brightness to know if brightness is supported
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_brightness_update_, entity_id, ha_attr_type::brightness);
-          // selectively subscribe to light attributes based on the supported color modes
-          this->subscribe_homeassistant_state(
-                &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, entity_id, ha_attr_type::supported_color_modes);
-        }
-        if (page_item->is_type(entity_type::switch_) ||
-            page_item->is_type(entity_type::input_boolean) ||
-            page_item->is_type(entity_type::automation) ||
-            page_item->is_type(entity_type::fan)) {
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_state_update_, entity_id);
-        }
-        // icons and unit_of_measurement based on state and device_class
-        else if (page_item->is_type(entity_type::sensor) ||
-            page_item->is_type(entity_type::binary_sensor) ||
-            page_item->is_type(entity_type::cover)) {
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_state_update_, entity_id);
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, entity_id, ha_attr_type::unit_of_measurement);
-          if (!page_item->is_icon_value_overridden())
-            this->subscribe_homeassistant_state(
-                &NSPanelLovelace::on_entity_attr_device_class_update_, entity_id, ha_attr_type::device_class);
-        }
-      }
-    }
+void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
+  bool found = false;
+  auto &item_uuid = item->get_uuid();
+  // for stateful items, also subscribe to state updates
+  if (page_item_cast<StatefulPageItem>(item.get())) {
     found = false;
-    for (auto &e : this->page_items_) {
-      if (e->get_uuid() == item_uuid) {
+    for (auto &item : this->stateful_page_items_) {
+      if (item->get_uuid() == item_uuid) {
         found = true;
         break;
       }
     }
-    if (!found)
-      // std::weak_ptr<PageItem> wptr_item = item;
-      this->page_items_.push_back(item);
+    if (!found) {
+      auto& page_item = (const std::shared_ptr<StatefulPageItem>&)item;
+      auto& entity_id = page_item->get_entity_id();
+      this->stateful_page_items_.push_back(page_item);
+      ESP_LOGV(TAG, "Adding item uuid.%s, entity_id=%s", 
+          page_item->get_uuid().c_str(), entity_id.c_str());
+
+      // all entity types have a 'state'
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_state_update_, entity_id);
+
+      if (page_item->is_type(entity_type::light)) {
+        // need to subscribe to brightness to know if brightness is supported
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_attr_brightness_update_, 
+            entity_id, ha_attr_type::brightness);
+        // selectively subscribe to light attributes based on the supported color modes
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
+            entity_id, ha_attr_type::supported_color_modes);
+      }
+      // icons and unit_of_measurement based on state and device_class
+      else if (page_item->is_type(entity_type::sensor) ||
+          page_item->is_type(entity_type::binary_sensor) ||
+          page_item->is_type(entity_type::cover)) {
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
+            entity_id, ha_attr_type::unit_of_measurement);
+        if (!page_item->is_icon_value_overridden()) {
+          this->subscribe_homeassistant_state(
+              &NSPanelLovelace::on_entity_attr_device_class_update_, 
+              entity_id, ha_attr_type::device_class);
+        }
+      }
+    }
   }
+  found = false;
+  for (auto &e : this->page_items_) {
+    if (e->get_uuid() == item_uuid) {
+      found = true;
+      break;
+    }
+  }
+  if (!found)
+    // std::weak_ptr<PageItem> wptr_item = item;
+    this->page_items_.push_back(item);
 }
 
 void NSPanelLovelace::set_display_timeout(uint16_t timeout) {
@@ -420,8 +427,14 @@ void NSPanelLovelace::render_current_page_() {
 }
 
 void NSPanelLovelace::render_item_update_(Page *page) {
-  page->render(this->command_buffer_);
-  this->send_buffered_command_();
+  if (page->is_type(page_type::screensaver)) {
+    static_cast<Screensaver*>(page)
+      ->render_status_update(this->command_buffer_);
+    this->send_buffered_command_();
+  } else {
+    page->render(this->command_buffer_);
+    this->send_buffered_command_();
+  }
 }
 
 void NSPanelLovelace::render_popup_page_(const std::string &internal_id) {
@@ -537,14 +550,14 @@ void NSPanelLovelace::process_display_command_queue_() {
   // Store the command for later processing so the function can return quickly
   if (!this->command_buffer_.empty()) {
     this->command_queue_.push(this->command_buffer_);
-    ESP_LOGV(TAG, "Command queued (size: %u)", this->command_queue_.size());
+    ESP_LOGVV(TAG, "Command queued (size: %u)", this->command_queue_.size());
     this->command_buffer_.clear();
     return;
   } else if (!this->command_queue_.empty()) {
     // todo: can we use std::move? it changes the capacity of the buffer
     this->command_buffer_.assign(this->command_queue_.front());
     this->command_queue_.pop();
-    ESP_LOGV(TAG, "Command un-queued (size: %u)", this->command_queue_.size());
+    ESP_LOGVV(TAG, "Command un-queued (size: %u)", this->command_queue_.size());
   }
 
   ESP_LOGD(TAG, "Sending: %s", this->command_buffer_.c_str());
@@ -1104,29 +1117,31 @@ void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, 
     item->set_attribute(attr, attr_value);
   }
 
-  ESP_LOGV(TAG, "HA state update %s %s='%s'",
-      entity_id.c_str(), attr, attr_value.c_str());
+  ESP_LOGD(TAG, "HA update: uuid.%s %s %s='%s'",
+      item->get_uuid().c_str(), entity_id.c_str(), attr, attr_value.c_str());
 
   if (!item->has_page(this->current_page_)) {
-    this->cancel_timeout("stupd");
+    // this->cancel_timeout("stupd");
     return;
-
-    // If there are lots of entity attributes that update within a short time
-    // then this will queue lots of commands unnecessarily.
-    // This re-schedules updates every time one happens within a 200ms period.
-    this->set_timeout("stupd", 200, [this,item,attr] () {
-      // re-render only if the entity is on the currently active card
-      if (item->has_page(this->current_page_)) {
-        ESP_LOGV(TAG, "Render state update %s='%s'",
-            item->get_entity_id().c_str(), attr);
-        if (this->popup_page_current_uuid_ == item->get_uuid()) {
-          this->render_popup_page_update_(item);
-        } else if (this->popup_page_current_uuid_.empty()) {
-          this->render_item_update_(this->current_page_);
-        }
-      }
-    });
   }
+
+  // If there are lots of entity attributes that update within a short time
+  // then this will queue lots of commands unnecessarily.
+  // This re-schedules updates every time one happens within a 100ms period.
+  this->set_timeout("stupd", 100, [this,item] () {
+    // re-render only if the entity is on the currently active card
+    if (!item->has_page(this->current_page_)) {
+      return;
+    }
+    
+    ESP_LOGV(TAG, "Render HA update %s",
+        item->get_entity_id().c_str());
+    if (this->popup_page_current_uuid_ == item->get_uuid()) {
+      this->render_popup_page_update_(item);
+    } else if (this->popup_page_current_uuid_.empty()) {
+      this->render_item_update_(this->current_page_);
+    }
+  });
 
 }
 

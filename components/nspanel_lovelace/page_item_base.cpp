@@ -24,6 +24,7 @@ void PageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 const std::string &PageItem::render() {
   // only re-render if values have changed
   if (this->render_invalid_) {
+    this->render_buffer_.clear();
     this->render_(this->render_buffer_);
     this->render_invalid_ = false;
   }
@@ -217,9 +218,12 @@ std::string &PageItem_Value::render_(std::string &buffer) {
  */
 
 PageItem_State::PageItem_State(
+    IHaveRenderInvalid *const child) :
+    ISetRenderInvalid(child), state_("unknown") {}
+
+PageItem_State::PageItem_State(
     IHaveRenderInvalid *const child, const std::string &state) :
-    ISetRenderInvalid(child),
-    state_(state) {}
+    ISetRenderInvalid(child), state_(state) {}
 
 void PageItem_State::set_state(const std::string &state) {
   this->state_ = state;
@@ -254,8 +258,25 @@ std::string &PageItem_State::render_(std::string &buffer) {
 
 StatefulPageItem::StatefulPageItem(
     const std::string &uuid) :
-    PageItem(uuid), PageItem_Type(this), PageItem_EntityId(this), PageItem_Icon(this),
-    PageItem_State(this, "unknown") {}
+    PageItem(uuid), PageItem_Type(this), PageItem_EntityId(this), 
+    PageItem_Icon(this), PageItem_State(this) {}
+
+StatefulPageItem::StatefulPageItem(
+    const std::string &uuid, const std::string &icon_default_value) :
+    PageItem(uuid), PageItem_Type(this), PageItem_EntityId(this), 
+    PageItem_Icon(this, icon_default_value), PageItem_State(this) {}
+
+StatefulPageItem::StatefulPageItem(
+    const std::string &uuid, const uint16_t icon_default_color) :
+    PageItem(uuid), PageItem_Type(this), PageItem_EntityId(this), 
+    PageItem_Icon(this, icon_default_color), PageItem_State(this) {}
+
+StatefulPageItem::StatefulPageItem(
+    const std::string &uuid, 
+    const std::string &icon_default_value, const uint16_t icon_default_color) :
+    PageItem(uuid), PageItem_Type(this), PageItem_EntityId(this), 
+    PageItem_Icon(this, icon_default_value, icon_default_color),
+    PageItem_State(this) {}
 
 void StatefulPageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 

@@ -14,6 +14,21 @@ namespace nspanel_lovelace {
  * =============== GridCardEntityItem ===============
  */
 
+GridCardEntityItem::GridCardEntityItem(
+    const std::string &uuid, const std::string &entity_id) : 
+    CardItem(uuid) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+
+GridCardEntityItem::GridCardEntityItem(
+    const std::string &uuid, const std::string &entity_id, 
+    const std::string &display_name) : 
+    CardItem(uuid, display_name) {
+  this->set_entity_id(entity_id);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
+
 void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 /*

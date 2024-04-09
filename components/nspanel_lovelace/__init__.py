@@ -51,6 +51,8 @@ CONF_INCOMING_MSG = "on_incoming_msg"
 CONF_ICON = "icon"
 CONF_ICON_VALUE = "value"
 CONF_ICON_COLOR = "color"
+CONF_ICON_CONDITIONS = "conditions"
+CONF_ICON_CONDITION_STATE = "state"
 CONF_ENTITY_ID = "entity_id"
 CONF_SLEEP_TIMEOUT = "sleep_timeout"
 
@@ -124,6 +126,32 @@ def valid_icon_value(value):
         f"Must be a string, got {value}. did you forget putting quotes around the value?"
     )
 
+# todo: implement icon state conditions
+def valid_icon_condition(value):
+    if isinstance(value, dict):
+        if CONF_ICON_CONDITION_STATE not in value:
+            raise cv.Invalid(f"{CONF_ICON_CONDITION_STATE} is required")
+        cv.string_strict(value[CONF_ICON_CONDITION_STATE])
+
+        if CONF_ICON_COLOR in value or CONF_ICON_VALUE in value:
+            return cv.Schema({
+                cv.Required(CONF_ICON_CONDITION_STATE): cv.string_strict,
+                cv.Optional(CONF_ICON_VALUE): valid_icon_value,
+                cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535)
+            })(value)
+    raise cv.Invalid(f"Each condition should contain '{CONF_ICON_CONDITION_STATE}' and either the '{CONF_ICON_VALUE}' or '{CONF_ICON_COLOR}' attribute")
+
+def no_icon_condition_duplicates(conditions):
+    if not isinstance(conditions, list) or len(conditions) < 2:
+        return conditions
+    state_values = []
+    for condition in conditions:
+        if condition[CONF_ICON_CONDITION_STATE].lower() in (val.lower() for val in state_values):
+            raise cv.Invalid(f"Each '{CONF_ICON_CONDITION_STATE}' should be unique, found duplicate '{condition[CONF_ICON_CONDITION_STATE]}'")
+        else:
+            state_values.append(condition[CONF_ICON_CONDITION_STATE])
+    return conditions
+
 def valid_uuid(value):
     """Validate that a given config value is a valid uuid."""
     value = cv.string(value)
@@ -179,6 +207,15 @@ SCHEMA_LOCALE = cv.Schema({
 
 SCHEMA_ICON = cv.Any(
     cv.string_strict, # icon name
+    cv.Schema({
+        cv.Optional(CONF_ICON_VALUE): valid_icon_value,
+        cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),
+        cv.Required(CONF_ICON_CONDITIONS): cv.All(
+            cv.ensure_list(valid_icon_condition),
+            cv.Length(1),
+            no_icon_condition_duplicates
+        ),
+    }),
     cv.Schema({
         cv.Optional(CONF_ICON_VALUE): valid_icon_value,
         cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),

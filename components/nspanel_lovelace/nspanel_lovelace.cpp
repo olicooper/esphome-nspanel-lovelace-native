@@ -183,11 +183,9 @@ void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
       ESP_LOGV(TAG, "Adding item uuid.%s, entity_id=%s", 
           page_item->get_uuid().c_str(), entity_id.c_str());
 
-      // all entity types have a 'state'
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_state_update_, entity_id);
-
       if (page_item->is_type(entity_type::light)) {
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_state_update_, entity_id);
         // need to subscribe to brightness to know if brightness is supported
         this->subscribe_homeassistant_state(
             &NSPanelLovelace::on_entity_attr_brightness_update_, 
@@ -197,10 +195,19 @@ void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
             &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
             entity_id, ha_attr_type::supported_color_modes);
       }
+      else if (page_item->is_type(entity_type::switch_) ||
+          page_item->is_type(entity_type::input_boolean) ||
+          page_item->is_type(entity_type::automation) ||
+          page_item->is_type(entity_type::fan)) {
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_state_update_, entity_id);
+      }
       // icons and unit_of_measurement based on state and device_class
       else if (page_item->is_type(entity_type::sensor) ||
           page_item->is_type(entity_type::binary_sensor) ||
           page_item->is_type(entity_type::cover)) {
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_state_update_, entity_id);
         this->subscribe_homeassistant_state(
             &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
             entity_id, ha_attr_type::unit_of_measurement);

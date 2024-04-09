@@ -82,9 +82,6 @@ CONF_CARD_ENTITIES_NAME = "name"
 
 CONF_CARD_QR_TEXT = "qr_text"
 
-# forward reference, defined later
-SCHEMA_ENTITY_ICON = None
-
 def load_icons():
     global iconJson
     # iconJsonPath = core.CORE.relative_src_path(os.path.join("esphome", "components", "nspanel_lovelace", "icons.json"))
@@ -125,25 +122,6 @@ def valid_icon_value(value):
         raise cv.Invalid(f"Icon '{value}' not found! Valid example 'weather-sunny' or 'hex:E598'")
     raise cv.Invalid(
         f"Must be a string, got {value}. did you forget putting quotes around the value?"
-    )
-
-def valid_icon(value):
-    """Validate that a given config value is a valid icon."""
-    cv.check_not_templatable(value)
-    if not value:
-        return value
-    # if isinstance(value, list):
-    #     return cv.ensure_list(valid_icon)(value)
-    #     # for item in value:
-    #     #     if not isinstance(item, dict) and not isinstance(item, str):
-    #     #         raise cv.Invalid(f"Icon state overrides must be a list of icon 'value' strings or dictionary values containing 'value' and 'color'")
-    #     # return SCHEMA_ENTITY_ICON_LIST(value)
-    if isinstance(value, dict):
-        return SCHEMA_ENTITY_ICON(value)
-    if isinstance(value, str):
-        return valid_icon_value(value)
-    raise cv.Invalid(
-        f"Must be a string or dictionary, got {value}. did you forget putting quotes around the value?"
     )
 
 def valid_uuid(value):
@@ -199,14 +177,18 @@ SCHEMA_LOCALE = cv.Schema({
     cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP,
 })
 
-SCHEMA_ENTITY_ICON = cv.Schema({
-    cv.Optional(CONF_ICON_VALUE): valid_icon_value,
-    cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),
-})
+SCHEMA_ICON = cv.Any(
+    cv.string_strict, # icon name
+    cv.Schema({
+        cv.Optional(CONF_ICON_VALUE): valid_icon_value,
+        cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),
+    }),
+    msg=f"Must be a string or a dictionary with {CONF_ICON_VALUE} and {CONF_ICON_COLOR} attributes"
+)
 
 SCHEMA_STATUS_ICON = cv.Schema({
     cv.Optional(CONF_ENTITY_ID): valid_entity_id,
-    cv.Optional(CONF_ICON): valid_icon,
+    cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
 
@@ -223,7 +205,7 @@ SCHEMA_SCREENSAVER = cv.Schema({
 SCHEMA_CARD_ENTITY = cv.Schema({
     cv.Required(CONF_ENTITY_ID): valid_entity_id,
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
-    cv.Optional(CONF_ICON): valid_icon,
+    cv.Optional(CONF_ICON): SCHEMA_ICON,
 })
 
 SCHEMA_CARD = cv.Schema({

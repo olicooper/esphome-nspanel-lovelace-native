@@ -25,7 +25,7 @@ public:
       const char *type, const std::string &uuid, const std::string &title,
       const uint16_t sleep_timeout);
   Page(const Page &other);
-  virtual ~Page() {}
+  virtual ~Page();
 
   virtual void accept(PageVisitor& visitor);
 
@@ -45,10 +45,13 @@ public:
   
   virtual void set_items_render_invalid();
 
+  virtual const char *get_render_instruction() const = 0;
+  virtual std::string &render(std::string &buffer) = 0;
+
   void add_item(const std::shared_ptr<PageItem> &item);
   void add_item_range(const std::vector<std::shared_ptr<PageItem>> &items);
   const std::vector<std::shared_ptr<PageItem>> &get_items() {
-    return items_;
+    return this->items_;
   }
 
   template<class TPageItem = PageItem>
@@ -56,18 +59,15 @@ public:
      static_assert(
         std::is_base_of<PageItem, TPageItem>::value,
         "TPageItem must derive from esphome::nspanel_lovelace::PageItem");
-    if ((items_.size() - 1) < index) 
+    if ((this->items_.size() - 1) < index) 
       return nullptr;
-    return page_item_cast<TPageItem>(items_.at(index).get());
+    return page_item_cast<TPageItem>(this->items_.at(index).get());
   }
-
-  virtual const char *get_render_instruction() const = 0;
-  virtual std::string &render(std::string &buffer) = 0;
 
 protected:
   Page();
 
-  virtual void on_item_added_(PageItem *) {}
+  virtual void on_item_added_(PageItem *);
 
   std::string uuid_;
   const char *type_;

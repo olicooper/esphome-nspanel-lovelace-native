@@ -3,8 +3,7 @@
 #include "config.h"
 #include "helpers.h"
 #include "types.h"
-#include <array>
-#include <string>
+#include <algorithm>
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -33,6 +32,29 @@ const std::string &PageItem::render() {
 
 std::string &PageItem::render_(std::string &buffer) {
   return buffer.append("uuid.").append(this->uuid_);
+}
+
+bool PageItem::has_page(Page *page) const {
+  return this->find_page(page) != nullptr;
+}
+
+const Page *PageItem::find_page(Page *page) const {
+  for (auto& p : this->pages_) {
+    if (p != page)
+      continue;
+    return p;
+  }
+  return nullptr;
+}
+
+void PageItem::add_page(Page *page) {
+  this->pages_.push_back(page);
+}
+
+void PageItem::remove_page(Page *page) {
+  this->pages_.erase(std::remove(
+    this->pages_.begin(), this->pages_.end(), page), 
+    this->pages_.end());
 }
 
 /*
@@ -359,8 +381,6 @@ void StatefulPageItem::set_device_class(const std::string &device_class) {
 }
 
 std::string &StatefulPageItem::render_(std::string &buffer) {
-  // buffer.clear(); // todo: should move to calling function?
-  
   // type~
   PageItem_Type::render_(buffer).append(1, SEPARATOR);
   if (this->entity_id_ == entity_type::delete_)

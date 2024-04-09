@@ -36,6 +36,12 @@ Page::Page(const Page &other) :
     uuid_(""), type_(other.type_), title_(other.title_), hidden_(other.hidden_),
     sleep_timeout_(other.sleep_timeout_) {}
 
+Page::~Page() {
+  for (auto& item : this->items_) {
+    item->remove_page(this);
+  }
+}
+
 void Page::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
 bool Page::is_type(const char *type) const {
@@ -61,6 +67,10 @@ void Page::add_item_range(const std::vector<std::shared_ptr<PageItem>> &items) {
   for (auto& item : items) {
     this->add_item(item);
   }
+}
+
+void Page::on_item_added_(PageItem *item) {
+  item->add_page(this);
 }
 
 } // namespace nspanel_lovelace

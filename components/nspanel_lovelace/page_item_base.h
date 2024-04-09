@@ -5,13 +5,17 @@
 #include "page_item_visitor.h"
 #include "types.h"
 #include <array>
-#include <map>
 #include <functional>
+#include <map>
+#include <stdint.h>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace esphome {
 namespace nspanel_lovelace {
+
+class Page;
 
 struct IRender {
 protected:
@@ -60,15 +64,28 @@ public:
   virtual void set_render_invalid() { this->render_invalid_ = true; }
   virtual const std::string &render();
 
+  bool has_page(Page *page) const;
+  const Page *find_page(Page *page) const;
+  template <typename TPage> const TPage *find_page(TPage *page) const {
+    static_assert(
+        std::is_base_of<Page, TPage>::value, "TPage must derive from Page");
+    auto p = this->find_page(static_cast<Page *>(page)); // todo: static cast needed?
+    return p == nullptr ? p : static_cast<TPage *>(p);
+  }
+
+  virtual void add_page(Page *page);
+  virtual void remove_page(Page *page);
+
 protected:
+  std::string uuid_;
+  std::string render_buffer_;
+  bool render_invalid_ = true;
+  std::vector<Page *> pages_;
+
   virtual uint16_t get_render_buffer_reserve_() const { return 15; }
   
   // output: internalName (uuid)
   std::string &render_(std::string &buffer) override;
-
-  std::string uuid_;
-  std::string render_buffer_;
-  bool render_invalid_ = true;
 };
 
 /*
@@ -264,6 +281,10 @@ public:
   void set_device_class(const std::string &device_class);
 
 protected:
+  // A function which modifies the entity when the state changes
+  std::function<void(StatefulPageItem *)> on_state_callback_;
+  std::string device_class_;
+
   static void state_on_off_fn(StatefulPageItem *me);
   static void state_binary_sensor_fn(StatefulPageItem *me);
   static void state_cover_fn(StatefulPageItem *me);
@@ -274,10 +295,6 @@ protected:
   // output: type~internalName~icon~iconColor~
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
-
-  // A function which modifies the entity when the state changes
-  std::function<void(StatefulPageItem *)> on_state_callback_;
-  std::string device_class_;
 };
 
 } // namespace nspanel_lovelace

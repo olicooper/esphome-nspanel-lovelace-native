@@ -15,31 +15,18 @@ namespace nspanel_lovelace {
  * =============== Card ===============
  */
 
-Card::Card(const char *type, const std::string &uuid) : Page(type, uuid) {}
+Card::Card(const char *type, const std::string &uuid) :
+    Page(type, uuid) {}
 
-Card::Card(const char *type, const std::string &uuid, const std::string &title) : 
-    Page(type, uuid, title) {}
+Card::Card(const char *type, const std::string &uuid,
+    const std::string &title) : Page(type, uuid, title) {}
 
 Card::Card(
     const char *type, const std::string &uuid, 
     const std::string &title, const uint16_t sleep_timeout) :
     Page(type, uuid, title, sleep_timeout) {}
 
-Card::~Card() {
-  for (auto& item : this->items_) {
-    if (auto card_item = page_item_cast<CardItem>(item.get())) {
-      card_item->remove_card(this);
-    }
-  }
-}
-
 void Card::accept(PageVisitor& visitor) { visitor.visit(*this); }
-
-void Card::on_item_added_(PageItem *item) {
-  if (auto card_item = page_item_cast<CardItem>(item)) {
-    card_item->add_card(this);
-  }
-}
 
 std::string &Card::render(std::string &buffer) {
   buffer.assign(this->get_render_instruction())
@@ -68,29 +55,6 @@ std::string &Card::render(std::string &buffer) {
  */
 
 void CardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
-
-bool CardItem::has_card(Page *card) const {
-  return this->find_card(card) != nullptr;
-}
-
-const Card *CardItem::find_card(Page *card) const {
-  for (auto& c : cards_) {
-    if (c != card)
-      continue;
-    return c;
-  }
-  return nullptr;
-}
-
-void CardItem::add_card(Card *card) {
-  this->cards_.push_back(card);
-}
-
-void CardItem::remove_card(Card *card) {
-  cards_.erase(std::remove(
-    cards_.begin(), cards_.end(), card), 
-    cards_.end());
-}
 
 void CardItem::set_entity_id(const std::string &entity_id) {
   StatefulPageItem::set_entity_id(entity_id);

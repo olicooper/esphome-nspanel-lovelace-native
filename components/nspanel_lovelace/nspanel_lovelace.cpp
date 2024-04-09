@@ -1107,22 +1107,20 @@ void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, 
   ESP_LOGV(TAG, "HA state update %s %s='%s'",
       entity_id.c_str(), attr, attr_value.c_str());
 
-  if (auto card_item = page_item_cast<CardItem>(item)) {
-    if (!card_item->has_card(this->current_page_)) {
-      this->cancel_timeout("stupd");
-      return;
-    }
+  if (!item->has_page(this->current_page_)) {
+    this->cancel_timeout("stupd");
+    return;
 
     // If there are lots of entity attributes that update within a short time
     // then this will queue lots of commands unnecessarily.
     // This re-schedules updates every time one happens within a 200ms period.
-    this->set_timeout("stupd", 200, [this,card_item,attr] () {
+    this->set_timeout("stupd", 200, [this,item,attr] () {
       // re-render only if the entity is on the currently active card
-      if (card_item->has_card(this->current_page_)) {
+      if (item->has_page(this->current_page_)) {
         ESP_LOGV(TAG, "Render state update %s='%s'",
-            card_item->get_entity_id().c_str(), attr);
-        if (this->popup_page_current_uuid_ == card_item->get_uuid()) {
-          this->render_popup_page_update_(card_item);
+            item->get_entity_id().c_str(), attr);
+        if (this->popup_page_current_uuid_ == item->get_uuid()) {
+          this->render_popup_page_update_(item);
         } else if (this->popup_page_current_uuid_.empty()) {
           this->render_item_update_(this->current_page_);
         }

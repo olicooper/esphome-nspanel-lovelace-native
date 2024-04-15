@@ -27,9 +27,6 @@ public:
 
   void accept(PageVisitor& visitor) override;
 
-  std::unique_ptr<NavigationItem> nav_left;
-  std::unique_ptr<NavigationItem> nav_right;
-
   void set_nav_left(std::unique_ptr<NavigationItem> &nav) {
     this->nav_left.swap(nav);
   }
@@ -37,8 +34,14 @@ public:
     this->nav_right.swap(nav);
   }
 
-  const char *get_render_instruction() const override { return "entityUpd"; }
   std::string &render(std::string &buffer) override;
+
+protected:
+  std::unique_ptr<NavigationItem> nav_left;
+  std::unique_ptr<NavigationItem> nav_right;
+
+  const char *get_render_instruction() const override { return "entityUpd"; }
+  std::string &render_nav(std::string &buffer);
 };
 
 /*

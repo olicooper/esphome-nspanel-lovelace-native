@@ -45,7 +45,6 @@ public:
   
   virtual void set_items_render_invalid();
 
-  virtual const char *get_render_instruction() const = 0;
   virtual std::string &render(std::string &buffer) = 0;
 
   void add_item(const std::shared_ptr<PageItem> &item);
@@ -67,6 +66,7 @@ public:
 protected:
   Page();
 
+  virtual const char *get_render_instruction() const = 0;
   virtual void on_item_added_(PageItem *);
 
   std::string uuid_;

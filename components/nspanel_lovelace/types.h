@@ -15,6 +15,19 @@ namespace nspanel_lovelace {
 
 enum render_page_option { prev, next, down, screensaver, default_page };
 
+enum alarm_arm_action { arm_home, arm_away, arm_night, arm_vacation };
+struct alarm_entity_state {
+  static constexpr const char* disarmed = "disarmed";
+  static constexpr const char* arming = "arming";
+  static constexpr const char* pending = "pending";
+  static constexpr const char* triggered = "triggered";
+  static constexpr const char* armed_home = "armed_home";
+  static constexpr const char* armed_away = "armed_away";
+  static constexpr const char* armed_night = "armed_night";
+  static constexpr const char* armed_vacation = "armed_vacation";
+  static constexpr const char* armed_custom_bypass = "armed_custom_bypass";
+};
+
 static const std::array<std::array<const char *, 2>, 7> dow_names = {
     {{"Sun", "Sunday"},
      {"Mon", "Monday"},
@@ -182,6 +195,7 @@ struct generic_type {
   static constexpr const char* enable = "enable";
   static constexpr const char* disable = "disable";
   static constexpr const char* unknown = "unknown";
+  static constexpr const char* unavailable = "unavailable";
   static constexpr const char* on = "on";
   static constexpr const char* off = "off";
 };
@@ -400,6 +414,7 @@ struct page_type {
   static constexpr const char* cardUnlock = "cardUnlock";
   static constexpr const char* cardQR = "cardQR";
   static constexpr const char* cardPower = "cardPower";
+  static constexpr const char* cardAlarm = "cardAlarm";
   
   static constexpr const char* popupLight = "popupLight";
 };
@@ -430,6 +445,7 @@ struct ha_attr_type {
   static constexpr const char* color_mode = "color_mode";
   static constexpr const char* color_temp = "color_temp";
   static constexpr const char* rgb_color = "rgb_color";
+  static constexpr const char* code = "code";
 };
 
 struct ha_attr_color_mode {

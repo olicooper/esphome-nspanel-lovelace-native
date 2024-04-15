@@ -143,6 +143,7 @@ void PageItem_Icon::set_icon_value(const std::string &value) {
 void PageItem_Icon::reset_icon_value() {
   this->icon_value_ = this->icon_default_value_;
   this->icon_value_overridden_ = false;
+  set_render_invalid_();
 }
 
 void PageItem_Icon::set_icon_color(const uint16_t color) {
@@ -160,6 +161,7 @@ void PageItem_Icon::set_icon_color(const std::array<uint8_t, 3> rgb) {
 void PageItem_Icon::reset_icon_color() {
   this->icon_color_ = this->icon_default_color_;
   this->icon_color_overridden_ = false;
+  set_render_invalid_();
 }
 
 std::string &PageItem_Icon::render_(std::string &buffer) {

@@ -34,6 +34,16 @@ std::string &Card::render(std::string &buffer) {
       .append(this->get_title())
       .append(1, SEPARATOR);
   
+  this->render_nav(buffer);
+
+  for (auto& item : this->items_) {
+    buffer.append(1, SEPARATOR).append(item->render());
+  }
+
+  return buffer;
+}
+
+std::string &Card::render_nav(std::string &buffer) {
   if (this->nav_left)
     buffer.append(this->nav_left->render()).append(1, SEPARATOR);
   else
@@ -42,10 +52,6 @@ std::string &Card::render(std::string &buffer) {
     buffer.append(this->nav_right->render());
   else
     buffer.append("delete").append(5, SEPARATOR);
-
-  for (auto& item : this->items_) {
-    buffer.append(1, SEPARATOR).append(item->render());
-  }
 
   return buffer;
 }

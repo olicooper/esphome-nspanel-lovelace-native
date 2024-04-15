@@ -118,5 +118,44 @@ protected:
   std::string &render_(std::string &buffer) override;
 };
 
+/*
+ * =============== AlarmButtonItem ===============
+ */
+
+class AlarmButtonItem :
+    public PageItem,
+    public PageItem_Type,
+    public PageItem_DisplayName {
+public:
+  AlarmButtonItem(const std::string &uuid,
+      const char *action_type, const std::string &display_name);
+  // virtual ~AlarmButtonItem() {}
+
+  void accept(PageItemVisitor& visitor) override;
+
+protected:
+  // output: displayName~action
+  std::string &render_(std::string &buffer) override;
+};
+
+/*
+ * =============== AlarmIconItem ===============
+ */
+
+class AlarmIconItem :
+    public PageItem,
+    public PageItem_Icon {
+public:
+  AlarmIconItem(const std::string &uuid,
+      const std::string &icon_default_value, const uint16_t icon_default_color);
+  // virtual ~AlarmIconItem() {}
+
+  void accept(PageItemVisitor& visitor) override;
+
+protected:
+  // output: icon~iconColor
+  std::string &render_(std::string &buffer) override;
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

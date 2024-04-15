@@ -105,6 +105,11 @@ nspanel_lovelace:
           name: Password
           icon: key
 
+    - type: cardAlarm
+      sleep_timeout: 60
+      title: Home Alarm
+      alarm_entity_id: alarm_control_panel.home_alarm
+
 logger:
   baud_rate: 115200
   # level: DEBUG #[NONE,ERROR,WARN,DEBUG,VERBOSE,VERY_VERBOSE]

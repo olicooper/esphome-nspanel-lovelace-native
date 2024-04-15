@@ -28,11 +28,11 @@ This is a **beta project** which is not fully functional yet and is subject to c
 There are many UI components missing and the [python build script](components/nspanel_lovelace/__init__.py) is in dire need of refactoring (I butchered it together to get it working but PRs to the ESPHome repo are required to provide more flexibility over code generation).
 
 Currently the following features work:
-- Screensaver with time, date and weather display
-- Support for `cardGrid`, `cardEntities`, `cardQR`
-- Most entity types should display on cards. Lights, switches and scenes have been tested to work, with additional support for the `popupLight` page.
+- Screensaver with time, date, weather and status icon display
+- Support for `cardGrid`, `cardEntities`, `cardQR`, `cardAlarm`
+- Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` page.
 
-There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardAlarm`, `cardPower` etc. but these are planned for the future.
+There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardPower` etc. but these are planned for the future.
 Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.
 
 PRs to expand the functionality or fix bugs are very welcome!

@@ -171,5 +171,35 @@ char_icon_map WeatherItem::icon_color_map = {
 
 std::string WeatherItem::temperature_unit = "°C";
 
+/*
+ * =============== AlarmButtonItem ===============
+ */
+
+AlarmButtonItem::AlarmButtonItem(const std::string &uuid,
+    const char *action_type, const std::string &display_name) :
+    PageItem(uuid), PageItem_Type(this, action_type), 
+    PageItem_DisplayName(this, display_name) {}
+
+void AlarmButtonItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
+std::string &AlarmButtonItem::render_(std::string &buffer) {
+  PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
+  return PageItem_Type::render_(buffer);
+}
+
+/*
+ * =============== AlarmIconItem ===============
+ */
+
+AlarmIconItem::AlarmIconItem(const std::string &uuid,
+    const std::string &icon_default_value, const uint16_t icon_default_color) :
+    PageItem(uuid), PageItem_Icon(this, icon_default_value, icon_default_color) {}
+
+void AlarmIconItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
+std::string &AlarmIconItem::render_(std::string &buffer) {
+  return PageItem_Icon::render_(buffer);
+}
+
 } // namespace nspanel_lovelace
 } // namespace esphome

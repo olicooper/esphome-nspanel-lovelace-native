@@ -162,6 +162,16 @@ void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t p
   for (auto &item : page->get_items()) {
     this->add_page_item(item);
   }
+
+  if (page->is_type(page_type::cardAlarm)) {
+    auto card = static_cast<AlarmCard *>(page.get());
+    this->subscribe_homeassistant_state(
+      &NSPanelLovelace::on_alarm_state_update_,
+      card->get_alarm_entity_id());
+    this->subscribe_homeassistant_state(
+      &NSPanelLovelace::on_alarm_code_required_update_,
+      card->get_alarm_entity_id(), "code_arm_required");
+  }
 }
 
 void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
@@ -434,12 +444,12 @@ void NSPanelLovelace::render_current_page_() {
 }
 
 void NSPanelLovelace::render_item_update_(Page *page) {
+  page->render(this->command_buffer_);
+  this->send_buffered_command_();
+
   if (page->is_type(page_type::screensaver)) {
     static_cast<Screensaver*>(page)
       ->render_status_update(this->command_buffer_);
-    this->send_buffered_command_();
-  } else {
-    page->render(this->command_buffer_);
     this->send_buffered_command_();
   }
 }
@@ -533,7 +543,7 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  ESP_LOGCONFIG(TAG, "\tState: page_count:%u,item_count:%u,page_item_count:%u", 
+  ESP_LOGCONFIG(TAG, "\tState: pages:%u,items:%u,stateful_items:%u", 
       this->pages_.size(), 
       this->page_items_.size(), 
       this->stateful_page_items_.size());
@@ -787,13 +797,15 @@ void NSPanelLovelace::process_button_press_(
     const std::string &button_type, 
     const std::string &value,
     bool called_from_timeout) {
+  if (button_type.empty()) return;
+  
   // Throttle and filter processing of spammy actions to avoid command flooding
   if (!called_from_timeout) {
     if (internal_id == this->button_press_uuid_ && 
         button_type == this->button_press_type_) {
       this->button_press_value_ = value;
       if (this->button_press_timeout_set_) return;
-      this->set_timeout("btnpr", 500, [this]() {
+      this->set_timeout("btnpr", 200, [this]() {
         this->button_press_timeout_set_ = false;
         ESP_LOGD(TAG, "Button press delayed: %s,%s,%s", 
             this->button_press_uuid_.c_str(), this->button_press_type_.c_str(), 
@@ -931,10 +943,9 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        // todo: wont compile without explicit string conversion!?
-        {std::string(ha_attr_type::entity_id), entity_id},
+        {(const char*)ha_attr_type::entity_id, entity_id},
         // scale 0-100 to ha brightness range
-        {ha_attr_type::brightness, std::to_string(
+        {(const char*)ha_attr_type::brightness, std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100}, {0, 255})
           )).c_str()}
@@ -957,9 +968,9 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {ha_attr_type::entity_id, entity_id},
+        {(const char*)ha_attr_type::entity_id, entity_id},
         // scale 0-100 from slider to color range of the light
-        {ha_attr_type::color_temp, std::to_string(
+        {(const char*)ha_attr_type::color_temp, std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100},
             {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
@@ -983,11 +994,29 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {ha_attr_type::entity_id, entity_id}
+        {(const char*)ha_attr_type::entity_id, entity_id}
       }},
       {{
-        {ha_attr_type::rgb_color, rgb_str.c_str()}
+        {(const char*)ha_attr_type::rgb_color, rgb_str.c_str()}
       }});
+  } else if (
+    button_type == button_type::armHome ||
+    button_type == button_type::armAway ||
+    button_type == button_type::armNight ||
+    button_type == button_type::armVacation ||
+    button_type == button_type::disarm)
+  {
+    auto action = std::string("alarm_").append(button_type);
+    if (value.empty()) {
+      this->call_ha_service_(entity_type, action.c_str(), entity_id);
+    } else {
+      this->call_ha_service_(
+        entity_type, action.c_str(), 
+        {{
+          {(const char*)ha_attr_type::entity_id, entity_id},
+          {(const char*)ha_attr_type::code, value.c_str()}
+        }});
+    }
   }
 }
 
@@ -1150,6 +1179,62 @@ void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, 
     }
   });
 
+}
+
+void NSPanelLovelace::on_alarm_code_required_update_(std::string entity_id, std::string code_required) {
+  // find correct page to update state
+  AlarmCard *alarm_card = nullptr;
+  for (auto &&page : this->pages_) {
+    if (!page->is_type(page_type::cardAlarm)) continue;
+    
+    alarm_card = static_cast<AlarmCard*>(page.get());
+    if (alarm_card->get_alarm_entity_id() != entity_id) {
+      continue;
+    }
+
+    alarm_card->set_show_keypad(code_required != generic_type::off);
+    break;
+  }
+
+  ESP_LOGD(TAG, "HA update: uuid.%s %s code_arm_required='%s'",
+      alarm_card == nullptr ? "??" : alarm_card->get_uuid().c_str(),
+      entity_id.c_str(), code_required.c_str());
+
+  if (alarm_card == nullptr ||
+      !this->popup_page_current_uuid_.empty() ||
+      this->current_page_->get_uuid() != alarm_card->get_uuid()) {
+    return;
+  }
+  this->current_page_->render(this->command_buffer_);
+  this->send_buffered_command_();
+}
+
+void NSPanelLovelace::on_alarm_state_update_(std::string entity_id, std::string state) {
+  // find correct page to update state
+  AlarmCard *alarm_card = nullptr;
+  for (auto &&page : this->pages_) {
+    if (!page->is_type(page_type::cardAlarm)) continue;
+    
+    alarm_card = static_cast<AlarmCard*>(page.get());
+    if (alarm_card->get_alarm_entity_id() != entity_id) {
+      continue;
+    }
+
+    alarm_card->set_state(state);
+    break;
+  }
+
+  ESP_LOGD(TAG, "HA update: uuid.%s %s state='%s'",
+      alarm_card == nullptr ? "??" : alarm_card->get_uuid().c_str(),
+      entity_id.c_str(), state.c_str());
+
+  if (alarm_card == nullptr ||
+      !this->popup_page_current_uuid_.empty() ||
+      this->current_page_->get_uuid() != alarm_card->get_uuid()) {
+    return;
+  }
+  this->current_page_->render(this->command_buffer_);
+  this->send_buffered_command_();
 }
 
 void NSPanelLovelace::send_weather_update_command_() {

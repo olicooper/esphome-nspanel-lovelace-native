@@ -152,6 +152,8 @@ protected:
   void on_entity_attr_min_mireds_update_(std::string entity_id, std::string min_mireds);
   void on_entity_attr_max_mireds_update_(std::string entity_id, std::string max_mireds);
   void on_entity_attribute_update_(const std::string &entity_id, const char *attr_name, const std::string &attr_value);
+  void on_alarm_state_update_(std::string entity_id, std::string state);
+  void on_alarm_code_required_update_(std::string entity_id, std::string code_required);
 
   void on_weather_state_update_(std::string entity_id, std::string state);
   void on_weather_temperature_update_(std::string entity_id, std::string temperature);

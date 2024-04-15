@@ -38,14 +38,28 @@ nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
 DOW = nspanel_lovelace_ns.class_("DayOfWeekMap").enum("dow")
 
+ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
+ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation']
+ALARM_ARM_OPTION_MAP = {
+    'arm_home': [ALARM_ARM_ACTION.arm_home, "Arm Home"],
+    'arm_away': [ALARM_ARM_ACTION.arm_away, "Arm Away"],
+    'arm_night': [ALARM_ARM_ACTION.arm_night, "Arm Night"],
+    'arm_vacation': [ALARM_ARM_ACTION.arm_vacation, "Arm Vacation"],
+}
+
 NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
     "NSPanelLovelaceMsgIncomingTrigger",
     automation.Trigger.template(cg.std_string)
 )
 
 ## todo: also internal ids such as iText and navigate to add
-ENTITY_ID_RE = re.compile(r"^(?:(delete)|((?:(?:binary_)?sensor|button|light|switch|scene|timer|weather|navigate).[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
-CARD_TYPES = ["screensaver","cardEntities","cardGrid","cardQR"]
+ENTITY_ID_RE = re.compile(r"^(?:(delete)|((?:(?:binary_)?sensor|button|light|switch|scene|timer|weather|navigate|alarm_control_panel).[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
+
+CARD_ENTITIES="cardEntities"
+CARD_GRID="cardGrid"
+CARD_GRID2="cardGrid2"
+CARD_QR="cardQR"
+CARD_ALARM="cardAlarm"
 
 CONF_INCOMING_MSG = "on_incoming_msg"
 CONF_ICON = "icon"
@@ -81,6 +95,8 @@ CONF_CARD_ENTITIES = "entities"
 CONF_CARD_ENTITIES_NAME = "name"
 
 CONF_CARD_QR_TEXT = "qr_text"
+CONF_CARD_ALARM_ENTITY_ID = "alarm_entity_id"
+CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 
 def load_icons():
     global iconJson
@@ -164,6 +180,13 @@ def valid_clock_format(property_name):
         return value
     return validator
 
+def ensure_unique(value: list):
+    all_values = list(value)
+    unique_values = set(value)
+    if len(all_values) != len(unique_values):
+        raise cv.Invalid("Mapping values must be unique.")
+    return value
+
 SCHEMA_DOW_ITEM = cv.All(
     cv.ensure_list(cv.string_strict), 
     cv.Length(2, 2, 'There must be exactly 2 items specified, the short form then the long form e.g. ["Sun", "Sunday"]'),
@@ -214,16 +237,12 @@ SCHEMA_CARD_ENTITY = cv.Schema({
     cv.Optional(CONF_ICON): SCHEMA_ICON,
 })
 
-SCHEMA_CARD = cv.Schema({
+SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
-    cv.Required(CONF_CARD_TYPE): cv.one_of(*CARD_TYPES, space="_"),
     cv.Optional(CONF_CARD_HIDDEN, default=False): cv.boolean,
     cv.Optional(CONF_CARD_TITLE): cv.string,
-    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
     # timeout range from 2s to 12hr
-    cv.Optional(CONF_CARD_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200),
-    # For QRCard. todo: move to separate schema
-    cv.Optional(CONF_CARD_QR_TEXT): cv.string_strict,
+    cv.Optional(CONF_CARD_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200)
 })
 
 def validate_config(config):
@@ -264,7 +283,31 @@ CONFIG_SCHEMA = cv.All(
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(NSPanelLovelaceMsgIncomingTrigger),
             })
         ),
-        cv.Optional(CONF_CARDS): cv.ensure_list(SCHEMA_CARD),
+        cv.Optional(CONF_CARDS): cv.ensure_list(
+            cv.typed_schema({
+                CARD_ENTITIES: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
+                }),
+                CARD_GRID: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
+                }),
+                CARD_GRID2: SCHEMA_CARD_BASE,
+                CARD_QR: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
+                    cv.Optional(CONF_CARD_QR_TEXT): cv.string_strict
+                }),
+                CARD_ALARM: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_ALARM_ENTITY_ID): valid_entity_id(['alarm_control_panel']),
+                    cv.Optional(CONF_CARD_ALARM_SUPPORTED_MODES, default=ALARM_ARM_OPTIONS): 
+                        cv.All(
+                            cv.ensure_list(cv.one_of(*ALARM_ARM_OPTIONS)),
+                            cv.Length(1, 4, f"Must be a list of up to 4 items from the following list: {ALARM_ARM_OPTIONS}"),
+                            ensure_unique
+                        )
+                }),
+            },
+            default_type=CARD_GRID)
+        ),
     })
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
@@ -277,20 +320,23 @@ EntitiesCard = nspanel_lovelace_ns.class_("EntitiesCard")
 GridCard = nspanel_lovelace_ns.class_("GridCard")
 # GridCard2 = nspanel_lovelace_ns.class_("GridCard2")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
+AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
 
 NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
 StatusIconItem = nspanel_lovelace_ns.class_("StatusIconItem")
 WeatherItem = nspanel_lovelace_ns.class_("WeatherItem")
 EntitiesCardEntityItem = nspanel_lovelace_ns.class_("EntitiesCardEntityItem")
 GridCardEntityItem = nspanel_lovelace_ns.class_("GridCardEntityItem")
+AlarmButtonItem = nspanel_lovelace_ns.class_("AlarmButtonItem")
 
 PAGE_MAP = {
     # [config type] : [c++ variable name prefix], [card class], [entity class]
-    "screensaver" : ["nspanel_screensaver", Screensaver, WeatherItem],
-    "cardEntities" : ["nspanel_card_", EntitiesCard, EntitiesCardEntityItem],
-    "cardGrid" : ["nspanel_card_", GridCard, GridCardEntityItem],
-    # "cardGrid2" : ["nspanel_card_", GridCard2, GridCardEntityItem]
-    "cardQR" : ["nspanel_card_", QRCard, EntitiesCardEntityItem]
+    CONF_SCREENSAVER: ["nspanel_screensaver", Screensaver, WeatherItem],
+    CARD_ENTITIES: ["nspanel_card_", EntitiesCard, EntitiesCardEntityItem],
+    CARD_GRID: ["nspanel_card_", GridCard, GridCardEntityItem],
+    # CARD_GRID2: ["nspanel_card_", GridCard2, GridCardEntityItem],
+    CARD_QR: ["nspanel_card_", QRCard, EntitiesCardEntityItem],
+    CARD_ALARM: ["nspanel_card_", AlarmCard, AlarmButtonItem]
 }
 
 def get_new_uuid(prefix: str = ""):
@@ -534,15 +580,20 @@ async def to_code(config):
         # else:
         #     card_class = cg.new_Pvariable(card_variable)
 
-        sleep_timeout = card_config.get(CONF_CARD_SLEEP_TIMEOUT, None)
+        sleep_timeout = card_config.get(CONF_CARD_SLEEP_TIMEOUT, 10)
         # if isinstance(sleep_timeout, int):
         #     cg.add(card_class.set_sleep_timeout(sleep_timeout))
         #     cg.add(cg.RawExpression(f"{card_variable}->set_sleep_timeout({sleep_timeout})"))
 
-        cg.add(cg.RawExpression(
-            f"auto {card_variable} = "
-            f"{make_shared.template(page_info[1]).__call__(card_uuids[i], title, sleep_timeout)}"))
-        # cg.add(cg.variable(card_variable, make_shared.template(page_info[1]).__call__(cg.global_ns.class_(page_info[0] + str(i + 1)))))
+        if card_config[CONF_CARD_TYPE] == CARD_ALARM:
+            cg.add(cg.RawExpression(
+                f"auto {card_variable} = "
+                f"{make_shared.template(page_info[1]).__call__(card_uuids[i], card_config[CONF_CARD_ALARM_ENTITY_ID], title, sleep_timeout)}"))
+        else:
+            cg.add(cg.RawExpression(
+                f"auto {card_variable} = "
+                f"{make_shared.template(page_info[1]).__call__(card_uuids[i], title, sleep_timeout)}"))
+            # cg.add(cg.variable(card_variable, make_shared.template(page_info[1]).__call__(cg.global_ns.class_(page_info[0] + str(i + 1)))))
 
         if card_config[CONF_CARD_HIDDEN] == True:
             cg.add(card_class.set_hidden(True))
@@ -574,9 +625,12 @@ async def to_code(config):
             cg.add(card_class.set_nav_right(cg.global_ns.class_(navright_variable)))
 
         # todo: create qr page specific function
-        if card_config[CONF_CARD_TYPE] == "cardQR":
+        if card_config[CONF_CARD_TYPE] == CARD_QR:
             if CONF_CARD_QR_TEXT in card_config:
                 cg.add(card_class.set_qr_text(card_config[CONF_CARD_QR_TEXT]))
+        if card_config[CONF_CARD_TYPE] == CARD_ALARM:
+            for mode in card_config[CONF_CARD_ALARM_SUPPORTED_MODES]:
+                cg.add(card_class.set_arm_button(ALARM_ARM_OPTION_MAP[mode][0], ALARM_ARM_OPTION_MAP[mode][1]))
 
         gen_card_entities(
             card_config.get(CONF_CARD_ENTITIES, []), 

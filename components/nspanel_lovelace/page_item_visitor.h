@@ -13,6 +13,8 @@ class PageItem;
 class NavigationItem;
 class StatusIconItem;
 class WeatherItem;
+class AlarmButtonItem;
+class AlarmIconItem;
 class CardItem;
 class StatefulPageItem;
 class GridCardEntityItem;
@@ -24,6 +26,8 @@ public:
   virtual bool visit(NavigationItem &) = 0;
   virtual bool visit(StatusIconItem &) = 0;
   virtual bool visit(WeatherItem &) = 0;
+  virtual bool visit(AlarmButtonItem &) = 0;
+  virtual bool visit(AlarmIconItem &) = 0;
   virtual bool visit(CardItem &) = 0;
   virtual bool visit(StatefulPageItem &) = 0;
   virtual bool visit(GridCardEntityItem &) = 0;
@@ -36,6 +40,8 @@ public:
   virtual bool visit(NavigationItem &);
   virtual bool visit(StatusIconItem &);
   virtual bool visit(WeatherItem &);
+  virtual bool visit(AlarmButtonItem &);
+  virtual bool visit(AlarmIconItem &);
   virtual bool visit(CardItem &);
   virtual bool visit(StatefulPageItem &);
   virtual bool visit(GridCardEntityItem &);

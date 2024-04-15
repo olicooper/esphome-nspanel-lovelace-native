@@ -17,6 +17,12 @@ bool InheritancePageItemVisitor::visit(StatusIconItem &item) {
 bool InheritancePageItemVisitor::visit(WeatherItem &item) {
   return visit(static_cast<PageItem &>(item));
 }
+bool InheritancePageItemVisitor::visit(AlarmButtonItem &item) {
+  return visit(static_cast<PageItem &>(item));
+}
+bool InheritancePageItemVisitor::visit(AlarmIconItem &item) {
+  return visit(static_cast<PageItem &>(item));
+}
 bool InheritancePageItemVisitor::visit(CardItem &item) {
   return visit(static_cast<StatefulPageItem &>(item)) ||
           visit(static_cast<PageItem &>(item));

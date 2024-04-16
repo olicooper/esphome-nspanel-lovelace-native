@@ -52,8 +52,13 @@ NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
     automation.Trigger.template(cg.std_string)
 )
 
-## todo: also internal ids such as iText and navigate to add
-ENTITY_ID_RE = re.compile(r"^(?:(delete)|((?:(?:binary_)?sensor|button|light|switch|scene|timer|weather|navigate|alarm_control_panel).[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
+ENTITY_ID_RE = re.compile(r"^(?:(delete)|([\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
+## The list of currently supported entities
+ENTITY_TYPES = [
+    'sensor','binary_sensor','light','switch','scene','timer','weather','navigate',
+    'alarm_control_panel','input_boolean','input_button','cover','fan','automation',
+    'script'
+]
 
 CARD_ENTITIES="cardEntities"
 CARD_GRID="cardGrid"
@@ -152,19 +157,37 @@ def valid_uuid(value):
     )
 
 def valid_entity_id(entity_type_whitelist: list[str] = None):
-    """Validate that a given config value is a valid entity_id."""
+    """Validate that a given entity_id is correctly formatted and present in the entity type whitelist."""
     def validator(value):
         value = cv.string_strict(value)
         if not value:
             return value
         if re.match(ENTITY_ID_RE, value):
-            if entity_type_whitelist is None or [w for w in entity_type_whitelist if value.startswith(w)]:
+            if value == 'delete' or value.startswith('iText.'):
                 return value
+            if [t for t in ENTITY_TYPES if value.startswith(t)]:
+                if entity_type_whitelist is None:
+                    return value
+                elif [w for w in entity_type_whitelist if value.startswith(w)]:
+                    return value
+                raise cv.Invalid(
+                    f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_whitelist}"
+                )
             raise cv.Invalid(
-                f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_whitelist}"
+                f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {ENTITY_TYPES}"
+            )
+        if value.startswith('iText.'):
+            raise cv.Invalid(
+                f'entity_id "{value}" must match the format "iText.[text to display]" and '+
+                'and not contain the character "~" (tilde)'
+            )
+        elif value.startswith('delete'):
+            raise cv.Invalid(
+                f'When using the special "delete" entity type, you cannot also specify a value'
             )
         raise cv.Invalid(
-            f'entity_id "{value}" must match the format "[entity type].[entity name]" and contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1"'
+            f'entity_id "{value}" must match the format "[entity type].[entity name]" and '+
+            'contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1".'
         )
     return validator
 

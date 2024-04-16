@@ -126,28 +126,12 @@ nspanel_lovelace:
 
 logger:
   baud_rate: 115200
-  # level: DEBUG #[NONE,ERROR,WARN,DEBUG,VERBOSE,VERY_VERBOSE]
-  # logs:
-  #   api: WARN
-  #   uart: WARN
-  #   time: WARN
-  #   switch: WARN
-  #   sensor: WARN
-  #   button: WARN
-  #   text_sensor: WARN
-  #   resistance: WARN
-  #   ntc: WARN
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  # IMPORTANT: Keep this to connect to hidden network
-  # fast_connect: true
-  # reboot_timeout: 30min
 
 api:
-  encryption: 
-    key: !secret api_key
   services:
     # Service to send a command directly to the display. Useful for testing
     - service: send_command
@@ -350,10 +334,3 @@ button:
   - platform: restart
     id: restart_switch
     name: Restart
-
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: IP Address
-    bssid:
-      name: BSSID

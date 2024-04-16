@@ -23,7 +23,10 @@ esp32:
       CONFIG_D0WD_PSRAM_CS_IO: '18'
 
 external_components:
-  - source: components
+  - source:
+      type: git
+      url: https://github.com/olicooper/esphome-nspanel-lovelace-native
+      ref: dev
     components: [nspanel_lovelace]
 
 nspanel_lovelace:
@@ -52,7 +55,18 @@ nspanel_lovelace:
     #   icon:
     #     value: robot-outline
     #     color: 200
-    #   alt_font: True
+    #     conditions:
+    #       - state: 'on'
+    #         name: mdi:lightbulb
+    #         color: 65535
+    #       - state: 'off'
+    #         name: mdi:lightbulb-outline
+    #         color: 40400
+    #   value:
+    #     entity_id: sensor.temperature_1
+    #     format: '%.0f'
+    #   template: '{icon}{value}°C'
+    #   large_font: True
   cards:
     - type: cardGrid
       id: front_room

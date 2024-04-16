@@ -105,18 +105,24 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 
 def load_icons():
     global iconJson
-    # iconJsonPath = core.CORE.relative_src_path(os.path.join("esphome", "components", "nspanel_lovelace", "icons.json"))
-    iconJsonPath = core.CORE.relative_config_path(os.path.join("components", "nspanel_lovelace", "icons.json"))
-    _LOGGER.debug(f"Loading icons: {iconJsonPath}")
-    # # import requests
-    # # response = requests.get("https://raw.githubusercontent.com/joBr99/nspanel-lovelace-ui/main/HMI/code_gen/icons/icons.json")
-    # # if response.ok:
-    # #     icon_json = json.load(response.text)
-    with open(iconJsonPath) as read_file:
-        iconJson = json.load(read_file)
-        if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
-            raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
-        _LOGGER.debug(f"Loaded {str(len(iconJson))} icons")
+    iconJsonPath = core.CORE.relative_build_path("nspanel_icons.json")
+    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load icons from '{iconJsonPath}'")
+    try:
+        with open(iconJsonPath, encoding="utf-8") as read_file:
+            iconJson = json.load(read_file)
+    except (UnicodeDecodeError, OSError):
+        import requests
+        response = requests.get("https://raw.githubusercontent.com/olicooper/esphome-nspanel-lovelace-native/dev/components/nspanel_lovelace/icons.json")
+        if response.ok:
+            with open(iconJsonPath, mode="w", encoding="utf-8") as new_file:
+                new_file.write(response.text)
+            iconJson = json.loads(response.text)
+        else:
+            raise cv.invalid("Failed to load icons, do you have internet connection?")
+
+    if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
+        raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
+    _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
 
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:

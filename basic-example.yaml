@@ -158,6 +158,7 @@ uart:
 time:
   - platform: homeassistant
     id: homeassistant_time
+    timezone: Europe/London
     on_time:
       # At midnight
       - seconds: 0

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "card_base.h"
+#include "entity.h"
 #include "page_item_visitor.h"
+#include <memory>
 #include <stdint.h>
 #include <string>
 
@@ -14,10 +16,11 @@ namespace nspanel_lovelace {
 
 class GridCardEntityItem : public CardItem {
 public:
-  GridCardEntityItem(const std::string &uuid, const std::string &entity_id);
+  GridCardEntityItem(const std::string &uuid, std::shared_ptr<Entity> entity);
   GridCardEntityItem(
-      const std::string &uuid, const std::string &entity_id, 
+      const std::string &uuid, std::shared_ptr<Entity> entity, 
       const std::string &display_name);
+  // virtual ~GridCardEntityItem() {}
 
   void accept(PageItemVisitor& visitor) override;
 };
@@ -30,16 +33,17 @@ class EntitiesCardEntityItem :
     public CardItem,
     public PageItem_Value {
 public:
-  EntitiesCardEntityItem(const std::string &uuid, const std::string &entity_id);
+  EntitiesCardEntityItem(const std::string &uuid, std::shared_ptr<Entity> entity);
   EntitiesCardEntityItem(
-      const std::string &uuid, const std::string &entity_id,
+      const std::string &uuid, std::shared_ptr<Entity> entity,
       const std::string &display_name);
+  // virtual ~EntitiesCardEntityItem() {}
 
   void accept(PageItemVisitor& visitor) override;
+  
+  void on_entity_attribute_change(const char *attr, const std::string &value) override;
 
   const std::string &get_value() const { return this->value_; }
-  bool set_type(const char *type) override;
-  void set_state(const std::string &state) override;
 
 protected:
   static void state_generic_fn(StatefulPageItem *me);
@@ -47,6 +51,9 @@ protected:
   static void state_button_fn(StatefulPageItem *me);
   static void state_scene_fn(StatefulPageItem *me);
   static void state_script_fn(StatefulPageItem *me);
+  static void state_timer_fn(StatefulPageItem *me);
+
+  void set_on_state_callback_(const char *type) override;
 
   // output: type~internalName~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;

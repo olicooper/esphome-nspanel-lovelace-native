@@ -17,26 +17,35 @@ namespace nspanel_lovelace {
 
 NavigationItem::NavigationItem(
     const std::string &uuid, const std::string &navigation_uuid) : 
-    PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
-    PageItem_Icon(this, 65535u) {}
+    PageItem(uuid), PageItem_Icon(this, 65535u),
+    navigation_uuid_(navigation_uuid) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
 NavigationItem::NavigationItem(
     const std::string &uuid, const std::string &navigation_uuid, 
     const std::string &icon_default_value) : 
-    PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
-    PageItem_Icon(this, icon_default_value, 65535u) {}
+    PageItem(uuid), PageItem_Icon(this, icon_default_value, 65535u),
+    navigation_uuid_(navigation_uuid) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
 NavigationItem::NavigationItem(
     const std::string &uuid, const std::string &navigation_uuid, 
     const uint16_t icon_default_color) : 
-    PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
-    PageItem_Icon(this, icon_default_color) {}
+    PageItem(uuid), PageItem_Icon(this, icon_default_color),
+    navigation_uuid_(navigation_uuid) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
 NavigationItem::NavigationItem(
     const std::string &uuid, const std::string &navigation_uuid, 
     const std::string &icon_default_value, const uint16_t icon_default_color) :
-    PageItem(uuid), PageItem_EntityId(this, navigation_uuid), 
-    PageItem_Icon(this, icon_default_value, icon_default_color) {}
+    PageItem(uuid),
+    PageItem_Icon(this, icon_default_value, icon_default_color),
+    navigation_uuid_(navigation_uuid) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
 void NavigationItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
@@ -45,9 +54,9 @@ std::string &NavigationItem::render_(std::string &buffer) {
   // type~
   buffer.append(entity_type::button).append(1, SEPARATOR);
   // internalName(navigate.uuid.[page uuid])~
-  // NOTE: entity_id_ contains the uuid of the item to navigate to
+  // NOTE: navigation_uuid_ contains the uuid of the item to navigate to
   buffer.append(entity_type::navigate_uuid)
-    .append(1,'.').append(entity_id_).append(1, SEPARATOR);
+    .append(1,'.').append(navigation_uuid_).append(1, SEPARATOR);
   // icon~iconColor
   PageItem_Icon::render_(buffer);
   // skip: ~displayName~value
@@ -58,38 +67,34 @@ std::string &NavigationItem::render_(std::string &buffer) {
  * =============== StatusIconItem ===============
  */
 
-StatusIconItem::StatusIconItem(const std::string &uuid) :
-    StatefulPageItem(uuid), alt_font_(false) {
+StatusIconItem::StatusIconItem(
+    const std::string &uuid, std::shared_ptr<Entity> entity) :
+    StatefulPageItem(uuid, std::move(entity)), alt_font_(false) {
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
+
 StatusIconItem::StatusIconItem(
-    const std::string &uuid, const std::string &entity_id) :
-    StatefulPageItem(uuid), alt_font_(false) {
-  this->set_entity_id(entity_id);
-  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
-}
-StatusIconItem::StatusIconItem(
-    const std::string &uuid, const std::string &entity_id,
+    const std::string &uuid, std::shared_ptr<Entity> entity,
     const std::string &icon_default_value) :
-    StatefulPageItem(uuid, icon_default_value),
+    StatefulPageItem(uuid, std::move(entity), icon_default_value),
     alt_font_(false) {
-  this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
+
 StatusIconItem::StatusIconItem(
-    const std::string &uuid, const std::string &entity_id,
+    const std::string &uuid, std::shared_ptr<Entity> entity,
     const uint16_t icon_default_color) :
-    StatefulPageItem(uuid, icon_default_color),
+    StatefulPageItem(uuid, std::move(entity), icon_default_color),
     alt_font_(false) {
-  this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
+
 StatusIconItem::StatusIconItem(
-    const std::string &uuid, const std::string &entity_id,
+    const std::string &uuid, std::shared_ptr<Entity> entity,
     const std::string &icon_default_value, const uint16_t icon_default_color) :
-    StatefulPageItem(uuid, icon_default_value, icon_default_color),
+    StatefulPageItem(uuid, std::move(entity),
+      icon_default_value, icon_default_color),
     alt_font_(false) {
-  this->set_entity_id(entity_id);
   this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
@@ -106,8 +111,9 @@ std::string &StatusIconItem::render_(std::string &buffer) {
 
 WeatherItem::WeatherItem(const std::string &uuid) :
     PageItem(uuid), PageItem_Icon(this, 63878u), // change the default icon color: #ff3131 (red)
-    PageItem_DisplayName(this), PageItem_Value(this, "0.0"), 
-    float_value_(0.0f) {
+    PageItem_DisplayName(this),
+    PageItem_Value(this, "0.0"), float_value_(0.0f) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 WeatherItem::WeatherItem(
@@ -115,8 +121,9 @@ WeatherItem::WeatherItem(
     const std::string &value, const char *weather_condition) :
     PageItem(uuid), PageItem_Icon(this, 63878u), 
     PageItem_DisplayName(this, display_name), 
-    PageItem_Value(this, value) {
+    PageItem_Value(this, value), float_value_(0.0f) {
   this->set_icon_by_weather_condition(weather_condition);
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 void WeatherItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
@@ -177,14 +184,16 @@ std::string WeatherItem::temperature_unit = "°C";
 
 AlarmButtonItem::AlarmButtonItem(const std::string &uuid,
     const char *action_type, const std::string &display_name) :
-    PageItem(uuid), PageItem_Type(this, action_type), 
-    PageItem_DisplayName(this, display_name) {}
+    PageItem(uuid), PageItem_DisplayName(this, display_name),
+    action_type_(action_type) {
+  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
+}
 
 void AlarmButtonItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 std::string &AlarmButtonItem::render_(std::string &buffer) {
   PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
-  return PageItem_Type::render_(buffer);
+  return buffer.append(this->action_type_);
 }
 
 /*

@@ -2,7 +2,6 @@
 
 #include "config.h"
 #include "types.h"
-#include <stdint.h>
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -36,12 +35,6 @@ Page::Page(const Page &other) :
     uuid_(""), type_(other.type_), title_(other.title_), hidden_(other.hidden_),
     sleep_timeout_(other.sleep_timeout_) {}
 
-Page::~Page() {
-  for (auto& item : this->items_) {
-    item->remove_page(this);
-  }
-}
-
 void Page::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
 bool Page::is_type(const char *type) const {
@@ -54,13 +47,18 @@ void Page::set_items_render_invalid() {
   }
 }
 
+void Page::set_on_item_added_callback(
+    std::function<void(const std::shared_ptr<PageItem>&)> &&callback) {
+  this->on_item_added_callback_ = std::move(callback);
+}
+
 void Page::add_item(const std::shared_ptr<PageItem> &item) {
   for (auto &i : this->items_) {
     if (i->get_uuid() == item->get_uuid())
       return;
   }
   this->items_.push_back(item);
-  this->on_item_added_(item.get());
+  this->on_item_added_(item);
 }
 
 void Page::add_item_range(const std::vector<std::shared_ptr<PageItem>> &items) {
@@ -69,8 +67,8 @@ void Page::add_item_range(const std::vector<std::shared_ptr<PageItem>> &items) {
   }
 }
 
-void Page::on_item_added_(PageItem *item) {
-  item->add_page(this);
+void Page::on_item_added_(const std::shared_ptr<PageItem> &item) {
+  this->on_item_added_callback_(item);
 }
 
 } // namespace nspanel_lovelace

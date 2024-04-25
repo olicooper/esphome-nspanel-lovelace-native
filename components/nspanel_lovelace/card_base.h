@@ -22,7 +22,8 @@ class Card : public Page {
 public:
   Card(const char *type, const std::string &uuid);
   Card(const char *type, const std::string &uuid, const std::string &title);
-  Card(const char *type, const std::string &uuid, const std::string &title, const uint16_t sleep_timeout);
+  Card(const char *type, const std::string &uuid,
+      const std::string &title, const uint16_t sleep_timeout);
   virtual ~Card() {}
 
   void accept(PageVisitor& visitor) override;
@@ -52,15 +53,12 @@ class CardItem :
     public StatefulPageItem,
     public PageItem_DisplayName {
 public:
-  CardItem(const std::string &uuid) :
-    StatefulPageItem(uuid), PageItem_DisplayName(this) {}
-  CardItem(const std::string &uuid, const std::string &display_name) :
-    StatefulPageItem(uuid), PageItem_DisplayName(this, display_name) {}
+  CardItem(const std::string &uuid, std::shared_ptr<Entity> entity);
+  CardItem(const std::string &uuid, std::shared_ptr<Entity> entity,
+      const std::string &display_name);
   virtual ~CardItem() {}
 
   void accept(PageItemVisitor& visitor) override;
-
-  void set_entity_id(const std::string &entity_id) override;
 
 protected:
   // output: type~internalName~icon~iconColor~displayName~

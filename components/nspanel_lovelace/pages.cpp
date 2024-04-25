@@ -12,13 +12,11 @@ namespace nspanel_lovelace {
 
 void Screensaver::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
-void Screensaver::set_icon_left(std::shared_ptr<StatusIconItem> &left_icon) {
-  this->left_icon = left_icon;
-  this->left_icon->add_page(this);
+void Screensaver::set_icon_left(std::shared_ptr<StatusIconItem> left_icon) {
+  this->left_icon = std::move(left_icon);
 }
-void Screensaver::set_icon_right(std::shared_ptr<StatusIconItem> &right_icon) {
-  this->right_icon = right_icon;
-  this->right_icon->add_page(this);
+void Screensaver::set_icon_right(std::shared_ptr<StatusIconItem> right_icon) {
+  this->right_icon = std::move(right_icon);
 }
 
 // output: weatherUpd~(5x)[type~internalName~icon~iconColor~displayName~value]
@@ -34,6 +32,11 @@ std::string &Screensaver::render(std::string &buffer) {
 
 // output: statusUpdate~icon1~icon1Color~icon2~icon2Color~icon1AltFont~icon2AltFont
 std::string &Screensaver::render_status_update(std::string &buffer) {
+  if (!this->left_icon || !this->right_icon) {
+    // buffer.clear();
+    return buffer;
+  }
+
   std::string alt_font;
   buffer.assign("statusUpdate").append(1, SEPARATOR);
   

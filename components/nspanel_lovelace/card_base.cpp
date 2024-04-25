@@ -47,11 +47,11 @@ std::string &Card::render_nav(std::string &buffer) {
   if (this->nav_left)
     buffer.append(this->nav_left->render()).append(1, SEPARATOR);
   else
-    buffer.append("delete").append(6, SEPARATOR);
+    buffer.append(entity_type::delete_).append(6, SEPARATOR);
   if (this->nav_right)
     buffer.append(this->nav_right->render());
   else
-    buffer.append("delete").append(5, SEPARATOR);
+    buffer.append(entity_type::delete_).append(5, SEPARATOR);
 
   return buffer;
 }
@@ -60,20 +60,20 @@ std::string &Card::render_nav(std::string &buffer) {
  * =============== CardItem ===============
  */
 
+CardItem::CardItem(const std::string &uuid, std::shared_ptr<Entity> entity) :
+    StatefulPageItem(uuid, std::move(entity)),
+    PageItem_DisplayName(this) {}
+
+CardItem::CardItem(const std::string &uuid, std::shared_ptr<Entity> entity,
+    const std::string &display_name) :
+    StatefulPageItem(uuid, std::move(entity)),
+    PageItem_DisplayName(this, display_name) {}
+
 void CardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
-
-void CardItem::set_entity_id(const std::string &entity_id) {
-  StatefulPageItem::set_entity_id(entity_id);
-
-  if (this->entity_id_.empty() || !this->display_name_.empty()) return;
-
-  // todo: should be blank instead?
-  this->set_display_name(this->entity_id_);
-}
 
 std::string &CardItem::render_(std::string &buffer) {
   StatefulPageItem::render_(buffer);
-  if (this->entity_id_ == entity_type::delete_)
+  if (this->entity_->is_type(entity_type::delete_))
     buffer.append(1, SEPARATOR);
   else
     // displayName~

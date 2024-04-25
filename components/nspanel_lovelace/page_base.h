@@ -4,6 +4,7 @@
 #include "page_item_base.h"
 #include "page_visitor.h"
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <stdint.h>
 #include <string>
@@ -25,7 +26,7 @@ public:
       const char *type, const std::string &uuid, const std::string &title,
       const uint16_t sleep_timeout);
   Page(const Page &other);
-  virtual ~Page();
+  virtual ~Page() {}
 
   virtual void accept(PageVisitor& visitor);
 
@@ -55,19 +56,22 @@ public:
 
   template<class TPageItem = PageItem>
   TPageItem* get_item(const size_t index) {
-     static_assert(
-        std::is_base_of<PageItem, TPageItem>::value,
-        "TPageItem must derive from esphome::nspanel_lovelace::PageItem");
+    static_assert(
+      std::is_base_of<PageItem, TPageItem>::value,
+      "TPageItem must derive from esphome::nspanel_lovelace::PageItem");
     if ((this->items_.size() - 1) < index) 
       return nullptr;
     return page_item_cast<TPageItem>(this->items_.at(index).get());
   }
 
+  void set_on_item_added_callback(
+      std::function<void(const std::shared_ptr<PageItem>&)> &&callback);
+
 protected:
   Page();
 
   virtual const char *get_render_instruction() const = 0;
-  virtual void on_item_added_(PageItem *);
+  virtual void on_item_added_(const std::shared_ptr<PageItem> &item);
 
   std::string uuid_;
   const char *type_;
@@ -76,6 +80,7 @@ protected:
   uint16_t sleep_timeout_;
 
   std::vector<std::shared_ptr<PageItem>> items_;
+  std::function<void(const std::shared_ptr<PageItem>&)> on_item_added_callback_;
 };
 
 } // namespace nspanel_lovelace

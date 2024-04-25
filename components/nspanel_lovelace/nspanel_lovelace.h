@@ -2,7 +2,9 @@
 
 #include "defines.h"
 
+#include <functional>
 #include <memory>
+#include <map>
 #include <queue>
 #include <stdint.h>
 #include <utility>
@@ -30,6 +32,7 @@
 #endif
 
 #include "config.h"
+#include "entity.h"
 #include "types.h"
 #include "helpers.h"
 #include "page_base.h"
@@ -50,6 +53,38 @@ public:
   void setup() override;
   void loop() override;
 
+  std::shared_ptr<Entity> create_entity(const std::string &entity_id);
+
+  template <class TPage, class... TArgs>
+  TPage* create_page(TArgs&&... args) {
+    return this->insert_page<TPage>(SIZE_MAX, std::forward<TArgs>(args)...);
+  }
+
+  template <class TPage, class... TArgs>
+  TPage* insert_page(const size_t position, TArgs&&... args) {
+    static_assert(
+      std::is_base_of<Page, TPage>::value,
+      "TPage must derive from esphome::nspanel_lovelace::Page");
+    std::shared_ptr<TPage> page = std::make_shared<TPage>(std::forward<TArgs>(args)...);
+    // allows us to listen to item added events from pages
+    page->set_on_item_added_callback(
+      std::bind(&NSPanelLovelace::on_page_item_added_callback,
+        this, std::placeholders::_1));
+    
+    if (position == SIZE_MAX || position >= this->pages_.size())
+        this->pages_.push_back(page);
+    else
+      this->pages_.insert(this->pages_.begin() + position, page);
+
+    // set the screensaver if the page is a screensaver page
+    // todo: refactor so this isn't required here
+    if (page->is_type(page_type::screensaver)) {
+      this->screensaver_ = page_cast<Screensaver>(page.get());
+    }
+
+    return page.get();
+  }
+
 #ifdef USE_TIME
   void set_time_id(time::RealTimeClock *time_id) { this->time_id_ = time_id; }
   void set_date_format(const std::string &date_format) { this->date_format_ = date_format; }
@@ -61,8 +96,7 @@ public:
   void update_datetime(const datetime_mode mode = datetime_mode::both, const char *date_format = "", const char *time_format = "");
 #endif
   
-  void set_screensaver(const std::shared_ptr<Screensaver> &screensaver);
-  void add_page(const std::shared_ptr<Page> &page, const size_t position = SIZE_MAX);
+  void on_page_item_added_callback(const std::shared_ptr<PageItem> &item);
   void set_display_timeout(uint16_t timeout);
   void set_display_active_dim(uint8_t active);
   void set_display_inactive_dim(uint8_t inactive);
@@ -75,7 +109,9 @@ public:
   /**
    * Softreset the Nextion
    */
-  void soft_reset_display() { this->send_nextion_command_("rest"); }
+  void soft_reset_display() {
+    this->send_nextion_command_("rest"); // doesnt exist/work!?
+  }
 
   float get_setup_priority() const override { return setup_priority::DATA; }
 
@@ -104,8 +140,6 @@ protected:
 #endif
   void send_nextion_command_(const std::string &command);
 
-  void add_page_item(const std::shared_ptr<PageItem> &item);
-
   bool process_data_();
   size_t find_page_index_by_uuid_(const std::string &uuid) const;
   const std::string &try_replace_uuid_with_entity_id_(const std::string &uuid_or_entity_id);
@@ -113,8 +147,8 @@ protected:
   void send_buffered_command_();
   void process_display_command_queue_();
   void process_button_press_(std::string &entity_id, const std::string &button_type, const std::string &value = "", bool called_from_timeout = false);
-  StatefulPageItem* get_entity_by_id_(const std::string &entity_id);
-  StatefulPageItem* get_entity_by_uuid_(const std::string &uuid);
+  StatefulPageItem* get_page_item_(const std::string &uuid);
+  Entity* get_entity_(const std::string &entity_id);
 
   void render_page_(size_t index);
   void render_page_(render_page_option d);
@@ -151,9 +185,8 @@ protected:
   void on_entity_attr_color_temp_update_(std::string entity_id, std::string color_temp);
   void on_entity_attr_min_mireds_update_(std::string entity_id, std::string min_mireds);
   void on_entity_attr_max_mireds_update_(std::string entity_id, std::string max_mireds);
+  void on_entity_attr_code_arm_required_update_(std::string entity_id, std::string code_required);
   void on_entity_attribute_update_(const std::string &entity_id, const char *attr_name, const std::string &attr_value);
-  void on_alarm_state_update_(std::string entity_id, std::string state);
-  void on_alarm_code_required_update_(std::string entity_id, std::string code_required);
 
   void on_weather_state_update_(std::string entity_id, std::string state);
   void on_weather_temperature_update_(std::string entity_id, std::string temperature);
@@ -162,13 +195,13 @@ protected:
   void send_weather_update_command_();
   std::string weather_entity_id_;
   DayOfWeekMap day_of_week_map_;
-  bool day_of_week_map_overridden_;
+  bool day_of_week_map_overridden_ = false;
 
   std::queue<std::string> command_queue_;
-  unsigned long command_last_sent_;
+  unsigned long command_last_sent_ = 0;
   unsigned int update_baud_rate_ = 921600;
 
-  bool button_press_timeout_set_;
+  bool button_press_timeout_set_ = false;
   std::string button_press_uuid_;
   std::string button_press_type_;
   std::string button_press_value_;
@@ -176,11 +209,13 @@ protected:
   uint8_t current_page_index_ = 0;
   std::string popup_page_current_uuid_;
   Page* current_page_ = nullptr;
+  bool force_current_page_update_ = false;
   Screensaver* screensaver_ = nullptr;
+  std::vector<std::shared_ptr<Entity>> entities_;
   std::vector<std::shared_ptr<Page>> pages_;
-  std::vector<std::shared_ptr<PageItem>> page_items_;
   std::vector<std::shared_ptr<StatefulPageItem>> stateful_page_items_;
   StatefulPageItem* cached_page_item_ = nullptr;
+  Entity* cached_entity_ = nullptr;
 
   CallbackManager<void(std::string)> incoming_msg_callback_;
 

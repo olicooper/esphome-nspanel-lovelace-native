@@ -6,7 +6,6 @@
 #include <cassert>
 #include <cmath>
 #include <esp_heap_caps.h>
-#include <map>
 #include <math.h>
 #include <stdint.h>
 #include <string>

@@ -9,9 +9,10 @@
 #include <time.h>
 #include <vector>
 #include <utility>
+// #include <driver/gpio.h>
 #include <esp_heap_caps.h>
 // #include <esp32/rom/rtc.h>
-// #include <esp_system.h>
+#include <esp_system.h>
 // #include <regex>
 #include "esphome/core/application.h"
 #include "esphome/core/helpers.h"
@@ -83,16 +84,25 @@ void NSPanelLovelace::setup() {
 #ifdef USE_TIME
   this->setup_time_();
 #endif
-  // ESP_LOGD(TAG, "Reset reason %#x", rtc_get_reset_reason(0));
-  // // Only reset the display if the ESP has
-  // // POWERON_RESET == hard reset (just powered up)
-  // // see: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
-  // // if (esp_reset_reason() != esp_reset_reason_t::ESP_RST_POWERON) {
-  // if (rtc_get_reset_reason(0) != POWERON_RESET) {
-  //   // this->send_display_command(std::string("pageType").append(1, SEPARATOR).append(action_type::startup));
-  //   this->soft_reset_display();
-  //   delay(50);
-  // }
+  // The display isn't reset when ESP is reset (on ota update etc.)
+  // so we need to simulate the display 'startup' instead
+  // see: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
+  auto reason = esp_reset_reason();
+  if (reason == esp_reset_reason_t::ESP_RST_SW ||
+      reason == esp_reset_reason_t::ESP_RST_DEEPSLEEP/* ||
+      reason == esp_reset_reason_t::ESP_RST_USB*/) {
+// #ifdef USE_ESP_IDF
+//     gpio_set_level(GPIO_NUM_4, !gpio_get_level(GPIO_NUM_4));
+//     delay(200);
+//     gpio_set_level(GPIO_NUM_4, !gpio_get_level(GPIO_NUM_4));
+// #else
+//     digitalWrite(GPIO4, !digitalRead(GPIO4));
+//     delay(200);
+//     digitalWrite(GPIO4, !digitalRead(GPIO4));
+// #endif
+    this->set_display_dim();
+    this->render_page_(render_page_option::screensaver);
+  }
 
   if (!this->weather_entity_id_.empty()) {
     // state provides the information for the icon
@@ -107,6 +117,56 @@ void NSPanelLovelace::setup() {
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
         "forecast");
+  }
+  
+  for (auto &entity : this->entities_) {
+    auto &entity_id = entity->get_entity_id();
+    ESP_LOGV(TAG, "Adding subscriptions for entity '%s'", entity_id.c_str());
+    bool add_state_subscription = false;
+    if (entity->is_type(entity_type::light)) {
+      add_state_subscription = true;
+      // need to subscribe to brightness to know if brightness is supported
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_brightness_update_, 
+          entity_id, ha_attr_type::brightness);
+      // selectively subscribe to light attributes based on the supported color modes
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
+          entity_id, ha_attr_type::supported_color_modes);
+    }
+    else if (entity->is_type(entity_type::switch_) ||
+        entity->is_type(entity_type::input_boolean) ||
+        entity->is_type(entity_type::automation) ||
+        entity->is_type(entity_type::fan) ||
+        entity->is_type(entity_type::timer)) {
+      add_state_subscription = true;
+    }
+    // icons and unit_of_measurement based on state and device_class
+    else if (entity->is_type(entity_type::sensor) ||
+        entity->is_type(entity_type::binary_sensor) ||
+        entity->is_type(entity_type::cover)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
+          entity_id, ha_attr_type::unit_of_measurement);
+      // if (!entity->is_icon_value_overridden()) {
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_entity_attr_device_class_update_, 
+            entity_id, ha_attr_type::device_class);
+      // }
+    }
+    else if (entity->is_type(entity_type::alarm_control_panel)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_code_arm_required_update_,
+        entity_id, ha_attr_type::code_arm_required);
+    }
+
+    if (add_state_subscription) {
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_state_update_,
+        entity_id);
+    }
   }
 }
 
@@ -128,58 +188,36 @@ void NSPanelLovelace::loop() {
     }
   }
 
+  if (this->force_current_page_update_) {
+    this->force_current_page_update_ = false;
+    ESP_LOGD(TAG, "Render HA update");
+    if (this->popup_page_current_uuid_.empty()) {
+      this->render_item_update_(this->current_page_);
+    } else {
+      this->render_popup_page_update_(this->cached_page_item_);
+    }
+  }
+
   // Throttle command processing to avoid flooding the display with commands
   if ((millis() - this->command_last_sent_) > COMMAND_COOLDOWN) {
     this->process_display_command_queue_();
   }
 }
 
-void NSPanelLovelace::set_screensaver(const std::shared_ptr<Screensaver> &screensaver) {
-  this->screensaver_ = screensaver.get();
-  this->add_page(screensaver, 0);
-  if (this->screensaver_->left_icon)
-    this->add_page_item(this->screensaver_->left_icon);
-  if (this->screensaver_->right_icon)
-    this->add_page_item(this->screensaver_->right_icon);
+std::shared_ptr<Entity> NSPanelLovelace::create_entity(const std::string &entity_id) {
+  for (auto &e : this->entities_) {
+    if (entity_id == e->get_entity_id()) return e;
+  }
+  auto entity = std::make_shared<Entity>(entity_id);
+  this->entities_.push_back(entity);
+  return entity;
 }
 
-void NSPanelLovelace::add_page(const std::shared_ptr<Page> &page, const size_t position) {
-  bool found = false;
-  auto &page_uuid = page->get_uuid();
-  for (auto &p : this->pages_) {
-    if (p->get_uuid() == page_uuid) {
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    if (position == SIZE_MAX || position >= this->pages_.size())
-      this->pages_.push_back(page);
-    else
-      this->pages_.insert(this->pages_.begin() + position, page);
-  }
-  
-  for (auto &item : page->get_items()) {
-    this->add_page_item(item);
-  }
-
-  if (page->is_type(page_type::cardAlarm)) {
-    auto card = static_cast<AlarmCard *>(page.get());
-    this->subscribe_homeassistant_state(
-      &NSPanelLovelace::on_alarm_state_update_,
-      card->get_alarm_entity_id());
-    this->subscribe_homeassistant_state(
-      &NSPanelLovelace::on_alarm_code_required_update_,
-      card->get_alarm_entity_id(), "code_arm_required");
-  }
-}
-
-void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
+void NSPanelLovelace::on_page_item_added_callback(const std::shared_ptr<PageItem> &item) {
   bool found = false;
   auto &item_uuid = item->get_uuid();
-  // for stateful items, also subscribe to state updates
+
   if (page_item_cast<StatefulPageItem>(item.get())) {
-    found = false;
     for (auto &item : this->stateful_page_items_) {
       if (item->get_uuid() == item_uuid) {
         found = true;
@@ -187,58 +225,13 @@ void NSPanelLovelace::add_page_item(const std::shared_ptr<PageItem> &item) {
       }
     }
     if (!found) {
-      auto& page_item = (const std::shared_ptr<StatefulPageItem>&)item;
-      auto& entity_id = page_item->get_entity_id();
-      this->stateful_page_items_.push_back(page_item);
-      ESP_LOGV(TAG, "Adding item uuid.%s, entity_id=%s", 
-          page_item->get_uuid().c_str(), entity_id.c_str());
-
-      if (page_item->is_type(entity_type::light)) {
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_state_update_, entity_id);
-        // need to subscribe to brightness to know if brightness is supported
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_attr_brightness_update_, 
-            entity_id, ha_attr_type::brightness);
-        // selectively subscribe to light attributes based on the supported color modes
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
-            entity_id, ha_attr_type::supported_color_modes);
-      }
-      else if (page_item->is_type(entity_type::switch_) ||
-          page_item->is_type(entity_type::input_boolean) ||
-          page_item->is_type(entity_type::automation) ||
-          page_item->is_type(entity_type::fan)) {
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_state_update_, entity_id);
-      }
-      // icons and unit_of_measurement based on state and device_class
-      else if (page_item->is_type(entity_type::sensor) ||
-          page_item->is_type(entity_type::binary_sensor) ||
-          page_item->is_type(entity_type::cover)) {
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_state_update_, entity_id);
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
-            entity_id, ha_attr_type::unit_of_measurement);
-        if (!page_item->is_icon_value_overridden()) {
-          this->subscribe_homeassistant_state(
-              &NSPanelLovelace::on_entity_attr_device_class_update_, 
-              entity_id, ha_attr_type::device_class);
-        }
-      }
+      auto& stateful_item = (const std::shared_ptr<StatefulPageItem>&)item;
+      this->stateful_page_items_.push_back(stateful_item);
+      ESP_LOGV(TAG, "Adding stateful item uuid.%s %s", 
+        item_uuid.c_str(),
+        stateful_item->get_entity_id().c_str());
     }
   }
-  found = false;
-  for (auto &e : this->page_items_) {
-    if (e->get_uuid() == item_uuid) {
-      found = true;
-      break;
-    }
-  }
-  if (!found)
-    // std::weak_ptr<PageItem> wptr_item = item;
-    this->page_items_.push_back(item);
 }
 
 void NSPanelLovelace::set_display_timeout(uint16_t timeout) {
@@ -401,6 +394,7 @@ void NSPanelLovelace::render_page_(size_t index) {
   if (index == 0 || index > this->pages_.size() - 1) return;
   this->current_page_index_ = index;
   this->current_page_ = this->pages_.at(index).get();
+  this->force_current_page_update_ = false;
   this->render_current_page_();
 }
 
@@ -425,6 +419,7 @@ void NSPanelLovelace::render_page_(render_page_option d) {
     // todo?
   }
   this->current_page_ = this->pages_.at(this->current_page_index_).get();
+  this->force_current_page_update_ = false;
   this->render_current_page_();
 }
 
@@ -447,10 +442,11 @@ void NSPanelLovelace::render_item_update_(Page *page) {
   page->render(this->command_buffer_);
   this->send_buffered_command_();
 
-  if (page->is_type(page_type::screensaver)) {
-    static_cast<Screensaver*>(page)
-      ->render_status_update(this->command_buffer_);
-    this->send_buffered_command_();
+  if (page->is_type(page_type::screensaver) && this->screensaver_ != nullptr) {
+    if (this->screensaver_->should_render_status_update()) {
+      this->screensaver_->render_status_update(this->command_buffer_);
+      this->send_buffered_command_();
+    }
   }
 }
 
@@ -465,7 +461,7 @@ void NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
   auto uuid = internal_id.substr(5);
 
   if (this->cached_page_item_->get_uuid() != uuid) {
-    // Only search for entities in the current page to reduce processing time
+    // Only search for items in the current page to reduce processing time
     for (auto &item : this->current_page_->get_items()) {
       if (item->get_uuid() != uuid) continue;
       if (auto page_item = page_item_cast<StatefulPageItem>(item.get())) {
@@ -495,18 +491,19 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
 void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
   if (item == nullptr) return;
 
-  auto supported_modes = item->get_attribute(ha_attr_type::supported_color_modes);
-  bool enable_color_wheel = item->get_state() == generic_type::on &&
+  auto entity = item->get_entity();
+  auto &supported_modes = entity->get_attribute(ha_attr_type::supported_color_modes);
+  bool enable_color_wheel = entity->get_state() == generic_type::on &&
       (contains_value(supported_modes, ha_attr_color_mode::xy) || 
       contains_value(supported_modes, ha_attr_color_mode::hs) ||
       contains_value(supported_modes, ha_attr_color_mode::rgb) ||
       contains_value(supported_modes, ha_attr_color_mode::rgbw));
 
-  std::string color_mode = item->get_attribute(ha_attr_type::color_mode);
+  std::string color_mode = entity->get_attribute(ha_attr_type::color_mode);
   std::string color_temp = generic_type::disable;
   if (contains_value(supported_modes, ha_attr_color_mode::color_temp)) {
     if (color_mode == ha_attr_color_mode::color_temp) {
-      color_temp = item->get_attribute(ha_attr_type::color_temp, generic_type::disable);
+      color_temp = entity->get_attribute(ha_attr_type::color_temp, generic_type::disable);
     } else {
       color_temp = generic_type::unknown;
     }
@@ -522,9 +519,9 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
       // icon_color~
       .append(item->get_icon_color_str()).append(1, SEPARATOR)
       // switch_val~
-      .append(std::to_string(item->get_state() == generic_type::on ? 1 : 0)).append(1, SEPARATOR)
+      .append(std::to_string(entity->get_state() == generic_type::on ? 1 : 0)).append(1, SEPARATOR)
       // brightness~ (0-100)
-      .append(item->get_attribute(ha_attr_type::brightness, generic_type::disable)).append(1, SEPARATOR)
+      .append(entity->get_attribute(ha_attr_type::brightness, generic_type::disable)).append(1, SEPARATOR)
       // todo: color_temp~ (color temperature value or 'disable')
       .append(color_temp).append(1, SEPARATOR)
       // todo: color~ ('enable' or 'disable')
@@ -543,10 +540,14 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  ESP_LOGCONFIG(TAG, "\tState: pages:%u,items:%u,stateful_items:%u", 
-      this->pages_.size(), 
-      this->page_items_.size(), 
-      this->stateful_page_items_.size());
+  // ESP_LOGCONFIG(TAG, "\tRAM: %u %u %u",
+  //   psram_used(),
+  //   heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+  //   heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+  ESP_LOGCONFIG(TAG, "\tState: pages:%u,stateful_items:%u,entities:%u",
+      this->pages_.size(),
+      this->stateful_page_items_.size(),
+      this->entities_.size());
 }
 
 void NSPanelLovelace::send_nextion_command_(const std::string &command) {
@@ -786,7 +787,7 @@ const std::string &NSPanelLovelace::try_replace_uuid_with_entity_id_(
     return uuid_or_entity_id;
 
   auto uuid = uuid_or_entity_id.substr(5);
-  auto item = this->get_entity_by_uuid_(uuid);
+  auto item = this->get_page_item_(uuid);
   if (item == nullptr) return uuid_or_entity_id;
   
   return item->get_entity_id();
@@ -952,10 +953,10 @@ void NSPanelLovelace::process_button_press_(
       }});
   } else if (button_type == button_type::colorTempSlider) {
     if (value.empty()) return;
-    auto item = get_entity_by_id_(entity_id);
-    if (item == nullptr) return;
-    auto minstr = item->get_attribute(ha_attr_type::min_mireds);
-    auto maxstr = item->get_attribute(ha_attr_type::max_mireds);
+    auto entity = get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto &minstr = entity->get_attribute(ha_attr_type::min_mireds);
+    auto &maxstr = entity->get_attribute(ha_attr_type::max_mireds);
     uint16_t min_mireds = minstr.empty() ? 153 : std::stoi(minstr);
     uint16_t max_mireds = maxstr.empty() ? 500 : std::stoi(maxstr);
     if (min_mireds >= max_mireds) {
@@ -1020,7 +1021,7 @@ void NSPanelLovelace::process_button_press_(
   }
 }
 
-StatefulPageItem* NSPanelLovelace::get_entity_by_uuid_(const std::string &uuid) {
+StatefulPageItem* NSPanelLovelace::get_page_item_(const std::string &uuid) {
   // use cached version if possible
   if (this->cached_page_item_ != nullptr && 
       this->cached_page_item_->get_uuid() == uuid) 
@@ -1033,18 +1034,17 @@ StatefulPageItem* NSPanelLovelace::get_entity_by_uuid_(const std::string &uuid) 
   return this->cached_page_item_ = nullptr;
 }
 
-StatefulPageItem* NSPanelLovelace::get_entity_by_id_(const std::string &entity_id) {
+Entity* NSPanelLovelace::get_entity_(const std::string &entity_id) {
   // use cached version if possible
-  if (this->cached_page_item_ != nullptr && 
-      this->cached_page_item_->get_entity_id() == entity_id) 
-    return this->cached_page_item_;
+  if (this->cached_entity_ != nullptr && 
+      this->cached_entity_->get_entity_id() == entity_id) 
+    return this->cached_entity_;
 
-  for (auto& item : this->stateful_page_items_) {
-    if (item->get_entity_id() != entity_id) continue;
-    // todo: could be more than one item with the same entity_id, return list instead!
-    return this->cached_page_item_ = item.get();
+  for (auto& entity : this->entities_) {
+    if (entity->get_entity_id() != entity_id) continue;
+    return this->cached_entity_ = entity.get();
   }
-  return this->cached_page_item_ = nullptr;
+  return this->cached_entity_ = nullptr;
 }
 
 void NSPanelLovelace::call_ha_service_(
@@ -1133,108 +1133,58 @@ void NSPanelLovelace::on_entity_attr_min_mireds_update_(std::string entity_id, s
 void NSPanelLovelace::on_entity_attr_max_mireds_update_(std::string entity_id, std::string max_mireds) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::max_mireds, max_mireds);
 }
+void NSPanelLovelace::on_entity_attr_code_arm_required_update_(std::string entity_id, std::string code_required) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::code_arm_required, code_required);
+}
 void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, const char *attr, const std::string &attr_value) {
-  auto item = this->get_entity_by_id_(entity_id);
-  if (item == nullptr) return;
+  auto entity = this->get_entity_(entity_id);
+  if (entity == nullptr) return;
 
   if (attr == ha_attr_type::state) {
-    item->set_state(attr_value);
-  } else if (attr == ha_attr_type::device_class) {
-    item->set_device_class(attr_value);
-  } else if (attr == ha_attr_type::unit_of_measurement) {
-    // todo: move this to a generic attribute?
-    // note: only entitiesCard can display the unit_of_measurement
-    if (auto card_item = page_item_cast<EntitiesCardEntityItem>(item)) {
-      card_item->set_value_postfix(attr_value);
-    } else {
-      return;
-    }
+    entity->set_state(attr_value);
   } else {
-    item->set_attribute(attr, attr_value);
+    entity->set_attribute(attr, attr_value);
   }
 
-  ESP_LOGD(TAG, "HA update: uuid.%s %s %s='%s'",
-      item->get_uuid().c_str(), entity_id.c_str(), attr, attr_value.c_str());
+  ESP_LOGD(TAG, "HA update: %s %s='%s'",
+    entity_id.c_str(), attr, attr_value.c_str());
 
-  if (!item->has_page(this->current_page_)) {
-    // this->cancel_timeout("stupd");
-    return;
-  }
+  // if (this->force_current_page_update_) return;
 
   // If there are lots of entity attributes that update within a short time
   // then this will queue lots of commands unnecessarily.
-  // This re-schedules updates every time one happens within a 100ms period.
-  this->set_timeout("stupd", 100, [this,item] () {
-    // re-render only if the entity is on the currently active card
-    if (!item->has_page(this->current_page_)) {
+  // This re-schedules updates every time one happens within a 200ms period.
+  this->set_timeout(entity_id, 200, [this, entity_id] () {
+    if (this->force_current_page_update_) return;
+    if (this->current_page_ == nullptr) return;
+
+    if (this->screensaver_ != nullptr && 
+        this->current_page_->is_type(page_type::screensaver)) {
+      force_current_page_update_ = 
+        this->screensaver_->should_render_status_update(entity_id);
       return;
     }
-    
-    ESP_LOGV(TAG, "Render HA update %s",
-        item->get_entity_id().c_str());
-    if (this->popup_page_current_uuid_ == item->get_uuid()) {
-      this->render_popup_page_update_(item);
-    } else if (this->popup_page_current_uuid_.empty()) {
-      this->render_item_update_(this->current_page_);
+
+    // re-render only if the entity is on the currently active card
+    // todo: this doesnt account for popup pages
+    for (auto &item : this->current_page_->get_items()) {
+      auto stateful_item = page_item_cast<StatefulPageItem>(item.get());
+      if (stateful_item == nullptr) return;
+      
+      if (stateful_item->get_entity_id() == entity_id) {
+        force_current_page_update_ = true;
+        return;
+      }
     }
+    
+    // todo: implement popup page checks too
+    // if (this->popup_page_current_uuid_ == item->get_uuid()) {
+    //   this->render_popup_page_update_(item);
+    // } else if (this->popup_page_current_uuid_.empty()) {
+    //   this->render_item_update_(this->current_page_);
+    // }
   });
 
-}
-
-void NSPanelLovelace::on_alarm_code_required_update_(std::string entity_id, std::string code_required) {
-  // find correct page to update state
-  AlarmCard *alarm_card = nullptr;
-  for (auto &&page : this->pages_) {
-    if (!page->is_type(page_type::cardAlarm)) continue;
-    
-    alarm_card = static_cast<AlarmCard*>(page.get());
-    if (alarm_card->get_alarm_entity_id() != entity_id) {
-      continue;
-    }
-
-    alarm_card->set_show_keypad(code_required != generic_type::off);
-    break;
-  }
-
-  ESP_LOGD(TAG, "HA update: uuid.%s %s code_arm_required='%s'",
-      alarm_card == nullptr ? "??" : alarm_card->get_uuid().c_str(),
-      entity_id.c_str(), code_required.c_str());
-
-  if (alarm_card == nullptr ||
-      !this->popup_page_current_uuid_.empty() ||
-      this->current_page_->get_uuid() != alarm_card->get_uuid()) {
-    return;
-  }
-  this->current_page_->render(this->command_buffer_);
-  this->send_buffered_command_();
-}
-
-void NSPanelLovelace::on_alarm_state_update_(std::string entity_id, std::string state) {
-  // find correct page to update state
-  AlarmCard *alarm_card = nullptr;
-  for (auto &&page : this->pages_) {
-    if (!page->is_type(page_type::cardAlarm)) continue;
-    
-    alarm_card = static_cast<AlarmCard*>(page.get());
-    if (alarm_card->get_alarm_entity_id() != entity_id) {
-      continue;
-    }
-
-    alarm_card->set_state(state);
-    break;
-  }
-
-  ESP_LOGD(TAG, "HA update: uuid.%s %s state='%s'",
-      alarm_card == nullptr ? "??" : alarm_card->get_uuid().c_str(),
-      entity_id.c_str(), state.c_str());
-
-  if (alarm_card == nullptr ||
-      !this->popup_page_current_uuid_.empty() ||
-      this->current_page_->get_uuid() != alarm_card->get_uuid()) {
-    return;
-  }
-  this->current_page_->render(this->command_buffer_);
-  this->send_buffered_command_();
 }
 
 void NSPanelLovelace::send_weather_update_command_() {
@@ -1245,6 +1195,7 @@ void NSPanelLovelace::send_weather_update_command_() {
 }
 
 void NSPanelLovelace::on_weather_state_update_(std::string entity_id, std::string state) {
+  if (this->screensaver_ == nullptr) return;
   auto item = this->screensaver_->get_item<WeatherItem>(0);
   if (item == nullptr) return;
   item->set_icon_by_weather_condition(state);
@@ -1252,6 +1203,7 @@ void NSPanelLovelace::on_weather_state_update_(std::string entity_id, std::strin
 }
 
 void NSPanelLovelace::on_weather_temperature_update_(std::string entity_id, std::string temperature) {
+  if (this->screensaver_ == nullptr) return;
   auto item = this->screensaver_->get_item<WeatherItem>(0);
   if (item == nullptr) return;
   item->set_value(std::move(temperature));
@@ -1259,6 +1211,7 @@ void NSPanelLovelace::on_weather_temperature_update_(std::string entity_id, std:
 }
 
 void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit) {
+  if (this->screensaver_ == nullptr) return;
   WeatherItem::temperature_unit = std::move(temperature_unit);
   this->screensaver_->set_items_render_invalid();
   this->send_weather_update_command_();
@@ -1266,6 +1219,7 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
 
 // todo: apply this technique https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/#deserialization-in-chunks
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
+  if (this->screensaver_ == nullptr) return;
   // todo: check if we are on the screensaver otherwise don't update
   // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
 

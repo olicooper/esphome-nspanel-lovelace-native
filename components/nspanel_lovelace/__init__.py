@@ -30,6 +30,8 @@ def AUTO_LOAD():
 
 _LOGGER = logging.getLogger(__name__)
 
+entity_ids: dict[str] = {}
+entity_id_index = 0
 uuid_index = 0
 iconJson = None
 make_shared = cg.std_ns.class_("make_shared")
@@ -274,6 +276,11 @@ SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_CARD_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200)
 })
 
+def add_entity_id(id: str):
+    global entity_ids, entity_id_index
+    entity_ids[id] = f"nspanel_e{entity_id_index}"
+    entity_id_index += 1
+
 def validate_config(config):
     # if int(config[CONF_BERRY_DRIVER_VERSION]) > 0:
     #     if "CustomSend" not in config[CONF_MQTT_SEND_TOPIC]:
@@ -292,12 +299,28 @@ def validate_config(config):
         if CONF_CARD_ENTITIES in card_config:
             for entity_config in card_config.get(CONF_CARD_ENTITIES, []):
                 entity_id = entity_config.get(CONF_ENTITY_ID)
-                if isinstance(entity_id, str) and entity_id.startswith('navigate'):
+                if entity_id.startswith('navigate'):
                     entity_arr = entity_id.split('.', 1)
                     # if len(entity_arr) != 2:
                     #     raise cv.Invalid(f'The entity_id "{entity_id}" format is invalid')
                     if entity_arr[1] not in card_ids:
                         raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"')
+                # Add all valid HA entities to global entity list for later processing
+                # elif not (entity_id.startswith('iText') or entity_id.startswith('delete')):
+                else:
+                    add_entity_id(entity_id)
+        if CONF_CARD_ALARM_ENTITY_ID in card_config:
+            add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
+
+    if CONF_SCREENSAVER in config:
+        screensaver_config = config.get(CONF_SCREENSAVER)
+        left = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_LEFT, None)
+        right = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_RIGHT, None)
+        if left and CONF_ENTITY_ID in left:
+            add_entity_id(left.get(CONF_ENTITY_ID))
+        if right and CONF_ENTITY_ID in right:
+            add_entity_id(right.get(CONF_ENTITY_ID))
+
     return config
 
 CONFIG_SCHEMA = cv.All(
@@ -373,6 +396,11 @@ def get_new_uuid(prefix: str = ""):
     uuid_index += 1
     return prefix + str(uuid_index)
 
+def get_entity_id(entity_id):
+    # if entity_id in [None, "", "delete"] or entity_id.startswith("iText"):
+    #     return entity_id
+    return cg.MockObj(entity_ids[entity_id])
+
 def generate_icon_config(icon_config, parent_class: cg.MockObj = None) -> Union[None, dict]:
     attrs = {
         "value": None,
@@ -405,7 +433,7 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, id_prefix: s
         entity_class = cg.global_ns.class_(variable_name)
         entity_class.op = "->"
 
-        entity_id = entity_config.get(CONF_ENTITY_ID, "delete")
+        entity_id = get_entity_id(entity_config.get(CONF_ENTITY_ID, "delete"))
         display_name = entity_config.get(CONF_CARD_ENTITIES_NAME, None)
         # if display_name != None:
         #     entity_class = cg.new_Pvariable(variable_name, entity_config[CONF_CARD_ENTITIES_ID], entity_config[CONF_CARD_ENTITIES_NAME])
@@ -420,12 +448,12 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, id_prefix: s
         cg.add(card_class.add_item(entity_class))
 
 def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
-    entity_id = icon_config.get(CONF_ENTITY_ID, "")
+    entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
     default_icon_value = r'u8"\u{0}"'.format(get_icon_hex(default_icon_value))
     attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
     # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
     # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", "{entity_id}"'
+    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
     if isinstance(attrs["value"], str) and isinstance(attrs["color"], int):
         return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
     elif isinstance(attrs["value"], str):
@@ -505,7 +533,10 @@ async def to_code(config):
     for conf in config.get(CONF_INCOMING_MSG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
         await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
-    
+
+    for key, value in entity_ids.items():
+        cg.add(cg.RawExpression(f"auto {value} = {nspanel.create_entity(key)}"))
+
     screensaver_config = config.get(CONF_SCREENSAVER, None)
     screensaver_uuid = None
     if screensaver_config is not None:
@@ -528,7 +559,7 @@ async def to_code(config):
 
         cg.add(cg.RawExpression(
             f"auto {screensaver_info[0]} = "
-            f"{make_shared.template(screensaver_info[1]).__call__(screensaver_uuid)}"))
+            f"{nspanel.insert_page.template(screensaver_info[1]).__call__(0, screensaver_uuid)}"))
 
         if CONF_SCREENSAVER_STATUS_ICON_LEFT in screensaver_config:
             left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
@@ -563,8 +594,6 @@ async def to_code(config):
             for i in range(0,5):
                 screensaver_items.append(make_shared.template(screensaver_info[2]).__call__(get_new_uuid()))
             cg.add(screensaver_class.add_item_range(screensaver_items))
-
-        cg.add(nspanel.set_screensaver(screensaver_class))
 
         cg.add(cg.RawStatement("}"))
 
@@ -617,11 +646,11 @@ async def to_code(config):
         if card_config[CONF_CARD_TYPE] == CARD_ALARM:
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
-                f"{make_shared.template(page_info[1]).__call__(card_uuids[i], card_config[CONF_CARD_ALARM_ENTITY_ID], title, sleep_timeout)}"))
+                f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], get_entity_id(card_config[CONF_CARD_ALARM_ENTITY_ID]), title, sleep_timeout)}"))
         else:
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
-                f"{make_shared.template(page_info[1]).__call__(card_uuids[i], title, sleep_timeout)}"))
+                f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], title, sleep_timeout)}"))
             # cg.add(cg.variable(card_variable, make_shared.template(page_info[1]).__call__(cg.global_ns.class_(page_info[0] + str(i + 1)))))
 
         if card_config[CONF_CARD_HIDDEN] == True:
@@ -667,7 +696,6 @@ async def to_code(config):
             card_variable, 
             page_info[2])
 
-        cg.add(nspanel.add_page(card_class))
         cg.add(cg.RawStatement("}"))
 
 

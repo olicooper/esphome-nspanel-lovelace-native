@@ -1,12 +1,14 @@
 #pragma once
 
+
 #include "config.h"
+#include "entity.h"
 #include "helpers.h"
 #include "page_item_visitor.h"
 #include "types.h"
 #include <array>
 #include <functional>
-#include <map>
+#include <memory>
 #include <stdint.h>
 #include <string>
 #include <type_traits>
@@ -33,16 +35,17 @@ public:
 
 struct ISetRenderInvalid {
 public:
-  ISetRenderInvalid(IHaveRenderInvalid *const child) : child_(child) {}
+  ISetRenderInvalid(IHaveRenderInvalid *const parent) : parent_(parent) {}
+  virtual ~ISetRenderInvalid() {}
 
   virtual void set_render_invalid_() {
-    if (child_ == nullptr)
+    if (parent_ == nullptr)
       return;
-    child_->set_render_invalid();
+    parent_->set_render_invalid();
   }
 
 private:
-  IHaveRenderInvalid *const child_{nullptr};
+  IHaveRenderInvalid *const parent_{nullptr};
 };
 
 /*
@@ -64,78 +67,14 @@ public:
   virtual void set_render_invalid() { this->render_invalid_ = true; }
   virtual const std::string &render();
 
-  bool has_page(Page *page) const;
-  const Page *find_page(Page *page) const;
-  template <typename TPage> const TPage *find_page(TPage *page) const {
-    static_assert(
-        std::is_base_of<Page, TPage>::value, "TPage must derive from Page");
-    auto p = this->find_page(static_cast<Page *>(page)); // todo: static cast needed?
-    return p == nullptr ? p : static_cast<TPage *>(p);
-  }
-
-  virtual void add_page(Page *page);
-  virtual void remove_page(Page *page);
-
 protected:
   std::string uuid_;
   std::string render_buffer_;
   bool render_invalid_ = true;
-  std::vector<Page *> pages_;
 
-  virtual uint16_t get_render_buffer_reserve_() const { return 15; }
+  virtual uint16_t get_render_buffer_reserve_() const { return 5; }
   
   // output: internalName (uuid)
-  std::string &render_(std::string &buffer) override;
-};
-
-/*
- * =============== PageItem_Type ===============
- */
-
-class PageItem_Type : public IRender, public ISetRenderInvalid {
-public:
-  PageItem_Type(IHaveRenderInvalid *const child) : 
-      ISetRenderInvalid(child), type_(nullptr), render_type_(nullptr) {}
-  PageItem_Type(IHaveRenderInvalid *const child, const char *type);
-  
-  bool is_type(const char *type) const {
-    if (type == this->type_) return true;
-    if (type == nullptr || this->type_ == nullptr) return false;
-    return std::strcmp(this->type_, type) == 0;
-  }
-  const char *get_type() const { return value_or_empty(this->type_); }
-  const char *get_render_type() const {
-    return value_or_empty(this->render_type_);
-  }
-
-  virtual bool set_type(const char *type);
-
-protected:
-  const char *type_;
-  // todo: should this be moved to WeatherItem instead?
-  const char *render_type_;
-
-  // output: type
-  std::string &render_(std::string &buffer) override;
-};
-
-/*
- * =============== PageItem_EntityId ===============
- */
-
-class PageItem_EntityId : public IRender, public ISetRenderInvalid {
-public:
-  PageItem_EntityId(IHaveRenderInvalid *const child);
-  PageItem_EntityId(IHaveRenderInvalid *const child, const std::string &entity_id);
-
-  const std::string &get_entity_id() const { return this->entity_id_; }
-
-  virtual void set_entity_id(const std::string &entity_id);
-
-protected:
-  std::string entity_id_;
-
-  // output: entity_id
   std::string &render_(std::string &buffer) override;
 };
 
@@ -145,10 +84,11 @@ protected:
 
 class PageItem_Icon : public IRender, public ISetRenderInvalid {
 public:
-  PageItem_Icon(IHaveRenderInvalid *const child);
-  PageItem_Icon(IHaveRenderInvalid *const child, const std::string &icon_default_value);
-  PageItem_Icon(IHaveRenderInvalid *const child, const uint16_t icon_default_color);
-  PageItem_Icon(IHaveRenderInvalid *const child, const std::string &icon_default_value, const uint16_t icon_default_color);
+  PageItem_Icon(IHaveRenderInvalid *const parent);
+  PageItem_Icon(IHaveRenderInvalid *const parent, const std::string &icon_default_value);
+  PageItem_Icon(IHaveRenderInvalid *const parent, const uint16_t icon_default_color);
+  PageItem_Icon(IHaveRenderInvalid *const parent, const std::string &icon_default_value, const uint16_t icon_default_color);
+  virtual ~PageItem_Icon() {}
 
   const std::string &get_icon_value() const { return this->icon_value_; }
   bool is_icon_value_overridden() const { return this->icon_value_overridden_; }
@@ -183,8 +123,9 @@ protected:
 
 class PageItem_DisplayName : public IRender, public ISetRenderInvalid {
 public:
-  PageItem_DisplayName(IHaveRenderInvalid *const child) : ISetRenderInvalid(child) {}
-  PageItem_DisplayName(IHaveRenderInvalid *const child, const std::string &display_name);
+  PageItem_DisplayName(IHaveRenderInvalid *const parent) : ISetRenderInvalid(parent) {}
+  PageItem_DisplayName(IHaveRenderInvalid *const parent, const std::string &display_name);
+  virtual ~PageItem_DisplayName() {}
 
   const std::string &get_display_name() const {
     return this->display_name_;
@@ -205,8 +146,9 @@ protected:
 
 class PageItem_Value : public IRender, public ISetRenderInvalid {
 public:
-  PageItem_Value(IHaveRenderInvalid *const child) : ISetRenderInvalid(child) {}
-  PageItem_Value(IHaveRenderInvalid *const child, const std::string &value);
+  PageItem_Value(IHaveRenderInvalid *const parent) : ISetRenderInvalid(parent) {}
+  PageItem_Value(IHaveRenderInvalid *const parent, const std::string &value);
+  virtual ~PageItem_Value() {}
 
   const std::string &get_value() const { return this->value_; }
   const std::string &get_value_postfix() const { return this->value_postfix_; }
@@ -223,74 +165,45 @@ protected:
 };
 
 /*
- * =============== PageItem_State ===============
- */
-
-class PageItem_State : public IRender, public ISetRenderInvalid {
-public:
-  PageItem_State(IHaveRenderInvalid *const child);
-  PageItem_State(IHaveRenderInvalid *const child, const std::string &state);
-
-  const std::string &get_state() const { return this->state_; }
-  const std::string &get_condition_state() const {
-    return this->condition_state_;
-  }
-  const std::string &get_condition_not_state() const {
-    return this->condition_not_state_;
-  }
-  std::string get_attribute(const char *attr, std::string default_value = "") const {
-    auto it = attributes_.find(attr);
-    return it == attributes_.end() ? default_value : it->second;
-  }
-
-  virtual void set_state(const std::string &state);
-  virtual void set_condition_state(const std::string &condition);
-  virtual void set_condition_not_state(const std::string &condition);
-  virtual void set_attribute(const char *attr, const std::string &value) { attributes_[attr] = value; }
-
-protected:
-  std::string state_;
-  std::string condition_state_;
-  std::string condition_not_state_;
-  std::map<std::string, std::string> attributes_;
-
-  // output: state
-  std::string &render_(std::string &buffer) override;
-};
-
-/*
  * =============== StatefulPageItem ===============
  */
 
 class StatefulPageItem :
     public PageItem,
-    public PageItem_Type,
-    public PageItem_EntityId,
     public PageItem_Icon,
-    public PageItem_State {
+    public IEntitySubscriber {
 public:
-  StatefulPageItem(const std::string &uuid);
   StatefulPageItem(
-      const std::string &uuid, const std::string &icon_default_value);
+      const std::string &uuid, std::shared_ptr<Entity> entity);
   StatefulPageItem(
-      const std::string &uuid, const uint16_t icon_default_color);
+      const std::string &uuid, std::shared_ptr<Entity> entity,
+      const std::string &icon_default_value);
   StatefulPageItem(
-      const std::string &uuid, const std::string &icon_default_value, 
+      const std::string &uuid, std::shared_ptr<Entity> entity,
       const uint16_t icon_default_color);
-  virtual ~StatefulPageItem() {}
+  StatefulPageItem(
+      const std::string &uuid, std::shared_ptr<Entity> entity,
+      const std::string &icon_default_value, 
+      const uint16_t icon_default_color);
+  virtual ~StatefulPageItem();
 
   void accept(PageItemVisitor& visitor) override;
 
-  void set_entity_id(const std::string &entity_id) override;
-  bool set_type(const char *type) override;
-  void set_state(const std::string &state) override;
-  void set_attribute(const char *attr, const std::string &value) override;
-  void set_device_class(const std::string &device_class);
+  void on_entity_type_change(const char *type) override;
+  void on_entity_state_change(const std::string &state) override;
+  void on_entity_attribute_change(const char *attr, const std::string &value) override;
+
+  bool is_type(const char *type) const { return this->entity_->is_type(type); }
+  const std::string &get_entity_id() const { return this->entity_->get_entity_id(); }
+  Entity* get_entity() const { return this->entity_.get(); }
 
 protected:
+  const std::shared_ptr<Entity> entity_;
   // A function which modifies the entity when the state changes
   std::function<void(StatefulPageItem *)> on_state_callback_;
-  std::string device_class_;
+  const char *render_type_;
+
+  virtual void set_on_state_callback_(const char *type);
 
   static void state_on_off_fn(StatefulPageItem *me);
   static void state_binary_sensor_fn(StatefulPageItem *me);

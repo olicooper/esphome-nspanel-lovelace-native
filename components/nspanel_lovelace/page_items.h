@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config.h"
+#include "entity.h"
 #include "helpers.h"
 #include "page_item_base.h"
 #include "page_item_visitor.h"
@@ -19,7 +20,6 @@ namespace nspanel_lovelace {
 
 class NavigationItem :
     public PageItem,
-    public PageItem_EntityId,
     public PageItem_Icon {
 public:
   NavigationItem(
@@ -33,11 +33,12 @@ public:
   NavigationItem(
       const std::string &uuid, const std::string &navigation_uuid, 
       const std::string &icon_default_value, const uint16_t icon_default_color);
-  virtual ~NavigationItem() {}
+  // virtual ~NavigationItem() {}
 
   void accept(PageItemVisitor& visitor) override;
 
 protected:
+  std::string navigation_uuid_;
   // output: ~internalName~icon~iconColor~~
   std::string &render_(std::string &buffer) override;
 };
@@ -48,18 +49,18 @@ protected:
 
 class StatusIconItem : public StatefulPageItem {
 public:
-  StatusIconItem(const std::string &uuid);
-  StatusIconItem(const std::string &uuid, const std::string &entity_id);
+  StatusIconItem(const std::string &uuid, std::shared_ptr<Entity> entity);
   StatusIconItem(
-      const std::string &uuid, const std::string &entity_id, 
+      const std::string &uuid, std::shared_ptr<Entity> entity,
       const std::string &icon_default_value);
   StatusIconItem(
-      const std::string &uuid, const std::string &entity_id, 
+      const std::string &uuid, std::shared_ptr<Entity> entity,
       const uint16_t icon_default_color);
   StatusIconItem(
-      const std::string &uuid, const std::string &entity_id, 
-      const std::string &icon_default_value, const uint16_t icon_default_color);
-  virtual ~StatusIconItem() {}
+      const std::string &uuid, std::shared_ptr<Entity> entity,
+      const std::string &icon_default_value,
+      const uint16_t icon_default_color);
+  // virtual ~StatusIconItem() {}
 
   void accept(PageItemVisitor& visitor) override;
 
@@ -124,7 +125,6 @@ protected:
 
 class AlarmButtonItem :
     public PageItem,
-    public PageItem_Type,
     public PageItem_DisplayName {
 public:
   AlarmButtonItem(const std::string &uuid,
@@ -134,6 +134,7 @@ public:
   void accept(PageItemVisitor& visitor) override;
 
 protected:
+  const char *action_type_;
   // output: displayName~action
   std::string &render_(std::string &buffer) override;
 };

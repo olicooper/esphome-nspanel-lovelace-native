@@ -1,6 +1,7 @@
 #pragma once
 
 #include "card_base.h"
+#include "entity.h"
 #include "page_visitor.h"
 #include "types.h"
 #include <stdint.h>
@@ -23,6 +24,7 @@ public:
       const std::string &uuid, const std::string &title, 
       const uint16_t sleep_timeout) :
       Card(page_type::cardGrid, uuid, title, sleep_timeout) {}
+  // virtual ~GridCard() {}
 
   void accept(PageVisitor& visitor) override;
 };
@@ -39,6 +41,7 @@ public:
       Card(page_type::cardEntities, uuid, title) {}
   EntitiesCard(const std::string &uuid, const std::string &title, const uint16_t sleep_timeout) :
       Card(page_type::cardEntities, uuid, title, sleep_timeout) {}
+  // virtual ~EntitiesCard() {}
 
   void accept(PageVisitor& visitor) override;
 };
@@ -57,6 +60,7 @@ public:
       const std::string &uuid, const std::string &title, 
       const uint16_t sleep_timeout) :
       Card(page_type::cardQR, uuid, title, sleep_timeout) {}
+  // virtual ~QRCard() {}
 
   void accept(PageVisitor& visitor) override;
 
@@ -73,31 +77,33 @@ protected:
  * =============== AlarmCard ===============
  */
 
-class AlarmCard : public Card {
+class AlarmCard : public Card, public IEntitySubscriber {
 public:
-  AlarmCard(const std::string &uuid, const std::string &alarm_entity_id);
-  AlarmCard(const std::string &uuid, const std::string &alarm_entity_id,
+  AlarmCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &alarm_entity);
+  AlarmCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &alarm_entity,
       const std::string &title);
-  AlarmCard(const std::string &uuid, const std::string &alarm_entity_id,
+  AlarmCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &alarm_entity,
       const std::string &title, const uint16_t sleep_timeout);
+  virtual ~AlarmCard();
 
   void accept(PageVisitor& visitor) override;
 
-  const std::string &get_state() const { return this->state_; }
-  const std::string &get_alarm_entity_id() const { return this->alarm_entity_id_; }
-
-  void set_state(const std::string &state);
   void set_show_keypad(bool show_keypad) { this->show_keypad_ = show_keypad; }
   bool set_arm_button(
       alarm_arm_action action, const std::string &display_name);
   void set_disarm_button(const std::string &display_name);
 
+  void on_entity_state_change(const std::string &state) override;
+  void on_entity_attribute_change(const char *attr, const std::string &value) override;
+
   std::string &render(std::string &buffer) override;
 
 protected:
-  std::string state_;
+  std::shared_ptr<Entity> alarm_entity_;
   bool show_keypad_, status_icon_flashing_;
-  std::string alarm_entity_id_;
   std::unique_ptr<AlarmButtonItem> disarm_button_;
   std::unique_ptr<AlarmIconItem> status_icon_;
   std::unique_ptr<AlarmIconItem> info_icon_;

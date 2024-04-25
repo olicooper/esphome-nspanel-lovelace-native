@@ -1,9 +1,11 @@
 #include "cards.h"
 
 #include "config.h"
+#include "entity.h"
 #include "helpers.h"
 #include "types.h"
 #include "card_base.h"
+#include "page_items.h"
 #include <string>
 #include <memory>
 
@@ -50,11 +52,11 @@ std::string &QRCard::render(std::string &buffer) {
  */
 
 AlarmCard::AlarmCard(
-  const std::string &uuid, const std::string &alarm_entity_id) :
+  const std::string &uuid, const std::shared_ptr<Entity> &alarm_entity) :
     Card(page_type::cardAlarm, uuid),
-    state_(generic_type::unknown),
-    show_keypad_(true),status_icon_flashing_(false),
-    alarm_entity_id_(alarm_entity_id) {
+    alarm_entity_(alarm_entity),
+    show_keypad_(true), status_icon_flashing_(false) {
+  alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
@@ -62,12 +64,12 @@ AlarmCard::AlarmCard(
       button_type::disarm, "Disarm"));
 }
 AlarmCard::AlarmCard(
-  const std::string &uuid, const std::string &alarm_entity_id,
+  const std::string &uuid, const std::shared_ptr<Entity> &alarm_entity,
   const std::string &title) :
     Card(page_type::cardAlarm, uuid, title),
-    state_(generic_type::unknown),
-    show_keypad_(true),status_icon_flashing_(false),
-    alarm_entity_id_(alarm_entity_id) {
+    alarm_entity_(alarm_entity),
+    show_keypad_(true),status_icon_flashing_(false) {
+  alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
@@ -75,17 +77,21 @@ AlarmCard::AlarmCard(
       button_type::disarm, "Disarm"));
 }
 AlarmCard::AlarmCard(
-    const std::string &uuid, const std::string &alarm_entity_id,
+    const std::string &uuid, const std::shared_ptr<Entity> &alarm_entity,
     const std::string &title, const uint16_t sleep_timeout) :
     Card(page_type::cardAlarm, uuid, title, sleep_timeout),
-    state_(generic_type::unknown),
-    show_keypad_(true),status_icon_flashing_(false),
-    alarm_entity_id_(alarm_entity_id) {
+    alarm_entity_(alarm_entity),
+    show_keypad_(true),status_icon_flashing_(false) {
+  alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"), 
       button_type::disarm, "Disarm"));
+}
+
+AlarmCard::~AlarmCard() {
+  alarm_entity_->remove_subscriber(this);
 }
 
 void AlarmCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
@@ -127,9 +133,7 @@ void AlarmCard::set_disarm_button(const std::string &display_name) {
       button_type::disarm, display_name));
 }
 
-void AlarmCard::set_state(const std::string &state) {
-  if (this->state_ == state) return;
-
+void AlarmCard::on_entity_state_change(const std::string &state) {
   this->status_icon_flashing_ = false;
 
   if (state == alarm_entity_state::disarmed || 
@@ -164,8 +168,12 @@ void AlarmCard::set_state(const std::string &state) {
     this->status_icon_->set_icon_color(38066u); //grey
     this->status_icon_->set_icon_value(u8"\uE624"); //help-circle-outline
   }
+}
 
-  this->state_ = state;
+void AlarmCard::on_entity_attribute_change(const char *attr, const std::string &value) {
+  if (attr == ha_attr_type::code_arm_required) {
+    this->set_show_keypad(value != generic_type::off);
+  }
 }
 
 std::string &AlarmCard::render(std::string &buffer) {
@@ -176,10 +184,10 @@ std::string &AlarmCard::render(std::string &buffer) {
   
   this->render_nav(buffer).append(1, SEPARATOR);
 
-  buffer.append(this->alarm_entity_id_);
+  buffer.append(this->alarm_entity_->get_entity_id());
 
-  if (this->state_ == generic_type::unknown ||
-      this->state_ == alarm_entity_state::disarmed) {
+  if (this->alarm_entity_->is_state(generic_type::unknown) ||
+      this->alarm_entity_->is_state(alarm_entity_state::disarmed)) {
     for (auto& item : this->items_) {
       buffer.append(1, SEPARATOR).append(item->render());
     }

@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cstring>
+#include <map>
 #include <stdint.h>
 #include <string>
 #include <utility>
@@ -187,7 +188,7 @@ struct Icon {
 
 struct compare_char_str {
   bool operator()(const char *a, const char *b) const {
-    return b != nullptr && std::strcmp(a, b) < 0;
+    return a != nullptr && b != nullptr && std::strcmp(a, b) < 0;
   }
 };
 
@@ -446,6 +447,7 @@ struct ha_attr_type {
   static constexpr const char* color_temp = "color_temp";
   static constexpr const char* rgb_color = "rgb_color";
   static constexpr const char* code = "code";
+  static constexpr const char* code_arm_required = "code_arm_required";
 };
 
 struct ha_attr_color_mode {

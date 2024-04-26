@@ -460,6 +460,11 @@ struct ha_attr_type {
   // weather
   static constexpr const char* temperature = "temperature";
   static constexpr const char* temperature_unit = "temperature_unit";
+  // timer
+  static constexpr const char* duration = "duration";
+  static constexpr const char* remaining = "remaining";
+  static constexpr const char* editable = "editable";
+  static constexpr const char* finishes_at = "finishes_at";
 };
 
 struct ha_attr_color_mode {

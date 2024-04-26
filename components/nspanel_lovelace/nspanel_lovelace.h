@@ -146,7 +146,9 @@ protected:
   void process_command_(const std::string &message);
   void send_buffered_command_();
   void process_display_command_queue_();
-  void process_button_press_(std::string &entity_id, const std::string &button_type, const std::string &value = "", bool called_from_timeout = false);
+  void process_button_press_(std::string &entity_id,
+    const std::string &button_type,
+    const std::string &value = "", bool called_from_timeout = false);
   StatefulPageItem* get_page_item_(const std::string &uuid);
   Entity* get_entity_(const std::string &entity_id);
 
@@ -158,6 +160,7 @@ protected:
   void render_popup_page_update_(const std::string &internal_id);
   void render_popup_page_update_(StatefulPageItem *entity);
   void render_light_detail_update_(StatefulPageItem *entity);
+  void render_timer_detail_update_(StatefulPageItem *entity);
 
 #ifdef USE_TIME
   void setup_time_();
@@ -172,10 +175,21 @@ protected:
   uint8_t display_active_dim_ = 100;
   uint8_t display_inactive_dim_ = 50;
   
-  void call_ha_service_(const char* entity_type, const char* action, const std::string& entity_id);
-  void call_ha_service_(const char* entity_type, const char* action, const std::map<std::string, std::string> &data);
-  void call_ha_service_(const char* entity_type, const char* action, 
-      const std::map<std::string, std::string> &data, const std::map<std::string, std::string> &data_template);
+  void call_ha_service_(
+    const std::string& service, const std::string& entity_id);
+  void call_ha_service_(
+    const char* entity_type, const char* action, const std::string& entity_id);
+  void call_ha_service_(
+    const char* entity_type, const char* action,
+    const std::map<std::string, std::string> &data);
+  void call_ha_service_(
+    const char* entity_type, const char* action,
+    const std::map<std::string, std::string> &data,
+    const std::map<std::string, std::string> &data_template);
+  void call_ha_service_(
+    const std::string& service,
+    const std::map<std::string, std::string> &data,
+    const std::map<std::string, std::string> &data_template);
   void on_entity_state_update_(std::string entity_id, std::string state);
   void on_entity_attr_unit_of_measurement_update_(std::string entity_id, std::string unit_of_measurement);
   void on_entity_attr_device_class_update_(std::string entity_id, std::string device_class);
@@ -188,6 +202,10 @@ protected:
   void on_entity_attr_max_mireds_update_(std::string entity_id, std::string max_mireds);
   void on_entity_attr_code_arm_required_update_(std::string entity_id, std::string code_required);
   void on_entity_attr_current_position_update_(std::string entity_id, std::string current_position);
+  void on_entity_attr_editable_update_(std::string entity_id, std::string editable);
+  void on_entity_attr_duration_update_(std::string entity_id, std::string duration);
+  void on_entity_attr_remaining_update_(std::string entity_id, std::string remaining);
+  void on_entity_attr_finishes_at_update_(std::string entity_id, std::string finishes_at);
   void on_entity_attribute_update_(const std::string &entity_id, const char *attr_name, const std::string &attr_value);
 
   void on_weather_state_update_(std::string entity_id, std::string state);

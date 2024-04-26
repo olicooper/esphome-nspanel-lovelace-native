@@ -154,7 +154,6 @@ void NSPanelLovelace::setup() {
           &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
           entity_id, ha_attr_type::unit_of_measurement);
     }
-    // icons and unit_of_measurement based on state and device_class
     else if (entity->is_type(entity_type::cover)) {
       add_state_subscription = true;
       // supported_features, current_position, device_class
@@ -173,6 +172,21 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_entity_attr_code_arm_required_update_,
         entity_id, ha_attr_type::code_arm_required);
+    }
+    else if (entity->is_type(entity_type::timer)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_editable_update_,
+        entity_id, ha_attr_type::editable);
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_duration_update_,
+        entity_id, ha_attr_type::duration);
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_remaining_update_,
+        entity_id, ha_attr_type::remaining);
+      this->subscribe_homeassistant_state(
+        &NSPanelLovelace::on_entity_attr_finishes_at_update_,
+        entity_id, ha_attr_type::finishes_at);
     }
 
     if (add_state_subscription) {
@@ -495,7 +509,11 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
 
   if (item->is_type(entity_type::light)) {
     this->render_light_detail_update_(item);
-  } else return;
+  } else if (item->is_type(entity_type::timer)) {
+    this->render_timer_detail_update_(item);
+  } else {
+    return;
+  }
 
   this->send_buffered_command_();
 }
@@ -548,6 +566,91 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
       // effect_supported ('enable' or 'disable')
       // todo: requires parsing 'enabled_features' attribute
       .append(generic_type::disable);
+}
+
+// entityUpdateDetail~{entity_id}~~{icon_color}~{entity_id}~{min_remaining}~{sec_remaining}~{editable}~{action1}~{action2}~{action3}~{label1}~{label2}~{label3}
+void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
+  if (item == nullptr) return;
+
+  auto &state = item->get_state();
+  bool render = false;
+  uint16_t min_remaining = 0, sec_remaining = 0;
+  bool idle = state == "paused" || state == "idle";
+
+  if (idle) {
+    std::string time_remaining_str;
+    if (state == "paused") {
+      time_remaining_str = item->get_attribute(ha_attr_type::remaining);
+    } else {
+      time_remaining_str = item->get_attribute(ha_attr_type::duration);
+    }
+    if (!time_remaining_str.empty()) {
+      std::vector<std::string> time_parts;
+      split_str(':', time_remaining_str, time_parts);
+      if (time_parts.size() == 3) {
+        min_remaining = (stoi(time_parts[0]) * 60) + stoi(time_parts[1]);
+        sec_remaining = stoi(time_parts[2]);
+        render = true;
+      }
+    }
+  }
+  // active
+  else {
+    auto &finishes_at = item->get_attribute(ha_attr_type::finishes_at);
+    if (!finishes_at.empty()) {
+      tm t{};
+      if (iso8601_to_tm(finishes_at.c_str(), t)) {
+        // uint8_t hr = t.tm_hour;
+        ESPTime now = this->time_id_.value()->now();
+        if (now.is_valid()) {
+          uint32_t seconds = static_cast<uint16_t>(
+            difftime(now.timestamp, mktime(&t)));
+          if (seconds >= UINT16_MAX) seconds = UINT16_MAX;
+          min_remaining = seconds / 60;
+          sec_remaining = seconds % 60;
+          render = true;
+        }
+      }
+    }
+  }
+
+  if (!render) {
+    this->render_current_page_();
+    return;
+  }
+
+  this->set_display_timeout(30);
+
+  this->command_buffer_
+    // entityUpdateDetail~
+    .assign("entityUpdateDetail").append(1, SEPARATOR)
+    // entity_id~~
+    .append("uuid.").append(item->get_uuid()).append(2, SEPARATOR)
+    // icon_color~
+    .append(item->get_icon_color_str()).append(1, SEPARATOR)
+    // entity_id~~
+    .append("uuid.").append(item->get_uuid()).append(1, SEPARATOR)
+    // min_remaining~
+    .append(std::to_string(min_remaining)).append(1, SEPARATOR)
+    // sec_remaining~
+    .append(std::to_string(sec_remaining)).append(1, SEPARATOR)
+    // editable~
+    .append((idle && 
+      item->get_attribute(ha_attr_type::editable) == generic_type::on)
+        ? "1" : "0")
+    .append(1, SEPARATOR)
+    // action1~
+    .append(idle ? "" : "pause").append(1, SEPARATOR)
+    // action2~
+    .append(idle ? "start" : "cancel").append(1, SEPARATOR)
+    // action3~
+    .append(idle ? "" : "finish").append(1, SEPARATOR)
+    // label1~
+    .append(idle ? "" : "Pause").append(1, SEPARATOR)
+    // label2~
+    .append(idle ? "Start" : "Cancel").append(1, SEPARATOR)
+    // label3
+    .append(idle ? "" : "Finish");
 }
 
 void NSPanelLovelace::dump_config() {
@@ -1034,6 +1137,10 @@ void NSPanelLovelace::process_button_press_(
           {(const char*)ha_attr_type::code, value.c_str()}
         }});
     }
+  } else if (starts_with(button_type, entity_type::timer)) {
+    std::string service(button_type);
+    service[5] = '.';
+    this->call_ha_service_(service, entity_id);
   }
 }
 
@@ -1064,6 +1171,11 @@ Entity* NSPanelLovelace::get_entity_(const std::string &entity_id) {
 }
 
 void NSPanelLovelace::call_ha_service_(
+    const std::string &service, const std::string &entity_id) {
+  this->call_ha_service_(service, {{ha_attr_type::entity_id, entity_id}}, {});
+}
+
+void NSPanelLovelace::call_ha_service_(
     const char *entity_type, const char *action, const std::string &entity_id) {
   this->call_ha_service_(entity_type, action, {{ha_attr_type::entity_id, entity_id}});
 }
@@ -1079,8 +1191,17 @@ void NSPanelLovelace::call_ha_service_(
     const char *entity_type, const char *action,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
+  this->call_ha_service_(
+    std::string(entity_type).append(1, '.').append(action),
+    data, data_template);
+}
+
+void NSPanelLovelace::call_ha_service_(
+    const std::string &service,
+    const std::map<std::string, std::string> &data,
+    const std::map<std::string, std::string> &data_template) {
   api::HomeassistantServiceResponse resp;
-  resp.service.append(entity_type).append(1, '.').append(action);
+  resp.service = service;
 
   auto it = data.find(ha_attr_type::entity_id);
   if (it == data.end())
@@ -1158,6 +1279,18 @@ void NSPanelLovelace::on_entity_attr_code_arm_required_update_(std::string entit
 void NSPanelLovelace::on_entity_attr_current_position_update_(std::string entity_id, std::string current_position) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::current_position, current_position);
 }
+void NSPanelLovelace::on_entity_attr_editable_update_(std::string entity_id, std::string editable) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::editable, editable);
+}
+void NSPanelLovelace::on_entity_attr_duration_update_(std::string entity_id, std::string duration) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::duration, duration);
+}
+void NSPanelLovelace::on_entity_attr_remaining_update_(std::string entity_id, std::string remaining) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::remaining, remaining);
+}
+void NSPanelLovelace::on_entity_attr_finishes_at_update_(std::string entity_id, std::string finishes_at) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::finishes_at, finishes_at);
+}
 void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, const char *attr, const std::string &attr_value) {
   auto entity = this->get_entity_(entity_id);
   if (entity == nullptr) return;
@@ -1206,7 +1339,6 @@ void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, 
     //   this->render_item_update_(this->current_page_);
     // }
   });
-
 }
 
 void NSPanelLovelace::send_weather_update_command_() {

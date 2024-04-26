@@ -425,7 +425,7 @@ void NSPanelLovelace::render_page_(render_page_option d) {
 
 void NSPanelLovelace::render_current_page_() {
   if (this->current_page_ == nullptr)
-    return;
+    this->render_page_(render_page_option::default_page);
 
   this->command_buffer_.assign("pageType")
       .append(1, SEPARATOR)
@@ -460,7 +460,7 @@ void NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
   if (this->current_page_ == nullptr) return;
   auto uuid = internal_id.substr(5);
 
-  if (this->cached_page_item_->get_uuid() != uuid) {
+  if (this->cached_page_item_ == nullptr || this->cached_page_item_->get_uuid() != uuid) {
     // Only search for items in the current page to reduce processing time
     for (auto &item : this->current_page_->get_items()) {
       if (item->get_uuid() != uuid) continue;

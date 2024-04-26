@@ -38,7 +38,7 @@ public:
   const std::string &get_state() const;
   void set_state(const std::string &state);
 
-  const std::string &get_attribute(const char *attr, std::string default_value = "") const;
+  const std::string &get_attribute(const char *attr, const std::string &default_value = "") const;
   void set_attribute(const char *attr, const std::string &value);
 
 protected:

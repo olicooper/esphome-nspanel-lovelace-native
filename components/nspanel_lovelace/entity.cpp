@@ -92,7 +92,7 @@ void Entity::set_state(const std::string &state) {
   }
 }
 
-const std::string &Entity::get_attribute(const char *attr, std::string default_value) const {
+const std::string &Entity::get_attribute(const char *attr, const std::string &default_value) const {
   auto it = attributes_.find(attr);
   return it == attributes_.end() ? default_value : it->second;
 }

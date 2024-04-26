@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "config.h"
 #include "helpers.h"
@@ -203,7 +204,7 @@ struct generic_type {
 
 typedef std::map<const char*, const char*, compare_char_str> char_map;
 typedef std::map<const char*, Icon, compare_char_str> char_icon_map;
-typedef std::map<const char*, std::array<const char *, 2>, compare_char_str> char_list_map;
+typedef std::map<const char*, std::vector<const char *>, compare_char_str> char_list_map;
 
 struct weather_type {
   static constexpr const char* sunny = "sunny";
@@ -432,13 +433,18 @@ struct ha_action_type {
   static constexpr const char* turn_off = "turn_off";
   static constexpr const char* press = "press";
   static constexpr const char* toggle = "toggle";
+  static constexpr const char* open_cover = "open_cover";
+  static constexpr const char* close_cover = "close_cover";
+  static constexpr const char* stop_cover = "stop_cover";
 };
 
 struct ha_attr_type {
   static constexpr const char* entity_id = "entity_id";
   static constexpr const char* state = "state";
   static constexpr const char* device_class = "device_class";
+  static constexpr const char* supported_features = "supported_features";
   static constexpr const char* unit_of_measurement = "unit_of_measurement";
+  // light
   static constexpr const char* brightness = "brightness";
   static constexpr const char* min_mireds = "min_mireds";
   static constexpr const char* max_mireds = "max_mireds";
@@ -446,8 +452,14 @@ struct ha_attr_type {
   static constexpr const char* color_mode = "color_mode";
   static constexpr const char* color_temp = "color_temp";
   static constexpr const char* rgb_color = "rgb_color";
+  // alarm_control_panel
   static constexpr const char* code = "code";
   static constexpr const char* code_arm_required = "code_arm_required";
+  // cover
+  static constexpr const char* current_position = "current_position";
+  // weather
+  static constexpr const char* temperature = "temperature";
+  static constexpr const char* temperature_unit = "temperature_unit";
 };
 
 struct ha_attr_color_mode {
@@ -491,22 +503,21 @@ inline const char *get_icon_by_name(
   return nullptr;
 }
 
-inline const std::array<const char*, 2> *get_icon_by_name(
+inline const std::vector<const char*> *get_icon_by_name(
     const char_list_map &map,
-    const std::string& icon_name,
+    std::string icon_name,
     const std::string& default_icon_name = "") {
   if (map.size() == 0)
     return nullptr;
-  auto tmp_icon_name(icon_name);
   if (icon_name.empty()) {
     if (!default_icon_name.empty()) {
-      tmp_icon_name = default_icon_name;
+      icon_name = default_icon_name;
     }
     else {
       return nullptr;
     }
   }
-  auto icon_it = map.find(tmp_icon_name.c_str());
+  auto icon_it = map.find(icon_name.c_str());
   // todo: no icon found in the map, fall back to a default?
   if (icon_it != map.end()) {
     return &icon_it->second;
@@ -516,20 +527,19 @@ inline const std::array<const char*, 2> *get_icon_by_name(
 
 inline const Icon *get_icon_by_name(
     const char_icon_map &map,
-    const std::string& icon_name,
+    std::string icon_name,
     const std::string& default_icon_name = "") {
   if (map.size() == 0)
     return nullptr;
-  auto tmp_icon_name(icon_name);
   if (icon_name.empty()) {
     if (!default_icon_name.empty()) {
-      tmp_icon_name = default_icon_name;
+      icon_name = default_icon_name;
     }
     else {
       return nullptr;
     }
   }
-  auto icon_it = map.find(tmp_icon_name.c_str());
+  auto icon_it = map.find(icon_name.c_str());
   // todo: no icon found in the map, fall back to a default?
   if (icon_it != map.end()) {
     return &icon_it->second;
@@ -661,17 +671,17 @@ const char_map SENSOR_ICON_MAP {
 
 // cover_mapping
 const char_list_map COVER_MAP {
-  // "device_class": ("icon-open", "icon-closed", "icon-cover-open", "icon-cover-stop", "icon-cover-close")
-  {entity_cover_type::awning, {u8"\uE5B0", u8"\uE5AD"}}, // window-open, window-closed
-  {entity_cover_type::blind, {u8"\uF010", u8"\uE0AB"}}, // blinds-open, blinds
-  {entity_cover_type::curtain, {u8"\uF845", u8"\uF846"}}, // curtains, curtains-closed
-  {entity_cover_type::damper, {u8"\uE12E", u8"\uEAA4"}}, // checkbox-blank-circle, circle-slice-8
-  {entity_cover_type::door, {u8"\uE81B", u8"\uE81A"}}, // door-open, door-closed
-  {entity_cover_type::garage, {u8"\uE6D9", u8"\uE6D8"}}, // garage-open, garage
-  {entity_cover_type::gate, {u8"\uF169", u8"\uE298"}}, // gate-open, gate
-  {entity_cover_type::shade, {u8"\uF010", u8"\uE0AB"}}, // blinds-open, blinds
-  {entity_cover_type::shutter, {u8"\uF11D", u8"\uF11B"}}, // window-shutter-open, window-shutter
-  {entity_cover_type::window, {u8"\uE5B0", u8"\uE5AD"}}, // window-open, window-closed
+  // "device_class": ("icon-open", "icon-closed", "icon-cover-open", "icon-cover-close")
+  {entity_cover_type::awning, {u8"\uE5B0", u8"\uE5AD", u8"\uE05C", u8"\uE044"}}, // window-open, window-closed, arrow-up, arrow-down
+  {entity_cover_type::blind, {u8"\uF010", u8"\uE0AB", u8"\uE05C", u8"\uE044"}}, // blinds-open, blinds, arrow-up
+  {entity_cover_type::curtain, {u8"\uF845", u8"\uF846", u8"\uE84D", u8"\uE84B"}}, // curtains, curtains-closed, arrow-expand-horizontal, arrow-collapse-horizontal
+  {entity_cover_type::damper, {u8"\uE12E", u8"\uEAA4", u8"\uE05C", u8"\uE044"}}, // checkbox-blank-circle, circle-slice-8, arrow-up
+  {entity_cover_type::door, {u8"\uE81B", u8"\uE81A", u8"\uE84D", u8"\uE84B"}}, // door-open, door-closed, arrow-expand-horizontal, arrow-collapse-horizontal
+  {entity_cover_type::garage, {u8"\uE6D9", u8"\uE6D8", u8"\uE05C", u8"\uE044"}}, // garage-open, garage, arrow-up
+  {entity_cover_type::gate, {u8"\uF169", u8"\uE298", u8"\uE84D", u8"\uE84B"}}, // gate-open, gate, arrow-expand-horizontal, arrow-collapse-horizontal
+  {entity_cover_type::shade, {u8"\uF010", u8"\uE0AB", u8"\uE05C", u8"\uE044"}}, // blinds-open, blinds, arrow-up
+  {entity_cover_type::shutter, {u8"\uF11D", u8"\uF11B", u8"\uE05C", u8"\uE044"}}, // window-shutter-open, window-shutter, arrow-up
+  {entity_cover_type::window, {u8"\uE5B0", u8"\uE5AD", u8"\uE05C", u8"\uE044"}}, // window-open, window-closed, arrow-up
 };
 
 // see: 

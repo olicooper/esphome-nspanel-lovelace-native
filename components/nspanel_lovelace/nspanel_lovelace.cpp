@@ -110,10 +110,10 @@ void NSPanelLovelace::setup() {
         &NSPanelLovelace::on_weather_state_update_, this->weather_entity_id_);
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_update_,
-        this->weather_entity_id_, "temperature");
+        this->weather_entity_id_, ha_attr_type::temperature);
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_unit_update_,
-        this->weather_entity_id_, "temperature_unit");
+        this->weather_entity_id_, ha_attr_type::temperature_unit);
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
         "forecast");
@@ -125,14 +125,14 @@ void NSPanelLovelace::setup() {
     bool add_state_subscription = false;
     if (entity->is_type(entity_type::light)) {
       add_state_subscription = true;
-      // need to subscribe to brightness to know if brightness is supported
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_brightness_update_, 
-          entity_id, ha_attr_type::brightness);
       // selectively subscribe to light attributes based on the supported color modes
       this->subscribe_homeassistant_state(
           &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
           entity_id, ha_attr_type::supported_color_modes);
+      // need to subscribe to brightness to know if brightness is supported
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_brightness_update_, 
+          entity_id, ha_attr_type::brightness);
     }
     else if (entity->is_type(entity_type::switch_) ||
         entity->is_type(entity_type::input_boolean) ||
@@ -143,17 +143,30 @@ void NSPanelLovelace::setup() {
     }
     // icons and unit_of_measurement based on state and device_class
     else if (entity->is_type(entity_type::sensor) ||
-        entity->is_type(entity_type::binary_sensor) ||
-        entity->is_type(entity_type::cover)) {
+        entity->is_type(entity_type::binary_sensor)) {
       add_state_subscription = true;
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
-          entity_id, ha_attr_type::unit_of_measurement);
       // if (!entity->is_icon_value_overridden()) {
         this->subscribe_homeassistant_state(
             &NSPanelLovelace::on_entity_attr_device_class_update_, 
             entity_id, ha_attr_type::device_class);
       // }
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
+          entity_id, ha_attr_type::unit_of_measurement);
+    }
+    // icons and unit_of_measurement based on state and device_class
+    else if (entity->is_type(entity_type::cover)) {
+      add_state_subscription = true;
+      // supported_features, current_position, device_class
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_device_class_update_, 
+          entity_id, ha_attr_type::device_class);
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_supported_features_update_, 
+          entity_id, ha_attr_type::supported_features);
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_entity_attr_current_position_update_, 
+          entity_id, ha_attr_type::current_position);
     }
     else if (entity->is_type(entity_type::alarm_control_panel)) {
       add_state_subscription = true;
@@ -878,11 +891,14 @@ void NSPanelLovelace::process_button_press_(
   }
   // cover and shutter cards
   else if (button_type == button_type::up) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::open_cover, entity_id);
   } else if (button_type == button_type::stop) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::stop_cover, entity_id);
   } else if (button_type == button_type::down) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::close_cover, entity_id);
   } else if (button_type == button_type::positionSlider) {
     // todo
   } else if (button_type == button_type::tiltOpen) {
@@ -1097,6 +1113,9 @@ void NSPanelLovelace::on_entity_attr_unit_of_measurement_update_(std::string ent
 void NSPanelLovelace::on_entity_attr_device_class_update_(std::string entity_id, std::string device_class) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::device_class, device_class);
 }
+void NSPanelLovelace::on_entity_attr_supported_features_update_(std::string entity_id, std::string supported_features) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::supported_features, supported_features);
+}
 void NSPanelLovelace::on_entity_attr_supported_color_modes_update_(std::string entity_id, std::string supported_color_modes) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::supported_color_modes, supported_color_modes);
 
@@ -1135,6 +1154,9 @@ void NSPanelLovelace::on_entity_attr_max_mireds_update_(std::string entity_id, s
 }
 void NSPanelLovelace::on_entity_attr_code_arm_required_update_(std::string entity_id, std::string code_required) {
   this->on_entity_attribute_update_(entity_id, ha_attr_type::code_arm_required, code_required);
+}
+void NSPanelLovelace::on_entity_attr_current_position_update_(std::string entity_id, std::string current_position) {
+  this->on_entity_attribute_update_(entity_id, ha_attr_type::current_position, current_position);
 }
 void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, const char *attr, const std::string &attr_value) {
   auto entity = this->get_entity_(entity_id);

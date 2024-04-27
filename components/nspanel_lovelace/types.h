@@ -15,6 +15,8 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
+enum weather_forcast_type { hourly, daily };
+
 enum render_page_option { prev, next, down, screensaver, default_page };
 
 enum alarm_arm_action { arm_home, arm_away, arm_night, arm_vacation };

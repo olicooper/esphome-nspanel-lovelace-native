@@ -102,7 +102,10 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
-  void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
+  void set_weather_entity(const std::string &weather_entity_id, weather_forcast_type foracst_type) {
+    this->weather_entity_id_ = weather_entity_id;
+    this->weather_forecast_type_ = forcast_type;
+  }
   void set_day_of_week_override(DayOfWeekMap::dow dow, const std::array<const char *, 2> &value);
 
   void send_display_command(const char *command);
@@ -211,9 +214,10 @@ protected:
   void on_weather_state_update_(std::string entity_id, std::string state);
   void on_weather_temperature_update_(std::string entity_id, std::string temperature);
   void on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit);
-  void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
+  void on_weather_forecast_update_(const std::string &forecast_json);
   void send_weather_update_command_();
   std::string weather_entity_id_;
+  weather_forcast_type weather_forecast_type_;
   DayOfWeekMap day_of_week_map_;
   bool day_of_week_map_overridden_ = false;
 

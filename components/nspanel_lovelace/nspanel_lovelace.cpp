@@ -114,9 +114,12 @@ void NSPanelLovelace::setup() {
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, ha_attr_type::temperature_unit);
-    this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
-        "forecast");
+    // note: no longer available in HA 2024.4+
+    // this->subscribe_homeassistant_state(
+    //     &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
+    //     "forecast");
+
+    // todo: call the weather.get_forecasts service periodically (~1/hr?) 
   }
   
   for (auto &entity : this->entities_) {
@@ -1372,7 +1375,7 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
 }
 
 // todo: apply this technique https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/#deserialization-in-chunks
-void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
+void NSPanelLovelace::on_weather_forecast_update_(const std::string &forecast_json) {
   if (this->screensaver_ == nullptr) return;
   // todo: check if we are on the screensaver otherwise don't update
   // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
@@ -1401,20 +1404,6 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   }
 
   this->command_buffer_.clear();
-
-  // check if forecast is hourly or daily
-  auto weather_entity_is_hourly = false;
-  if (doc.size() > 1) {
-    auto date1 = doc[0]["datetime"].as<const char *>();
-    auto date2 = doc[1]["datetime"].as<const char *>();
-    tm t{};
-    if (iso8601_to_tm(date1, t)) {
-      uint8_t hr = t.tm_hour;
-      if (iso8601_to_tm(date2, t) && t.tm_hour != hr) {
-        weather_entity_is_hourly = true;
-      }
-    }
-  }
 
   char buff[16] = {};
   uint8_t index = 1, item_count = this->screensaver_->get_items().size();
@@ -1448,7 +1437,7 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
       };
     }
 
-    if (weather_entity_is_hourly) {
+    if (this->weather_forecast_type_ == weather_forcast_type::hourly) {
       // ESPTime now; now.strftime(datefmt);
       strftime(buff, sizeof(buff), this->time_format_.c_str(), &t);
       weatherItem->set_display_name(buff);

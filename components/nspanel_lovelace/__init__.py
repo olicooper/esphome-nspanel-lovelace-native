@@ -89,6 +89,7 @@ CONF_SCREENSAVER = "screensaver"
 CONF_SCREENSAVER_DATE_FORMAT = "date_format"
 CONF_SCREENSAVER_TIME_FORMAT = "time_format"
 CONF_SCREENSAVER_WEATHER = "weather"
+CONF_SCREENSAVER_WEATHER_FORECAST_TYPE = "forecast_type"
 CONF_SCREENSAVER_STATUS_ICON_LEFT = "status_icon_left"
 CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
@@ -258,7 +259,8 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
     cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
-        cv.Required(CONF_ENTITY_ID): valid_entity_id()
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+        cv.Required(CONF_SCREENSAVER_WEATHER_FORECAST_TYPE): cv.enum({ 'hourly': 0, 'daily': 1 })
     }),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
@@ -590,7 +592,8 @@ async def to_code(config):
 
         if CONF_SCREENSAVER_WEATHER in screensaver_config:
             entity_id = screensaver_config[CONF_SCREENSAVER_WEATHER][CONF_ENTITY_ID]
-            cg.add(nspanel.set_weather_entity_id(entity_id))
+            forecast_type = screensaver_config[CONF_SCREENSAVER_WEATHER][CONF_SCREENSAVER_WEATHER_FORECAST_TYPE]
+            cg.add(nspanel.set_weather_entity(entity_id, forecast_type))
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):

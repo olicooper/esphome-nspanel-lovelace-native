@@ -46,7 +46,8 @@ nspanel_lovelace:
     ## see: https://cplusplus.com/reference/ctime/strftime/
     # time_format: '%H:%M'
     # date_format: '%A, %d. %B %Y'
-    weather_entity_id: !secret weather_entity_id
+    weather:
+      entity_id: !secret weather_entity_id
     # status_icon_left:
     #   entity_id: light.front_room_inner
     #   icon: hiking

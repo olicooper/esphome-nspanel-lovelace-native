@@ -88,7 +88,7 @@ CONF_DOW_SATURDAY = "saturday"
 CONF_SCREENSAVER = "screensaver"
 CONF_SCREENSAVER_DATE_FORMAT = "date_format"
 CONF_SCREENSAVER_TIME_FORMAT = "time_format"
-CONF_SCREENSAVER_WEATHER_ENTITY_ID = "weather_entity_id"
+CONF_SCREENSAVER_WEATHER = "weather"
 CONF_SCREENSAVER_STATUS_ICON_LEFT = "status_icon_left"
 CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
@@ -257,7 +257,9 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
-    cv.Optional(CONF_SCREENSAVER_WEATHER_ENTITY_ID): valid_entity_id(),
+    cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
+        cv.Required(CONF_ENTITY_ID): valid_entity_id()
+    }),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
@@ -586,8 +588,9 @@ async def to_code(config):
                 cg.add(iconright_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_right(iconright_variable_class))
 
-        if CONF_SCREENSAVER_WEATHER_ENTITY_ID in screensaver_config:
-            cg.add(nspanel.set_weather_entity_id(screensaver_config[CONF_SCREENSAVER_WEATHER_ENTITY_ID]))
+        if CONF_SCREENSAVER_WEATHER in screensaver_config:
+            entity_id = screensaver_config[CONF_SCREENSAVER_WEATHER][CONF_ENTITY_ID]
+            cg.add(nspanel.set_weather_entity_id(entity_id))
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):

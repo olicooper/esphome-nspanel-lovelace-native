@@ -37,6 +37,38 @@ Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/m
 
 PRs to expand the functionality or fix bugs are very welcome!
 
+# Known Issues
+
+### 1. Weather forecast is not displayed on the screensaver when using Home Assistant 2024.4 or later
+
+This issue is due to the `forcast` attribute being removed from weather entities. There is currently no alternative way to fetch this data with the current ESPHome functionality but I hope to get this fixed (see [this feature request](https://github.com/esphome/feature-requests/issues/2703)).
+More info on the issue can be [found here](https://github.com/olicooper/esphome-nspanel-lovelace-native/issues/8).
+
+As a workaround, please add the following to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update your weather `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`) - thanks @CultusMechanicus for this snippet!
+```yaml
+template:
+  - trigger:
+      - platform: time_pattern
+        hours: /1
+      - platform: homeassistant
+        event: start
+    action:
+      - service: weather.get_forecasts
+        data:
+          type: daily
+        target:
+          entity_id: weather.home # change to your weather entity
+        response_variable: daily
+    sensor:
+      - name: Weather Forecast Daily
+        unique_id: weather_forecast_daily # Use this id in your esphome config (screensaver -> weather -> entity_id)
+        state: "{{ states('weather.home') }}" # # change to your weather entity in this line
+        attributes:
+          temperature: "{{ state_attr('weather.home', 'temperature') }}" # change to your weather entity
+          temperature_unit: "{{ state_attr('weather.home', 'temperature_unit') }}" # change to your weather entity
+          forecast: "{{ daily['weather.home'].forecast }}" # change to your weather entity
+```
+
 # License
 
 Code in this repository is licensed under the GPLv3 license. Third-party code used in this project have their own license terms. Please see [the license document](LICENSE) for more information.

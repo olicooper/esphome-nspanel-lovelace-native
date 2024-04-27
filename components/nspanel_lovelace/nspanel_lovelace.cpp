@@ -418,7 +418,7 @@ void NSPanelLovelace::process_command_(const std::string &message) {
 }
 
 void NSPanelLovelace::render_page_(size_t index) {
-  if (index == 0 || index > this->pages_.size() - 1) return;
+  if (index > this->pages_.size() - 1) return;
   this->current_page_index_ = index;
   this->current_page_ = this->pages_.at(index).get();
   this->force_current_page_update_ = false;

@@ -307,8 +307,7 @@ def validate_config(config):
                         raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"')
                 # Add all valid HA entities to global entity list for later processing
                 # elif not (entity_id.startswith('iText') or entity_id.startswith('delete')):
-                else:
-                    add_entity_id(entity_id)
+                add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
 

@@ -1162,7 +1162,15 @@ void NSPanelLovelace::process_button_press_(
   } else if (starts_with(button_type, entity_type::timer)) {
     std::string service(button_type);
     service[5] = '.';
-    this->call_ha_service_(service, entity_id);
+    if (value.empty()) {
+      this->call_ha_service_(service, entity_id);
+    } else {
+      this->call_ha_service_(service, 
+        {{
+          {to_string(ha_attr_type::entity_id), entity_id},
+          {to_string(ha_attr_type::duration), value.c_str()}
+        }}, {});
+    }
   }
 }
 

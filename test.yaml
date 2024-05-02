@@ -24,11 +24,6 @@ esphome:
   platformio_options:
     build_flags:
       - -DTEST_DEVICE_MODE
-  on_boot:
-    priority: 400
-    then:
-      # Simulate TFT reboot
-      - button.press: tft_reboot
 
 esp32:
   board: lolin32_lite

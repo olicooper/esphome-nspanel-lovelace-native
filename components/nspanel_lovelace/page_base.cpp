@@ -11,21 +11,21 @@ namespace nspanel_lovelace {
  */
 
 Page::Page() :
-    uuid_(""), type_(nullptr), hidden_(false),
+    uuid_(""), type_(page_type::unknown), hidden_(false),
     sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
-Page::Page(const char *type, const std::string &uuid) :
+Page::Page(page_type type, const std::string &uuid) :
     uuid_(uuid), type_(type), hidden_(false),
     sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
 Page::Page(
-    const char *type, const std::string &uuid, const std::string &title) :
+    page_type type, const std::string &uuid, const std::string &title) :
     uuid_(uuid),
     type_(type), title_(title), hidden_(false),
     sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
 Page::Page(
-    const char *type, const std::string &uuid, const std::string &title,
+    page_type type, const std::string &uuid, const std::string &title,
     const uint16_t sleep_timeout) :
     uuid_(uuid),
     type_(type), title_(title), hidden_(false), sleep_timeout_(sleep_timeout) {}
@@ -37,8 +37,8 @@ Page::Page(const Page &other) :
 
 void Page::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
-bool Page::is_type(const char *type) const {
-  return this->type_ == type || std::strcmp(this->type_, type) == 0;
+bool Page::is_type(page_type type) const {
+  return this->type_ == type;
 }
 
 void Page::set_items_render_invalid() { 
@@ -53,9 +53,11 @@ void Page::set_on_item_added_callback(
 }
 
 void Page::add_item(const std::shared_ptr<PageItem> &item) {
-  for (auto &i : this->items_) {
-    if (i->get_uuid() == item->get_uuid())
-      return;
+  if (item->get_uuid() != entity_type::delete_) {
+    for (auto &i : this->items_) {
+      if (i->get_uuid() == item->get_uuid())
+        return;
+    }
   }
   this->items_.push_back(item);
   this->on_item_added_(item);

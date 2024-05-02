@@ -20,9 +20,9 @@ namespace nspanel_lovelace {
 class Card : public Page {
 
 public:
-  Card(const char *type, const std::string &uuid);
-  Card(const char *type, const std::string &uuid, const std::string &title);
-  Card(const char *type, const std::string &uuid,
+  Card(page_type type, const std::string &uuid);
+  Card(page_type type, const std::string &uuid, const std::string &title);
+  Card(page_type type, const std::string &uuid,
       const std::string &title, const uint16_t sleep_timeout);
   virtual ~Card() {}
 

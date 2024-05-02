@@ -469,7 +469,7 @@ void NSPanelLovelace::render_current_page_() {
 
   this->command_buffer_.assign("pageType")
       .append(1, SEPARATOR)
-      .append(this->current_page_->get_type());
+      .append(this->current_page_->get_type_str());
   this->send_buffered_command_();
   this->popup_page_current_uuid_.clear();
 
@@ -974,7 +974,7 @@ void NSPanelLovelace::process_button_press_(
   }
 
   // Screen tapped when on the screensaver, show the default card or use the first card in the config.
-  if (internal_id == page_type::screensaver && button_type == button_type::bExit) {
+  if (internal_id == to_string(page_type::screensaver) && button_type == button_type::bExit) {
     // todo: make a note of last used card
     //
     // config.get("screensaver.defaultCard")

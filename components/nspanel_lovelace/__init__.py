@@ -310,8 +310,9 @@ def validate_config(config):
                     if entity_arr[1] not in card_ids:
                         raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"')
                 # Add all valid HA entities to global entity list for later processing
-                # elif not (entity_id.startswith('iText') or entity_id.startswith('delete')):
-                add_entity_id(entity_id)
+                # if not (entity_id.startswith('iText') or entity_id.startswith('delete')):
+                if not entity_id.startswith('delete'):
+                    add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
 
@@ -377,6 +378,7 @@ GridCard = nspanel_lovelace_ns.class_("GridCard")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
 AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
 
+DeleteItem = nspanel_lovelace_ns.class_("DeleteItem")
 NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
 StatusIconItem = nspanel_lovelace_ns.class_("StatusIconItem")
 WeatherItem = nspanel_lovelace_ns.class_("WeatherItem")
@@ -384,14 +386,16 @@ EntitiesCardEntityItem = nspanel_lovelace_ns.class_("EntitiesCardEntityItem")
 GridCardEntityItem = nspanel_lovelace_ns.class_("GridCardEntityItem")
 AlarmButtonItem = nspanel_lovelace_ns.class_("AlarmButtonItem")
 
+PageType = nspanel_lovelace_ns.enum("page_type", True)
+
 PAGE_MAP = {
     # [config type] : [c++ variable name prefix], [card class], [entity class]
-    CONF_SCREENSAVER: ["nspanel_screensaver", Screensaver, WeatherItem],
-    CARD_ENTITIES: ["nspanel_card_", EntitiesCard, EntitiesCardEntityItem],
-    CARD_GRID: ["nspanel_card_", GridCard, GridCardEntityItem],
-    # CARD_GRID2: ["nspanel_card_", GridCard2, GridCardEntityItem],
-    CARD_QR: ["nspanel_card_", QRCard, EntitiesCardEntityItem],
-    CARD_ALARM: ["nspanel_card_", AlarmCard, AlarmButtonItem]
+    CONF_SCREENSAVER: ["nspanel_screensaver", Screensaver, PageType.screensaver, WeatherItem],
+    CARD_ENTITIES: ["nspanel_card_", EntitiesCard, PageType.cardEntities, EntitiesCardEntityItem],
+    CARD_GRID: ["nspanel_card_", GridCard, PageType.cardGrid, GridCardEntityItem],
+    # CARD_GRID2: ["nspanel_card_", GridCard2, PageType.cardGrid2, GridCardEntityItem],
+    CARD_QR: ["nspanel_card_", QRCard, PageType.cardQR, EntitiesCardEntityItem],
+    CARD_ALARM: ["nspanel_card_", AlarmCard, PageType.cardAlarm, AlarmButtonItem]
 }
 
 def get_new_uuid(prefix: str = ""):
@@ -430,13 +434,20 @@ def generate_icon_config(icon_config, parent_class: cg.MockObj = None) -> Union[
     if parent_class is None:
         return attrs
 
-def gen_card_entities(entities_config, card_class: cg.MockObjClass, id_prefix: str, entity_type: cg.MockObjClass):
+def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass):
     for i, entity_config in enumerate(entities_config):
-        variable_name = id_prefix + "_item_" + str(i + 1)
+        variable_name = card_variable.__str__() + "_item_" + str(i + 1)
         entity_class = cg.global_ns.class_(variable_name)
         entity_class.op = "->"
 
-        entity_id = get_entity_id(entity_config.get(CONF_ENTITY_ID, "delete"))
+        if entity_config.get(CONF_ENTITY_ID, "delete").startswith('delete'):
+            cg.add(cg.RawExpression(
+                f"auto {variable_name} = "
+                f"{make_shared.template(DeleteItem).__call__(card_class)}"))
+            cg.add(card_variable.add_item(entity_class))
+            continue
+
+        entity_id = get_entity_id(entity_config.get(CONF_ENTITY_ID))
         display_name = entity_config.get(CONF_CARD_ENTITIES_NAME, None)
         # if display_name != None:
         #     entity_class = cg.new_Pvariable(variable_name, entity_config[CONF_CARD_ENTITIES_ID], entity_config[CONF_CARD_ENTITIES_NAME])
@@ -448,7 +459,7 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, id_prefix: s
 
         generate_icon_config(entity_config.get(CONF_ICON, None), entity_class)
 
-        cg.add(card_class.add_item(entity_class))
+        cg.add(card_variable.add_item(entity_class))
 
 def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
     entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
@@ -596,7 +607,7 @@ async def to_code(config):
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):
-                screensaver_items.append(make_shared.template(screensaver_info[2]).__call__(get_new_uuid()))
+                screensaver_items.append(make_shared.template(screensaver_info[3]).__call__(get_new_uuid()))
             cg.add(screensaver_class.add_item_range(screensaver_items))
 
         cg.add(cg.RawStatement("}"))
@@ -696,9 +707,9 @@ async def to_code(config):
 
         gen_card_entities(
             card_config.get(CONF_CARD_ENTITIES, []), 
+            page_info[2], 
             card_class, 
-            card_variable, 
-            page_info[2])
+            page_info[3])
 
         cg.add(cg.RawStatement("}"))
 

@@ -405,21 +405,42 @@ struct sensor_type {
   static constexpr const char* window = "window";
 };
 
-struct page_type {
-  static constexpr const char* screensaver = "screensaver";
-  static constexpr const char* screensaver2 = "screensaver2";
-  static constexpr const char* cardGrid = "cardGrid";
-  static constexpr const char* cardGrid2 = "cardGrid2";
-  static constexpr const char* cardEntities = "cardEntities";
-  static constexpr const char* cardThermo = "cardThermo";
-  static constexpr const char* cardMedia = "cardMedia";
-  static constexpr const char* cardUnlock = "cardUnlock";
-  static constexpr const char* cardQR = "cardQR";
-  static constexpr const char* cardPower = "cardPower";
-  static constexpr const char* cardAlarm = "cardAlarm";
-  
-  static constexpr const char* popupLight = "popupLight";
+enum class page_type : uint8_t {
+  unknown,
+  screensaver,
+  screensaver2,
+  cardGrid,
+  cardGrid2,
+  cardEntities,
+  cardThermo,
+  cardMedia,
+  cardUnlock,
+  cardQR,
+  cardPower,
+  cardAlarm,
+  popupLight,
 };
+static constexpr const char* page_type_names [] = {
+  "",
+  "screensaver",
+  "screensaver2",
+  "cardGrid",
+  "cardGrid2",
+  "cardEntities",
+  "cardThermo",
+  "cardMedia",
+  "cardUnlock",
+  "cardQR",
+  "cardPower",
+  "cardAlarm",
+  "popupLight",
+};
+
+inline const char *to_string(page_type type) {
+  if ((size_t)type >= (sizeof(page_type_names) / sizeof(*page_type_names)))
+    return nullptr;
+  return page_type_names[(uint8_t)type];
+}
 
 struct action_type {
   static constexpr const char* buttonPress2 = "buttonPress2";

@@ -15,14 +15,14 @@ namespace nspanel_lovelace {
  * =============== Card ===============
  */
 
-Card::Card(const char *type, const std::string &uuid) :
+Card::Card(page_type type, const std::string &uuid) :
     Page(type, uuid) {}
 
-Card::Card(const char *type, const std::string &uuid,
+Card::Card(page_type type, const std::string &uuid,
     const std::string &title) : Page(type, uuid, title) {}
 
 Card::Card(
-    const char *type, const std::string &uuid, 
+    page_type type, const std::string &uuid, 
     const std::string &title, const uint16_t sleep_timeout) :
     Page(type, uuid, title, sleep_timeout) {}
 

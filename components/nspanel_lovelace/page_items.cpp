@@ -210,5 +210,27 @@ std::string &AlarmIconItem::render_(std::string &buffer) {
   return PageItem_Icon::render_(buffer);
 }
 
+/*
+ * =============== DeleteItem ===============
+ */
+
+DeleteItem::DeleteItem(page_type page_type) :
+    PageItem(entity_type::delete_) {
+  // Currently all page_types that accept delete entities
+  // have the same separator quantity
+  this->uuid_.append(5, SEPARATOR);
+}
+
+DeleteItem::DeleteItem(uint8_t separator_quantity) :
+    PageItem(entity_type::delete_) {
+  this->uuid_.append(separator_quantity, SEPARATOR);
+}
+
+void DeleteItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
+std::string &DeleteItem::render_(std::string &buffer) {
+  return buffer.append(this->uuid_);
+}
+
 } // namespace nspanel_lovelace
 } // namespace esphome

@@ -8,9 +8,11 @@
 # - Simulate TFT reboot (EU model, firmware version 53): `event,startup,53,eu`
 # - Navigate to Extras 1 Card: `event,buttonPress2,navigate.uuid.extras_1_card,button`
 # - Navigate to screensaver: `event,buttonPress2,navigate.uuid.1,button`
+# - Navigate to first card: `event,buttonPress2,screensaver,bExit`
 # - Close the current page / go back to screensaver: `event,sleepReached,`
 # - Open a popupPage (open the page where the entity exists first):
 #    - Timer: `event,pageOpenDetail,popupTimer,uuid.15`
+#       - Start timer with time 0:35:40: `event,buttonPress2,uuid.15,timer-start,0:35:40`
 #    - RGBW Light: `event,pageOpenDetail,popupLight,uuid.12`
 
 substitutions:

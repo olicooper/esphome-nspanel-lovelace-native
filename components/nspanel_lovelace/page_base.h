@@ -20,10 +20,10 @@ namespace nspanel_lovelace {
 
 class Page {
 public:
-  Page(const char *type, const std::string &uuid);
-  Page(const char *type, const std::string &uuid, const std::string &title);
+  Page(page_type type, const std::string &uuid);
+  Page(page_type type, const std::string &uuid, const std::string &title);
   Page(
-      const char *type, const std::string &uuid, const std::string &title,
+      page_type type, const std::string &uuid, const std::string &title,
       const uint16_t sleep_timeout);
   Page(const Page &other);
   virtual ~Page() {}
@@ -32,8 +32,8 @@ public:
 
   const std::string &get_uuid() const { return this->uuid_; }
   const std::string &get_title() const { return this->title_; }
-  bool is_type(const char *type) const;
-  const char *get_type() const { return this->type_; }
+  bool is_type(page_type type) const;
+  const char *get_type_str() const { return to_string(this->type_); }
   bool is_hidden() const { return this->hidden_; }
   uint16_t get_sleep_timeout() const { return this->sleep_timeout_; }
 
@@ -74,7 +74,7 @@ protected:
   virtual void on_item_added_(const std::shared_ptr<PageItem> &item);
 
   std::string uuid_;
-  const char *type_;
+  page_type type_;
   std::string title_;
   bool hidden_;
   uint16_t sleep_timeout_;

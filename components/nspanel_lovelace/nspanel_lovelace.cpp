@@ -127,6 +127,9 @@ void NSPanelLovelace::setup() {
       add_state_subscription = true;
       this->subscribe_homeassistant_state_attr(
         &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::supported_color_modes));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
         entity_id, to_string(ha_attr_type::color_mode));
       this->subscribe_homeassistant_state_attr(
         &NSPanelLovelace::on_entity_attribute_update_,

@@ -1043,8 +1043,7 @@ void NSPanelLovelace::process_button_press_(
         entity_type == entity_type::scene ||
         entity_type == entity_type::script) {
       this->call_ha_service_(
-          entity_type, ha_action_type::turn_on,
-          entity_id);
+        entity_type, ha_action_type::turn_on, entity_id);
     } else if (
         entity_type == entity_type::light ||
         entity_type == entity_type::switch_ ||
@@ -1052,14 +1051,12 @@ void NSPanelLovelace::process_button_press_(
         entity_type == entity_type::automation ||
         entity_type == entity_type::fan) {
       this->call_ha_service_(
-          entity_type, ha_action_type::toggle,
-          entity_id);
+        entity_type, ha_action_type::toggle, entity_id);
     } else if (
         entity_type == entity_type::button ||
         entity_type == entity_type::input_button) {
       this->call_ha_service_(
-          entity_type, ha_action_type::press,
-          entity_id);
+        entity_type, ha_action_type::press, entity_id);
     }
   }
   // media cards
@@ -1090,7 +1087,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::brightness), std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100}, {0, 255})
-          )).c_str()}
+          ))}
       }});
   } else if (button_type == button_type::colorTempSlider) {
     if (value.empty()) return;
@@ -1116,7 +1113,7 @@ void NSPanelLovelace::process_button_press_(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100},
             {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
-          )).c_str()}
+          ))}
       }});
   } else if (button_type == button_type::colorWheel) {
     if (value.empty()) return;
@@ -1139,7 +1136,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::entity_id), entity_id}
       }},
       {{
-        {to_string(ha_attr_type::rgb_color), rgb_str.c_str()}
+        {to_string(ha_attr_type::rgb_color), rgb_str}
       }});
   } else if (
     button_type == button_type::armHome ||
@@ -1156,7 +1153,7 @@ void NSPanelLovelace::process_button_press_(
         entity_type, action.c_str(), 
         {{
           {to_string(ha_attr_type::entity_id), entity_id},
-          {to_string(ha_attr_type::code), value.c_str()}
+          {to_string(ha_attr_type::code), value}
         }});
     }
   } else if (starts_with(button_type, entity_type::timer)) {
@@ -1168,8 +1165,8 @@ void NSPanelLovelace::process_button_press_(
       this->call_ha_service_(service, 
         {{
           {to_string(ha_attr_type::entity_id), entity_id},
-          {to_string(ha_attr_type::duration), value.c_str()}
-        }}, {});
+          {to_string(ha_attr_type::duration), value}
+        }});
     }
   }
 }
@@ -1202,23 +1199,16 @@ Entity* NSPanelLovelace::get_entity_(const std::string &entity_id) {
 
 void NSPanelLovelace::call_ha_service_(
     const std::string &service, const std::string &entity_id) {
-  this->call_ha_service_(service, {{to_string(ha_attr_type::entity_id), entity_id}}, {});
+  this->call_ha_service_(service, {{to_string(ha_attr_type::entity_id), entity_id}});
 }
 
 void NSPanelLovelace::call_ha_service_(
-    const char *entity_type, const char *action, const std::string &entity_id) {
+    const char *entity_type, const std::string &action, const std::string &entity_id) {
   this->call_ha_service_(entity_type, action, {{to_string(ha_attr_type::entity_id), entity_id}});
 }
 
 void NSPanelLovelace::call_ha_service_(
-    const char *entity_type, const char *action,
-    const std::map<std::string, std::string> &data) {
-  // this->call_homeassistant_service(service, data);
-  this->call_ha_service_(entity_type, action, data, {});
-}
-
-void NSPanelLovelace::call_ha_service_(
-    const char *entity_type, const char *action,
+    const char *entity_type, const std::string &action,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
   this->call_ha_service_(

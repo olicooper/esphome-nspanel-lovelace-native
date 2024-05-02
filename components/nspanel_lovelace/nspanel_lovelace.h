@@ -191,18 +191,15 @@ protected:
   void call_ha_service_(
     const std::string& service, const std::string& entity_id);
   void call_ha_service_(
-    const char* entity_type, const char* action, const std::string& entity_id);
+    const char *entity_type, const std::string &action, const std::string& entity_id);
   void call_ha_service_(
-    const char* entity_type, const char* action,
-    const std::map<std::string, std::string> &data);
-  void call_ha_service_(
-    const char* entity_type, const char* action,
+    const char *entity_type, const std::string &action,
     const std::map<std::string, std::string> &data,
-    const std::map<std::string, std::string> &data_template);
+    const std::map<std::string, std::string> &data_template = {});
   void call_ha_service_(
     const std::string& service,
     const std::map<std::string, std::string> &data,
-    const std::map<std::string, std::string> &data_template);
+    const std::map<std::string, std::string> &data_template = {});
   void on_entity_state_update_(std::string entity_id, std::string state);
   void on_entity_attribute_update_(
     std::string entity_id, std::string attr_name, std::string attr_value);

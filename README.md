@@ -30,7 +30,7 @@ There are many UI components missing and the [python build script](components/ns
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display
 - Support for `cardGrid`, `cardEntities`, `cardQR`, `cardAlarm`
-- Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` page.
+- Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` and `popupTimer` pages.
 
 There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardPower` etc. but these are planned for the future.
 Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.

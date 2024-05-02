@@ -145,8 +145,7 @@ void NSPanelLovelace::setup() {
     else if (entity->is_type(entity_type::switch_) ||
         entity->is_type(entity_type::input_boolean) ||
         entity->is_type(entity_type::automation) ||
-        entity->is_type(entity_type::fan) ||
-        entity->is_type(entity_type::timer)) {
+        entity->is_type(entity_type::fan)) {
       add_state_subscription = true;
     }
     // icons and unit_of_measurement based on state and device_class
@@ -524,7 +523,15 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
   if (item->is_type(entity_type::light)) {
     this->render_light_detail_update_(item);
   } else if (item->is_type(entity_type::timer)) {
+    this->set_display_timeout(30);
     this->render_timer_detail_update_(item);
+    this->set_interval(entity_type::timer, 1000, [this, item]() {
+      if (this->popup_page_current_uuid_ != item->get_uuid()) {
+        this->cancel_interval(entity_type::timer);
+        return;
+      }
+      this->render_timer_detail_update_(item);
+    });
   } else {
     return;
   }
@@ -592,6 +599,7 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
   bool idle = state == "paused" || state == "idle";
 
   if (idle) {
+    this->cancel_interval(entity_type::timer);
     std::string time_remaining_str;
     if (state == "paused") {
       time_remaining_str = item->get_attribute(ha_attr_type::remaining);
@@ -614,15 +622,17 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     if (!finishes_at.empty()) {
       tm t{};
       if (iso8601_to_tm(finishes_at.c_str(), t)) {
-        // uint8_t hr = t.tm_hour;
         ESPTime now = this->time_id_.value()->now();
         if (now.is_valid()) {
-          uint32_t seconds = static_cast<uint16_t>(
-            difftime(now.timestamp, mktime(&t)));
+          double seconds = difftime(mktime(&t), now.timestamp);
           if (seconds >= UINT16_MAX) seconds = UINT16_MAX;
-          min_remaining = seconds / 60;
-          sec_remaining = seconds % 60;
+          if (seconds < 0) seconds = 0;
+          min_remaining = static_cast<uint16_t>(seconds) / 60;
+          sec_remaining = static_cast<uint16_t>(seconds) % 60;
           render = true;
+          if (seconds == 0) {
+            this->cancel_interval(entity_type::timer);
+          }
         }
       }
     }
@@ -632,8 +642,6 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     this->render_current_page_();
     return;
   }
-
-  this->set_display_timeout(30);
 
   this->command_buffer_
     // entityUpdateDetail~

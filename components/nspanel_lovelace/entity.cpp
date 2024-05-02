@@ -92,12 +92,12 @@ void Entity::set_state(const std::string &state) {
   }
 }
 
-const std::string &Entity::get_attribute(const char *attr, const std::string &default_value) const {
+const std::string &Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
   auto it = attributes_.find(attr);
   return it == attributes_.end() ? default_value : it->second;
 }
 
-void Entity::set_attribute(const char *attr, const std::string &value) {
+void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
   if (value.empty() || value == "None" || value == "none") {
     attributes_.erase(attr);
     this->notify_attribute_change(attr, "");
@@ -138,7 +138,7 @@ void Entity::notify_state_change(const std::string &state) {
   }
 }
 
-void Entity::notify_attribute_change(const char *attr, const std::string &value) {
+void Entity::notify_attribute_change(ha_attr_type attr, const std::string &value) {
   for (auto iter = this->targets_.begin(); iter != this->targets_.end(); ++iter) {
     (*iter)->on_entity_attribute_change(attr, value);
   }

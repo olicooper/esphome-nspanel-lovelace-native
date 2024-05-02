@@ -97,7 +97,7 @@ public:
   void set_disarm_button(const std::string &display_name);
 
   void on_entity_state_change(const std::string &state) override;
-  void on_entity_attribute_change(const char *attr, const std::string &value) override;
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
 
   std::string &render(std::string &buffer) override;
 

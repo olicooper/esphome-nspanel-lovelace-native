@@ -15,9 +15,9 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-enum render_page_option { prev, next, down, screensaver, default_page };
+enum class render_page_option : uint8_t { prev, next, down, screensaver, default_page };
 
-enum alarm_arm_action { arm_home, arm_away, arm_night, arm_vacation };
+enum class alarm_arm_action : uint8_t { arm_home, arm_away, arm_night, arm_vacation };
 struct alarm_entity_state {
   static constexpr const char* disarmed = "disarmed";
   static constexpr const char* arming = "arming";
@@ -41,8 +41,8 @@ static const std::array<std::array<const char *, 2>, 7> dow_names = {
 
 class DayOfWeekMap {
 public:
-  enum dow { sunday, monday, tuesday, wednesday, thursday, friday, saturday };
-  enum dow_mode { 
+  enum dow : uint8_t { sunday, monday, tuesday, wednesday, thursday, friday, saturday };
+  enum dow_mode : uint8_t { 
     none = 0,
     short_dow = 1 << 0,
     long_dow = 1 << 1,
@@ -438,51 +438,100 @@ struct ha_action_type {
   static constexpr const char* stop_cover = "stop_cover";
 };
 
-struct ha_attr_type {
-  static constexpr const char* entity_id = "entity_id";
-  static constexpr const char* state = "state";
-  static constexpr const char* device_class = "device_class";
-  static constexpr const char* supported_features = "supported_features";
-  static constexpr const char* unit_of_measurement = "unit_of_measurement";
+enum class ha_attr_type : uint8_t {
+  unknown,
+  // general
+  entity_id,
+  state,
+  device_class,
+  supported_features,
+  unit_of_measurement,
   // light
-  static constexpr const char* brightness = "brightness";
-  static constexpr const char* min_mireds = "min_mireds";
-  static constexpr const char* max_mireds = "max_mireds";
-  static constexpr const char* supported_color_modes = "supported_color_modes";
-  static constexpr const char* color_mode = "color_mode";
-  static constexpr const char* color_temp = "color_temp";
-  static constexpr const char* rgb_color = "rgb_color";
+  brightness,
+  min_mireds,
+  max_mireds,
+  supported_color_modes,
+  color_mode,
+  color_temp,
+  rgb_color,
   // alarm_control_panel
-  static constexpr const char* code = "code";
-  static constexpr const char* code_arm_required = "code_arm_required";
+  code,
+  code_arm_required,
   // cover
-  static constexpr const char* current_position = "current_position";
+  current_position,
   // weather
-  static constexpr const char* temperature = "temperature";
-  static constexpr const char* temperature_unit = "temperature_unit";
+  temperature,
+  temperature_unit,
   // timer
-  static constexpr const char* duration = "duration";
-  static constexpr const char* remaining = "remaining";
-  static constexpr const char* editable = "editable";
-  static constexpr const char* finishes_at = "finishes_at";
+  duration,
+  remaining,
+  editable,
+  finishes_at
 };
+
+static constexpr const char* ha_attr_names [] = {
+  "",
+  // general
+  "entity_id",
+  "state",
+  "device_class",
+  "supported_features",
+  "unit_of_measurement",
+  // light
+  "brightness",
+  "min_mireds",
+  "max_mireds",
+  "supported_color_modes",
+  "color_mode",
+  "color_temp",
+  "rgb_color",
+  // alarm_control_panel
+  "code",
+  "code_arm_required",
+  // cover
+  "current_position",
+  // weather
+  "temperature",
+  "temperature_unit",
+  // timer
+  "duration",
+  "remaining",
+  "editable",
+  "finishes_at",
+};
+
+inline const char *to_string(ha_attr_type attr) {
+  if ((size_t)attr >= (sizeof(ha_attr_names) / sizeof(*ha_attr_names)))
+    return nullptr;
+  return ha_attr_names[(uint8_t)attr];
+}
+
+inline ha_attr_type to_ha_attr(const std::string &attr) {
+  for (uint8_t i = 0; i < (sizeof(ha_attr_names) / sizeof(*ha_attr_names)); i++) {
+    if (attr == ha_attr_names[i]) return static_cast<ha_attr_type>(i);
+  }
+  return ha_attr_type::unknown;
+}
 
 struct ha_attr_color_mode {
   static constexpr const char* onoff = "onoff";
-  static constexpr const char* color_temp = ha_attr_type::color_temp;
+  static constexpr const char* color_temp = "color_temp";
   static constexpr const char* xy = "xy";
   static constexpr const char* hs = "hs";
   static constexpr const char* rgb = "rgb";
   static constexpr const char* rgbw = "rgbw";
 };
 
-enum datetime_mode {
+enum class datetime_mode : uint8_t {
   date = 1<<0,
   time = 1<<1,
   both = date | time
 };
 inline datetime_mode operator|(datetime_mode a, datetime_mode b) {
   return static_cast<datetime_mode>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+inline datetime_mode operator&(datetime_mode a, datetime_mode b) {
+  return static_cast<datetime_mode>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
 inline const char *get_icon_by_name(

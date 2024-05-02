@@ -54,7 +54,7 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void EntitiesCardEntityItem::on_entity_attribute_change(
-    const char *attr, const std::string &value) {
+    ha_attr_type attr, const std::string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
 
   // this class only needs to react to the following attributes

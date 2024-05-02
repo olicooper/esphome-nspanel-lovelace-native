@@ -170,7 +170,7 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
   }
 }
 
-void AlarmCard::on_entity_attribute_change(const char *attr, const std::string &value) {
+void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
   if (attr == ha_attr_type::code_arm_required) {
     this->set_show_keypad(value != generic_type::off);
   }

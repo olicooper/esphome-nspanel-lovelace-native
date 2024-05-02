@@ -41,7 +41,7 @@ public:
 
   void accept(PageItemVisitor& visitor) override;
   
-  void on_entity_attribute_change(const char *attr, const std::string &value) override;
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
 
   const std::string &get_value() const { return this->value_; }
 

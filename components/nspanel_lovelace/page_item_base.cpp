@@ -235,7 +235,7 @@ void StatefulPageItem::on_entity_state_change(const std::string &state) {
   }
 }
 
-void StatefulPageItem::on_entity_attribute_change(const char *attr, const std::string &value) {
+void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
   // this class only needs to react to the following attributes
   if (attr == ha_attr_type::device_class) {
     if (!this->icon_value_overridden_) {

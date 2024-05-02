@@ -191,7 +191,7 @@ public:
 
   void on_entity_type_change(const char *type) override;
   void on_entity_state_change(const std::string &state) override;
-  void on_entity_attribute_change(const char *attr, const std::string &value) override;
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
 
   bool is_type(const char *type) const { return this->entity_->is_type(type); }
   const char *get_type() const { return this ->entity_->get_type(); }
@@ -199,7 +199,7 @@ public:
   bool is_state(const std::string &state) const { return this->entity_->is_state(state); }
   const std::string &get_state() const { return this->entity_->get_state(); }
   const std::string &get_attribute(
-      const char *attr, const std::string &default_value = "") const {
+      ha_attr_type attr, const std::string &default_value = "") const {
     return this->entity_->get_attribute(attr, default_value);
   }
   Entity* get_entity() const { return this->entity_.get(); }

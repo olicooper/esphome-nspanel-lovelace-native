@@ -16,7 +16,7 @@ public:
   virtual ~IEntitySubscriber() {}
   virtual void on_entity_type_change(const char *type) {}
   virtual void on_entity_state_change(const std::string &state) {}
-  virtual void on_entity_attribute_change(const char *attr, const std::string &value) {}
+  virtual void on_entity_attribute_change(ha_attr_type attr, const std::string &value) {}
 };
 
 class Entity {
@@ -38,21 +38,21 @@ public:
   const std::string &get_state() const;
   void set_state(const std::string &state);
 
-  const std::string &get_attribute(const char *attr, const std::string &default_value = "") const;
-  void set_attribute(const char *attr, const std::string &value);
+  const std::string &get_attribute(ha_attr_type attr, const std::string &default_value = "") const;
+  void set_attribute(ha_attr_type attr, const std::string &value);
 
 protected:
   std::string entity_id_;
   const char *type_;
   bool type_overridden_ = false;
   std::string state_;
-  std::map<const char *, std::string> attributes_;
+  std::map<ha_attr_type, std::string> attributes_;
   std::vector<IEntitySubscriber*> targets_;
   bool enable_notifications_ = false;
 
   void notify_type_change(const char *type);
   void notify_state_change(const std::string &state);
-  void notify_attribute_change(const char *attr, const std::string &value);
+  void notify_attribute_change(ha_attr_type attr, const std::string &value);
 };
 
 }

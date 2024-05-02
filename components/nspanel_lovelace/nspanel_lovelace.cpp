@@ -110,10 +110,10 @@ void NSPanelLovelace::setup() {
         &NSPanelLovelace::on_weather_state_update_, this->weather_entity_id_);
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_update_,
-        this->weather_entity_id_, ha_attr_type::temperature);
+        this->weather_entity_id_, to_string(ha_attr_type::temperature));
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_unit_update_,
-        this->weather_entity_id_, ha_attr_type::temperature_unit);
+        this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
         "forecast");
@@ -125,14 +125,22 @@ void NSPanelLovelace::setup() {
     bool add_state_subscription = false;
     if (entity->is_type(entity_type::light)) {
       add_state_subscription = true;
-      // selectively subscribe to light attributes based on the supported color modes
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_supported_color_modes_update_, 
-          entity_id, ha_attr_type::supported_color_modes);
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::color_mode));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::min_mireds));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::max_mireds));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::color_temp));
       // need to subscribe to brightness to know if brightness is supported
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_brightness_update_, 
-          entity_id, ha_attr_type::brightness);
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::brightness));
     }
     else if (entity->is_type(entity_type::switch_) ||
         entity->is_type(entity_type::input_boolean) ||
@@ -146,47 +154,47 @@ void NSPanelLovelace::setup() {
         entity->is_type(entity_type::binary_sensor)) {
       add_state_subscription = true;
       // if (!entity->is_icon_value_overridden()) {
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_entity_attr_device_class_update_, 
-            entity_id, ha_attr_type::device_class);
+        this->subscribe_homeassistant_state_attr(
+            &NSPanelLovelace::on_entity_attribute_update_, 
+            entity_id, to_string(ha_attr_type::device_class));
       // }
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_unit_of_measurement_update_, 
-          entity_id, ha_attr_type::unit_of_measurement);
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::unit_of_measurement));
     }
     else if (entity->is_type(entity_type::cover)) {
       add_state_subscription = true;
       // supported_features, current_position, device_class
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_device_class_update_, 
-          entity_id, ha_attr_type::device_class);
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_supported_features_update_, 
-          entity_id, ha_attr_type::supported_features);
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_entity_attr_current_position_update_, 
-          entity_id, ha_attr_type::current_position);
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::device_class));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::supported_features));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::current_position));
     }
     else if (entity->is_type(entity_type::alarm_control_panel)) {
       add_state_subscription = true;
-      this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_code_arm_required_update_,
-        entity_id, ha_attr_type::code_arm_required);
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::code_arm_required));
     }
     else if (entity->is_type(entity_type::timer)) {
       add_state_subscription = true;
-      this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_editable_update_,
-        entity_id, ha_attr_type::editable);
-      this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_duration_update_,
-        entity_id, ha_attr_type::duration);
-      this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_remaining_update_,
-        entity_id, ha_attr_type::remaining);
-      this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_finishes_at_update_,
-        entity_id, ha_attr_type::finishes_at);
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::editable));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::duration));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::remaining));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::finishes_at));
     }
 
     if (add_state_subscription) {
@@ -1069,9 +1077,9 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {(const char*)ha_attr_type::entity_id, entity_id},
+        {to_string(ha_attr_type::entity_id), entity_id},
         // scale 0-100 to ha brightness range
-        {(const char*)ha_attr_type::brightness, std::to_string(
+        {to_string(ha_attr_type::brightness), std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100}, {0, 255})
           )).c_str()}
@@ -1094,9 +1102,9 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {(const char*)ha_attr_type::entity_id, entity_id},
+        {to_string(ha_attr_type::entity_id), entity_id},
         // scale 0-100 from slider to color range of the light
-        {(const char*)ha_attr_type::color_temp, std::to_string(
+        {to_string(ha_attr_type::color_temp), std::to_string(
           static_cast<int>(
             scale_value(std::stoi(value), {0, 100},
             {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
@@ -1120,10 +1128,10 @@ void NSPanelLovelace::process_button_press_(
       entity_type, 
       ha_action_type::turn_on, 
       {{
-        {(const char*)ha_attr_type::entity_id, entity_id}
+        {to_string(ha_attr_type::entity_id), entity_id}
       }},
       {{
-        {(const char*)ha_attr_type::rgb_color, rgb_str.c_str()}
+        {to_string(ha_attr_type::rgb_color), rgb_str.c_str()}
       }});
   } else if (
     button_type == button_type::armHome ||
@@ -1139,8 +1147,8 @@ void NSPanelLovelace::process_button_press_(
       this->call_ha_service_(
         entity_type, action.c_str(), 
         {{
-          {(const char*)ha_attr_type::entity_id, entity_id},
-          {(const char*)ha_attr_type::code, value.c_str()}
+          {to_string(ha_attr_type::entity_id), entity_id},
+          {to_string(ha_attr_type::code), value.c_str()}
         }});
     }
   } else if (starts_with(button_type, entity_type::timer)) {
@@ -1178,12 +1186,12 @@ Entity* NSPanelLovelace::get_entity_(const std::string &entity_id) {
 
 void NSPanelLovelace::call_ha_service_(
     const std::string &service, const std::string &entity_id) {
-  this->call_ha_service_(service, {{ha_attr_type::entity_id, entity_id}}, {});
+  this->call_ha_service_(service, {{to_string(ha_attr_type::entity_id), entity_id}}, {});
 }
 
 void NSPanelLovelace::call_ha_service_(
     const char *entity_type, const char *action, const std::string &entity_id) {
-  this->call_ha_service_(entity_type, action, {{ha_attr_type::entity_id, entity_id}});
+  this->call_ha_service_(entity_type, action, {{to_string(ha_attr_type::entity_id), entity_id}});
 }
 
 void NSPanelLovelace::call_ha_service_(
@@ -1209,7 +1217,7 @@ void NSPanelLovelace::call_ha_service_(
   api::HomeassistantServiceResponse resp;
   resp.service = service;
 
-  auto it = data.find(ha_attr_type::entity_id);
+  auto it = data.find(to_string(ha_attr_type::entity_id));
   if (it == data.end())
     ESP_LOGD(TAG, "Call HA: %s -> %s", resp.service.c_str(), it->second.c_str());
   else
@@ -1232,83 +1240,22 @@ void NSPanelLovelace::call_ha_service_(
 }
 
 void NSPanelLovelace::on_entity_state_update_(std::string entity_id, std::string state) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::state, state);
+  this->on_entity_attribute_update_(entity_id, to_string(ha_attr_type::state), state);
 }
-void NSPanelLovelace::on_entity_attr_unit_of_measurement_update_(std::string entity_id, std::string unit_of_measurement) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::unit_of_measurement, unit_of_measurement);
-}
-void NSPanelLovelace::on_entity_attr_device_class_update_(std::string entity_id, std::string device_class) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::device_class, device_class);
-}
-void NSPanelLovelace::on_entity_attr_supported_features_update_(std::string entity_id, std::string supported_features) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::supported_features, supported_features);
-}
-void NSPanelLovelace::on_entity_attr_supported_color_modes_update_(std::string entity_id, std::string supported_color_modes) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::supported_color_modes, supported_color_modes);
-
-  if (supported_color_modes.empty()) return;
-  if (supported_color_modes.length() == 1 && 
-      contains_value(supported_color_modes, ha_attr_color_mode::onoff)) {
-    return;
-  }
-
-  this->subscribe_homeassistant_state(
-      &NSPanelLovelace::on_entity_attr_color_mode_update_, entity_id, ha_attr_type::color_mode);
-
-  if (contains_value(supported_color_modes, ha_attr_color_mode::color_temp)) {
-    this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_min_mireds_update_, entity_id, ha_attr_type::min_mireds);
-    this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_max_mireds_update_, entity_id, ha_attr_type::max_mireds);
-    this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_entity_attr_color_temp_update_, entity_id, ha_attr_type::color_temp);
-  }
-}
-void NSPanelLovelace::on_entity_attr_color_mode_update_(std::string entity_id, std::string color_mode) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::color_mode, color_mode);
-}
-void NSPanelLovelace::on_entity_attr_brightness_update_(std::string entity_id, std::string brightness) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::brightness, brightness);
-}
-void NSPanelLovelace::on_entity_attr_color_temp_update_(std::string entity_id, std::string color_temp) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::color_temp, color_temp);
-}
-void NSPanelLovelace::on_entity_attr_min_mireds_update_(std::string entity_id, std::string min_mireds) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::min_mireds, min_mireds);
-}
-void NSPanelLovelace::on_entity_attr_max_mireds_update_(std::string entity_id, std::string max_mireds) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::max_mireds, max_mireds);
-}
-void NSPanelLovelace::on_entity_attr_code_arm_required_update_(std::string entity_id, std::string code_required) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::code_arm_required, code_required);
-}
-void NSPanelLovelace::on_entity_attr_current_position_update_(std::string entity_id, std::string current_position) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::current_position, current_position);
-}
-void NSPanelLovelace::on_entity_attr_editable_update_(std::string entity_id, std::string editable) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::editable, editable);
-}
-void NSPanelLovelace::on_entity_attr_duration_update_(std::string entity_id, std::string duration) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::duration, duration);
-}
-void NSPanelLovelace::on_entity_attr_remaining_update_(std::string entity_id, std::string remaining) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::remaining, remaining);
-}
-void NSPanelLovelace::on_entity_attr_finishes_at_update_(std::string entity_id, std::string finishes_at) {
-  this->on_entity_attribute_update_(entity_id, ha_attr_type::finishes_at, finishes_at);
-}
-void NSPanelLovelace::on_entity_attribute_update_(const std::string &entity_id, const char *attr, const std::string &attr_value) {
+void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::string attr, std::string attr_value) {
   auto entity = this->get_entity_(entity_id);
   if (entity == nullptr) return;
+  auto ha_attr = to_ha_attr(attr);
+  if (ha_attr == ha_attr_type::unknown) return;
 
-  if (attr == ha_attr_type::state) {
+  if (attr == to_string(ha_attr_type::state)) {
     entity->set_state(attr_value);
   } else {
-    entity->set_attribute(attr, attr_value);
+    entity->set_attribute(ha_attr, attr_value);
   }
 
   ESP_LOGD(TAG, "HA update: %s %s='%s'",
-    entity_id.c_str(), attr, attr_value.c_str());
+    entity_id.c_str(), attr.c_str(), attr_value.c_str());
 
   // if (this->force_current_page_update_) return;
 

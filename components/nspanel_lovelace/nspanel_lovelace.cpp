@@ -380,6 +380,12 @@ bool NSPanelLovelace::process_data_() {
   return true;
 }
 
+#ifdef TEST_DEVICE_MODE
+void NSPanelLovelace::process_command(const std::string &message) {
+  this->process_command_(message);
+};
+#endif
+
 void NSPanelLovelace::process_command_(const std::string &message) {
   ESP_LOGD(TAG, "Screen CMD: %s", message.c_str());
 

@@ -119,6 +119,11 @@ public:
 
   void add_incoming_msg_callback(std::function<void(std::string)> callback) { this->incoming_msg_callback_.add(std::move(callback)); }
 
+#ifdef TEST_DEVICE_MODE
+  // Only used to simulate TFT commands on test devices
+  void process_command(const std::string &message);
+#endif
+
 #ifdef USE_NSPANEL_TFT_UPLOAD
   /**
    * Upload the tft file and softreset the Nextion.

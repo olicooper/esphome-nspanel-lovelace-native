@@ -16,9 +16,9 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      # These are required to allow access to the PSRAM
-      # NOTE: This is temporary and will be removed in a 
-      #       future release when the build script is improved
+      ## These are required to allow access to the PSRAM
+      ## NOTE: This is temporary and will be removed in a 
+      ##       future release when the build script is improved
       CONFIG_D0WD_PSRAM_CLK_IO: '5'
       CONFIG_D0WD_PSRAM_CS_IO: '18'
 
@@ -45,7 +45,7 @@ nspanel_lovelace:
     #   saturday: ['Sat', 'Saturday']
   screensaver:
     time_id: homeassistant_time
-    ## see: https://cplusplus.com/reference/ctime/strftime/
+    ## For formatting options see: https://cplusplus.com/reference/ctime/strftime/
     # time_format: '%H:%M'
     # date_format: '%A, %d. %B %Y'
     weather:
@@ -136,12 +136,13 @@ wifi:
 
 api:
   services:
-    # Service to send a command directly to the display. Useful for testing
+    ## Service to send a command directly to the display. Useful for testing
     - service: send_command
       variables:
         cmd: string
       then:
         - lambda: 'id(nspanel).send_display_command(cmd.c_str());'
+    ## Service to update the TFT firmware using a URL that is accessible to the nspanel
     - service: upload_tft
       variables:
         url: string
@@ -151,7 +152,7 @@ api:
 ota:
   password: !secret ota_password
 
-# Uart for the Nextion display
+## UART for the Nextion display
 uart:
   id: uart_nextion
   tx_pin: 16
@@ -163,19 +164,19 @@ time:
     id: homeassistant_time
     timezone: Europe/London
     on_time:
-      # At midnight
+      ## At midnight
       - seconds: 0
         minutes: 0
         hours: 0
         then:
           - lambda: 'id(nspanel).set_display_dim(1, 50);'
-      # At 8:00 PM
+      ## At 8:00 PM
       - seconds: 0
         minutes: 0
         hours: 20
         then:
           - lambda: 'id(nspanel).set_display_dim(20, 80);'
-      # At 7:00 AM
+      ## At 7:00 AM
       - seconds: 0
         minutes: 0
         hours: 7
@@ -183,7 +184,7 @@ time:
           - lambda: 'id(nspanel).set_display_dim(50, 100);'
 
 switch:
-  # Physical relay 1
+  ## Physical relay 1
   - platform: gpio
     name: Relay 1
     id: relay_1
@@ -191,7 +192,7 @@ switch:
       number: 19
     restore_mode: ALWAYS_ON
 
-  # Physical relay 2
+  ## Physical relay 2
   - platform: gpio
     name: Relay 2
     id: relay_2
@@ -199,7 +200,7 @@ switch:
       number: 22
     restore_mode: ALWAYS_ON
 
-  # Turn screen power on/off
+  ## Turn screen power on/off
   - platform: gpio
     name: Screen Power
     id: screen_power
@@ -210,23 +211,23 @@ switch:
     restore_mode: ALWAYS_ON
 
 sensor:
-  # WiFi signal strength sensor
+  ## WiFi signal strength sensor
   - platform: wifi_signal
     name: WiFi Signal
     update_interval: 300s
-  # Internal temperature sensor, adc value
+  ## Internal temperature sensor, adc value
   - platform: adc
     id: ntc_source
     pin: 38
     update_interval: 60s
     attenuation: 11db
-  # Internal temperature sensor, adc reading converted to resistance (calculation)
+  ## Internal temperature sensor, adc reading converted to resistance (calculation)
   - platform: resistance
     id: resistance_sensor
     sensor: ntc_source
     configuration: DOWNSTREAM
     resistor: 11.2kOhm
-  # Internal temperature sensor, resistance to temperature (calculation)
+  ## Internal temperature sensor, resistance to temperature (calculation)
   - platform: ntc
     id: temperature
     sensor: resistance_sensor
@@ -236,9 +237,8 @@ sensor:
       reference_resistance: 10kOhm
     name: Temperature
 
-# Binary sensors
 binary_sensor:
-  # Left button below the display
+  ## Left button below the display
   - platform: gpio
     name: Left Button
     pin:
@@ -285,7 +285,7 @@ binary_sensor:
         then:
           - switch.toggle: relay_1
 
-  # Right button below the display
+  ## Right button below the display
   - platform: gpio
     name: Right Button
     pin:

@@ -31,6 +31,8 @@ external_components:
 
 nspanel_lovelace:
   id: nspanel
+  ## Options: eu, us-l, us-p
+  # model: eu
   sleep_timeout: 10
   # locale:
     # day_of_week_map:

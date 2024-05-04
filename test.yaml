@@ -41,6 +41,7 @@ external_components:
 
 nspanel_lovelace:
   id: nspanel
+  model: eu # eu us-l us-p
   sleep_timeout: 10
   screensaver:
     time_id: homeassistant_time
@@ -76,8 +77,6 @@ nspanel_lovelace:
           name: Fan
         - entity_id: cover.garage_door
           name: Cover (Garage)
-        - entity_id: navigate.qr_card
-          name: QR Card
 
     - type: cardEntities
       id: extras_2_card
@@ -90,6 +89,8 @@ nspanel_lovelace:
           name: Temp Sensor
         - entity_id: weather.demo_weather_south
           name: Weather
+        - entity_id: navigate.qr_card
+          name: QR Card
 
     - type: cardQR
       id: qr_card

@@ -62,12 +62,6 @@ ENTITY_TYPES = [
     'script'
 ]
 
-CARD_ENTITIES="cardEntities"
-CARD_GRID="cardGrid"
-CARD_GRID2="cardGrid2"
-CARD_QR="cardQR"
-CARD_ALARM="cardAlarm"
-
 CONF_INCOMING_MSG = "on_incoming_msg"
 CONF_ICON = "icon"
 CONF_ICON_VALUE = "value"
@@ -86,6 +80,7 @@ CONF_DOW_FRIDAY = "friday"
 CONF_DOW_SATURDAY = "saturday"
 
 CONF_SCREENSAVER = "screensaver"
+CONF_MODEL = "model"
 CONF_SCREENSAVER_DATE_FORMAT = "date_format"
 CONF_SCREENSAVER_TIME_FORMAT = "time_format"
 CONF_SCREENSAVER_WEATHER = "weather"
@@ -100,6 +95,13 @@ CONF_CARD_TITLE = "title"
 CONF_CARD_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_CARD_ENTITIES = "entities"
 CONF_CARD_ENTITIES_NAME = "name"
+
+CARD_ENTITIES="cardEntities"
+CARD_GRID="cardGrid"
+CARD_GRID2="cardGrid2"
+CARD_QR="cardQR"
+CARD_ALARM="cardAlarm"
+CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_QR, CARD_ALARM]
 
 CONF_CARD_QR_TEXT = "qr_text"
 CONF_CARD_ALARM_ENTITY_ID = "alarm_entity_id"
@@ -145,7 +147,6 @@ def get_icon_hex(iconLookup: str) -> Union[str, None]:
                 return attrs['hex'].upper()
     return None
 
-
 def valid_icon_value(value):
     if isinstance(value, str):
         if isinstance(get_icon_hex(value), str):
@@ -166,8 +167,8 @@ def valid_uuid(value):
         f'Value must be 30 characters or less in length and contain only numbers, letters and underscores e.g. "living_room_light_1"'
     )
 
-def valid_entity_id(entity_type_whitelist: list[str] = None):
-    """Validate that a given entity_id is correctly formatted and present in the entity type whitelist."""
+def valid_entity_id(entity_type_allowlist: list[str] = None):
+    """Validate that a given entity_id is correctly formatted and present in the entity type allowlist."""
     def validator(value):
         value = cv.string_strict(value)
         if not value:
@@ -176,12 +177,12 @@ def valid_entity_id(entity_type_whitelist: list[str] = None):
             if value == 'delete' or value.startswith('iText.'):
                 return value
             if [t for t in ENTITY_TYPES if value.startswith(t)]:
-                if entity_type_whitelist is None:
+                if entity_type_allowlist is None:
                     return value
-                elif [w for w in entity_type_whitelist if value.startswith(w)]:
+                elif [w for w in entity_type_allowlist if value.startswith(w)]:
                     return value
                 raise cv.Invalid(
-                    f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_whitelist}"
+                    f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_allowlist}"
                 )
             raise cv.Invalid(
                 f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {ENTITY_TYPES}"
@@ -213,6 +214,12 @@ def valid_clock_format(property_name):
         return value
     return validator
 
+def has_card_type(config):
+    card_type = config.get(CONF_CARD_TYPE, None)
+    if card_type is None:
+        raise cv.Invalid(f"type is required for cards, options are {CARD_TYPE_OPTIONS}")
+    return config
+
 def ensure_unique(value: list):
     all_values = list(value)
     unique_values = set(value)
@@ -240,12 +247,11 @@ SCHEMA_LOCALE = cv.Schema({
 })
 
 SCHEMA_ICON = cv.Any(
-    cv.string_strict, # icon name
+    valid_icon_value, # icon name
     cv.Schema({
         cv.Optional(CONF_ICON_VALUE): valid_icon_value,
         cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),
-    }),
-    msg=f"Must be a string or a dictionary with {CONF_ICON_VALUE} and {CONF_ICON_COLOR} attributes"
+    })
 )
 
 SCHEMA_STATUS_ICON = cv.Schema({
@@ -274,45 +280,61 @@ SCHEMA_CARD_ENTITY = cv.Schema({
 
 SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
-    cv.Optional(CONF_CARD_HIDDEN, default=False): cv.boolean,
     cv.Optional(CONF_CARD_TITLE): cv.string,
+    cv.Optional(CONF_CARD_HIDDEN, default=False): cv.boolean,
     # timeout range from 2s to 12hr
     cv.Optional(CONF_CARD_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200)
 })
 
 def add_entity_id(id: str):
     global entity_ids, entity_id_index
-    entity_ids[id] = f"nspanel_e{entity_id_index}"
-    entity_id_index += 1
+    if (entity_ids.get(id, None) is None):
+        entity_ids[id] = f"nspanel_e{entity_id_index}"
+        entity_id_index += 1
+
+def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[int]:
+    if (card_type == CARD_ENTITIES):
+        return [1,4] if model in ['eu','us-l'] else [1,6]
+    if (card_type == CARD_GRID):
+        return [1,6]
+    if (card_type == CARD_QR):
+        return [1,2]
+    return [0,0]
 
 def validate_config(config):
-    # if int(config[CONF_BERRY_DRIVER_VERSION]) > 0:
-    #     if "CustomSend" not in config[CONF_MQTT_SEND_TOPIC]:
-    #         # backend uses topic_send.replace("CustomSend", ...) for GetDriverVersion and FlashNextion
-    #         raise cv.Invalid(f"{CONF_MQTT_SEND_TOPIC} must contain \"CustomSend\" for correct backend compatibility.\n"
-    #                          f"Either change it or set {CONF_BERRY_DRIVER_VERSION} to 0.")
-    # _LOGGER.info(config)
-
+    model = config[CONF_MODEL]
     # Build a list of custom card ids
     card_ids = []
     for card_config in config.get(CONF_CARDS, []):
         if CONF_ID in card_config:
             card_ids.append(card_config[CONF_ID])
-    # Check that all 'navigate' entity_ids are valid
-    for card_config in config.get(CONF_CARDS, []):
-        if CONF_CARD_ENTITIES in card_config:
-            for entity_config in card_config.get(CONF_CARD_ENTITIES, []):
-                entity_id = entity_config.get(CONF_ENTITY_ID)
-                if entity_id.startswith('navigate'):
-                    entity_arr = entity_id.split('.', 1)
-                    # if len(entity_arr) != 2:
-                    #     raise cv.Invalid(f'The entity_id "{entity_id}" format is invalid')
-                    if entity_arr[1] not in card_ids:
-                        raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"')
-                # Add all valid HA entities to global entity list for later processing
-                # if not (entity_id.startswith('iText') or entity_id.startswith('delete')):
-                if not entity_id.startswith('delete'):
-                    add_entity_id(entity_id)
+
+    for i, card_config in enumerate(config.get(CONF_CARDS, [])):
+        entities = card_config.get(CONF_CARD_ENTITIES, [])
+        err_path = [CONF_CARDS, i, CONF_CARD_ENTITIES]
+
+        length_limits = get_card_entities_length_limits(card_config[CONF_CARD_TYPE], model)
+        if len(entities) > 0 and length_limits[1] == 0:
+            raise cv.Invalid(f"No entities are allowed for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
+        if length_limits[0] == length_limits[1] and len(entities) != length_limits[0]:
+            raise cv.Invalid(f"There must be exactly {length_limits[0]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
+        if len(entities) < length_limits[0]:
+            raise cv.Invalid(f"There must be at least {length_limits[0]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
+        if len(entities) > length_limits[1]:
+            raise cv.Invalid(f"There must be st most {length_limits[1]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
+
+        for entity_config in entities:
+            entity_id = entity_config.get(CONF_ENTITY_ID)
+            if entity_id.startswith('navigate'):
+                entity_arr = entity_id.split('.', 1)
+                # if len(entity_arr) != 2:
+                #     raise cv.Invalid(f'The entity_id "{entity_id}" format is invalid')
+                if entity_arr[1] not in card_ids:
+                    raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"', err_path)
+            # Add all valid HA entities to global entity list for later processing
+            # if not (entity_id.startswith('iText') or entity_id.startswith('delete')):
+            if not entity_id.startswith('delete'):
+                add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
 
@@ -330,8 +352,8 @@ def validate_config(config):
 CONFIG_SCHEMA = cv.All(
     cv.Schema({
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
-        # cv.GenerateID(CONF_MQTT_PARENT_ID): cv.use_id(mqtt.MQTTClientComponent),
         cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200),
+        cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
         cv.Optional(CONF_LOCALE): SCHEMA_LOCALE,
         cv.Optional(CONF_SCREENSAVER, default={}): SCHEMA_SCREENSAVER,
         cv.Optional(CONF_INCOMING_MSG): automation.validate_automation(
@@ -339,7 +361,8 @@ CONFIG_SCHEMA = cv.All(
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(NSPanelLovelaceMsgIncomingTrigger),
             })
         ),
-        cv.Optional(CONF_CARDS): cv.ensure_list(
+        cv.Optional(CONF_CARDS): cv.ensure_list(cv.All(
+            has_card_type,
             cv.typed_schema({
                 CARD_ENTITIES: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
@@ -347,7 +370,6 @@ CONFIG_SCHEMA = cv.All(
                 CARD_GRID: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
                 }),
-                CARD_GRID2: SCHEMA_CARD_BASE,
                 CARD_QR: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
                     cv.Optional(CONF_CARD_QR_TEXT): cv.string_strict
@@ -362,7 +384,7 @@ CONFIG_SCHEMA = cv.All(
                         )
                 }),
             },
-            default_type=CARD_GRID)
+            default_type=CARD_GRID))
         ),
     })
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -389,7 +411,7 @@ AlarmButtonItem = nspanel_lovelace_ns.class_("AlarmButtonItem")
 PageType = nspanel_lovelace_ns.enum("page_type", True)
 
 PAGE_MAP = {
-    # [config type] : [c++ variable name prefix], [card class], [entity class]
+    # [config type] : [c++ variable name prefix], [card class], [card type], [entity class]
     CONF_SCREENSAVER: ["nspanel_screensaver", Screensaver, PageType.screensaver, WeatherItem],
     CARD_ENTITIES: ["nspanel_card_", EntitiesCard, PageType.cardEntities, EntitiesCardEntityItem],
     CARD_GRID: ["nspanel_card_", GridCard, PageType.cardGrid, GridCardEntityItem],

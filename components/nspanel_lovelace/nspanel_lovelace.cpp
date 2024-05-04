@@ -1286,7 +1286,7 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
     // todo: this doesnt account for popup pages
     for (auto &item : this->current_page_->get_items()) {
       auto stateful_item = page_item_cast<StatefulPageItem>(item.get());
-      if (stateful_item == nullptr) return;
+      if (stateful_item == nullptr) continue;
       
       if (stateful_item->get_entity_id() == entity_id) {
         force_current_page_update_ = true;

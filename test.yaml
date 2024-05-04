@@ -61,6 +61,8 @@ nspanel_lovelace:
           name: hs,white
         - entity_id: light.office_rgbw_lights
           name: rgbw
+        - entity_id: light.living_room_rgbww_lights
+          name: rgbww
 
     - type: cardEntities
       id: extras_1_card

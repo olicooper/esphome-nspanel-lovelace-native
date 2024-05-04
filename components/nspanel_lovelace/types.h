@@ -541,6 +541,7 @@ struct ha_attr_color_mode {
   static constexpr const char* hs = "hs";
   static constexpr const char* rgb = "rgb";
   static constexpr const char* rgbw = "rgbw";
+  static constexpr const char* rgbww = "rgbww";
 };
 
 enum class datetime_mode : uint8_t {

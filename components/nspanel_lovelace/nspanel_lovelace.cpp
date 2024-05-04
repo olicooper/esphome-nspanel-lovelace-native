@@ -552,7 +552,8 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
       (contains_value(supported_modes, ha_attr_color_mode::xy) || 
       contains_value(supported_modes, ha_attr_color_mode::hs) ||
       contains_value(supported_modes, ha_attr_color_mode::rgb) ||
-      contains_value(supported_modes, ha_attr_color_mode::rgbw));
+      contains_value(supported_modes, ha_attr_color_mode::rgbw) ||
+      contains_value(supported_modes, ha_attr_color_mode::rgbww));
 
   std::string color_mode = entity->get_attribute(ha_attr_type::color_mode);
   std::string color_temp = generic_type::disable;

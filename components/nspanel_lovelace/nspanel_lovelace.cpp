@@ -472,7 +472,7 @@ void NSPanelLovelace::render_current_page_() {
 
   this->command_buffer_.assign("pageType")
       .append(1, SEPARATOR)
-      .append(this->current_page_->get_type_str());
+      .append(this->current_page_->get_render_type_str());
   this->send_buffered_command_();
   this->popup_page_current_uuid_.clear();
 

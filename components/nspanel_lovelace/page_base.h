@@ -33,7 +33,8 @@ public:
   const std::string &get_uuid() const { return this->uuid_; }
   const std::string &get_title() const { return this->title_; }
   bool is_type(page_type type) const;
-  const char *get_type_str() const { return to_string(this->type_); }
+  const char *get_render_type_str() const;
+  void set_render_type(page_type type);
   bool is_hidden() const { return this->hidden_; }
   uint16_t get_sleep_timeout() const { return this->sleep_timeout_; }
 
@@ -75,6 +76,7 @@ protected:
 
   std::string uuid_;
   page_type type_;
+  page_type render_type_;
   std::string title_;
   bool hidden_;
   uint16_t sleep_timeout_;

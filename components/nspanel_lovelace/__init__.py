@@ -101,7 +101,7 @@ CARD_GRID="cardGrid"
 CARD_GRID2="cardGrid2"
 CARD_QR="cardQR"
 CARD_ALARM="cardAlarm"
-CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_QR, CARD_ALARM]
+CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_GRID2, CARD_QR, CARD_ALARM]
 
 CONF_CARD_QR_TEXT = "qr_text"
 CONF_CARD_ALARM_ENTITY_ID = "alarm_entity_id"
@@ -297,6 +297,8 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
         return [1,4] if model in ['eu','us-l'] else [1,6]
     if (card_type == CARD_GRID):
         return [1,6]
+    if (card_type == CARD_GRID2):
+        return [1,8]
     if (card_type == CARD_QR):
         return [1,2]
     return [0,0]
@@ -370,6 +372,9 @@ CONFIG_SCHEMA = cv.All(
                 CARD_GRID: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
                 }),
+                CARD_GRID2: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
+                }),
                 CARD_QR: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
                     cv.Optional(CONF_CARD_QR_TEXT): cv.string_strict
@@ -415,7 +420,7 @@ PAGE_MAP = {
     CONF_SCREENSAVER: ["nspanel_screensaver", Screensaver, PageType.screensaver, WeatherItem],
     CARD_ENTITIES: ["nspanel_card_", EntitiesCard, PageType.cardEntities, EntitiesCardEntityItem],
     CARD_GRID: ["nspanel_card_", GridCard, PageType.cardGrid, GridCardEntityItem],
-    # CARD_GRID2: ["nspanel_card_", GridCard2, PageType.cardGrid2, GridCardEntityItem],
+    CARD_GRID2: ["nspanel_card_", GridCard, PageType.cardGrid2, GridCardEntityItem],
     CARD_QR: ["nspanel_card_", QRCard, PageType.cardQR, EntitiesCardEntityItem],
     CARD_ALARM: ["nspanel_card_", AlarmCard, PageType.cardAlarm, AlarmButtonItem]
 }
@@ -689,6 +694,10 @@ async def to_code(config):
                 f"auto {card_variable} = "
                 f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], title, sleep_timeout)}"))
             # cg.add(cg.variable(card_variable, make_shared.template(page_info[1]).__call__(cg.global_ns.class_(page_info[0] + str(i + 1)))))
+
+        # Special case for pages which use a different underlying type
+        if card_config[CONF_CARD_TYPE] == CARD_GRID2:
+            cg.add(card_class.set_render_type(page_info[2]))
 
         if card_config[CONF_CARD_HIDDEN] == True:
             cg.add(card_class.set_hidden(True))

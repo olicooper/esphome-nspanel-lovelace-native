@@ -29,7 +29,7 @@ There are many UI components missing and the [python build script](components/ns
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display
-- Support for `cardGrid`, `cardEntities`, `cardQR`, `cardAlarm`
+- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`
 - Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` and `popupTimer` pages.
 
 There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardPower` etc. but these are planned for the future.

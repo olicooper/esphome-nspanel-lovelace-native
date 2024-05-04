@@ -11,34 +11,44 @@ namespace nspanel_lovelace {
  */
 
 Page::Page() :
-    uuid_(""), type_(page_type::unknown), hidden_(false),
+    uuid_(""), type_(page_type::unknown),
+    render_type_(page_type::unknown), hidden_(false),
     sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
 Page::Page(page_type type, const std::string &uuid) :
-    uuid_(uuid), type_(type), hidden_(false),
-    sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
+    uuid_(uuid), type_(type), render_type_(type),
+    hidden_(false), sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
 Page::Page(
     page_type type, const std::string &uuid, const std::string &title) :
-    uuid_(uuid),
-    type_(type), title_(title), hidden_(false),
+    uuid_(uuid), type_(type), render_type_(type),
+    title_(title), hidden_(false),
     sleep_timeout_(DEFAULT_SLEEP_TIMEOUT_S) {}
 
 Page::Page(
     page_type type, const std::string &uuid, const std::string &title,
     const uint16_t sleep_timeout) :
-    uuid_(uuid),
-    type_(type), title_(title), hidden_(false), sleep_timeout_(sleep_timeout) {}
+    uuid_(uuid), type_(type), render_type_(type),
+    title_(title), hidden_(false), sleep_timeout_(sleep_timeout) {}
 
 // Copy constructor overridden so the uuid is cleared
 Page::Page(const Page &other) :
-    uuid_(""), type_(other.type_), title_(other.title_), hidden_(other.hidden_),
+    uuid_(""), type_(other.type_), render_type_(other.render_type_),
+    title_(other.title_), hidden_(other.hidden_),
     sleep_timeout_(other.sleep_timeout_) {}
 
 void Page::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
 bool Page::is_type(page_type type) const {
   return this->type_ == type;
+}
+
+const char *Page::get_render_type_str() const {
+  return to_string(this->render_type_);
+}
+
+void Page::set_render_type(page_type type) {
+  this->render_type_ = type;
 }
 
 void Page::set_items_render_invalid() { 

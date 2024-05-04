@@ -144,7 +144,7 @@ api:
       variables:
         cmd: string
       then:
-        - lambda: 'id(nspanel).send_display_command(cmd.c_str());'
+        - lambda: 'id(nspanel).send_display_command(cmd);'
     - service: upload_tft
       variables:
         url: string
@@ -154,7 +154,7 @@ api:
       variables:
         cmd: string
       then:
-        - lambda: 'id(nspanel).process_command(cmd.c_str());'
+        - lambda: 'id(nspanel).process_command(cmd);'
 
 ota:
 

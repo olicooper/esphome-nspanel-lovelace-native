@@ -1,5 +1,4 @@
 # Basic configuration example
-# This includes some commented out configuration items showing what other functionality is available
 # Available icons can be found in 'components\nspanel_lovelace\icons.json'. Icon colors range from 0 to 65535.
 
 # NOTE: This project is in the beta stage so the configuration is subject to change without notice.
@@ -9,7 +8,7 @@ esphome:
   name: nspanel
   name_add_mac_suffix: true
   comment: "ESPHome Basic NSPanel Example"
-  build_path: ./.build/nspanel
+  build_path: ./.build/nspanel-basic
 
 esp32:
   board: esp32dev
@@ -27,55 +26,17 @@ external_components:
       type: git
       url: https://github.com/olicooper/esphome-nspanel-lovelace-native
       ref: dev
+    refresh: 3h
     components: [nspanel_lovelace]
 
 nspanel_lovelace:
   id: nspanel
-  ## Options: eu, us-l, us-p
-  # model: eu
-  sleep_timeout: 10
-  # locale:
-    # day_of_week_map:
-    #   sunday: ['Sun', 'Sunday']
-    #   monday: ['Mon', 'Monday']
-    #   tuesday: ['Tue', 'Tuesday']
-    #   wednesday: ['Wed', 'Wednesday']
-    #   thursday: ['Thu', 'Thursday']
-    #   friday: ['Fri', 'Friday']
-    #   saturday: ['Sat', 'Saturday']
   screensaver:
     time_id: homeassistant_time
-    ## For formatting options see: https://cplusplus.com/reference/ctime/strftime/
-    # time_format: '%H:%M'
-    # date_format: '%A, %d. %B %Y'
-    weather:
-      entity_id: !secret weather_entity_id
-    # status_icon_left:
-    #   entity_id: light.front_room_inner
-    #   icon: hiking
-    # status_icon_right:
-    #   entity_id: light.front_room_outer
-    #   icon:
-    #     value: robot-outline
-    #     color: 200
-    #     conditions:
-    #       - state: 'on'
-    #         name: mdi:lightbulb
-    #         color: 65535
-    #       - state: 'off'
-    #         name: mdi:lightbulb-outline
-    #         color: 40400
-    #   value:
-    #     entity_id: sensor.temperature_1
-    #     format: '%.0f'
-    #   template: '{icon}{value}°C'
-    #   large_font: True
   cards:
     - type: cardGrid
       id: front_room
       title: Front Room
-      sleep_timeout: 10
-      # hidden: true
       entities:
         - entity_id: light.front_room_all
           name: All
@@ -86,47 +47,6 @@ nspanel_lovelace:
         - entity_id: scene.front_room_all_default
           name: Default
 
-    - type: cardGrid
-      sleep_timeout: 10
-      title: House Lights
-      entities:
-        - entity_id: light.hallway
-          name: Hallway
-        - entity_id: light.stairs
-          name: Stairs
-        - entity_id: delete
-        - entity_id: delete
-        - entity_id: switch.garden_lights
-          name: Garden
-
-    - type: cardEntities
-      sleep_timeout: 30
-      title: House Info
-      entities:
-        - entity_id: sensor.outside_temperature
-          name: Outside Temp
-        - entity_id: sensor.nspanel_temperature
-          name: Room Temp
-        - entity_id: navigate.front_room
-          name: Front Room Nav
-
-    - type: cardQR
-      sleep_timeout: 30
-      title: Guest WiFi
-      qr_text: !secret qrcard_text
-      entities:
-        - entity_id: !secret qrcard_ssid_itext
-          name: SSID
-          icon: wifi
-        - entity_id: !secret qrcard_password_itext
-          name: Password
-          icon: key
-
-    - type: cardAlarm
-      sleep_timeout: 60
-      title: Home Alarm
-      alarm_entity_id: alarm_control_panel.home_alarm
-
 logger:
   baud_rate: 115200
 
@@ -136,12 +56,6 @@ wifi:
 
 api:
   services:
-    ## Service to send a command directly to the display. Useful for testing
-    - service: send_command
-      variables:
-        cmd: string
-      then:
-        - lambda: 'id(nspanel).send_display_command(cmd.c_str());'
     ## Service to update the TFT firmware using a URL that is accessible to the nspanel
     - service: upload_tft
       variables:
@@ -150,7 +64,6 @@ api:
         - lambda: 'id(nspanel).upload_tft(url);'
 
 ota:
-  password: !secret ota_password
 
 ## UART for the Nextion display
 uart:
@@ -163,25 +76,6 @@ time:
   - platform: homeassistant
     id: homeassistant_time
     timezone: Europe/London
-    on_time:
-      ## At midnight
-      - seconds: 0
-        minutes: 0
-        hours: 0
-        then:
-          - lambda: 'id(nspanel).set_display_dim(1, 50);'
-      ## At 8:00 PM
-      - seconds: 0
-        minutes: 0
-        hours: 20
-        then:
-          - lambda: 'id(nspanel).set_display_dim(20, 80);'
-      ## At 7:00 AM
-      - seconds: 0
-        minutes: 0
-        hours: 7
-        then:
-          - lambda: 'id(nspanel).set_display_dim(50, 100);'
 
 switch:
   ## Physical relay 1
@@ -191,7 +85,6 @@ switch:
     pin:
       number: 19
     restore_mode: ALWAYS_ON
-
   ## Physical relay 2
   - platform: gpio
     name: Relay 2
@@ -199,43 +92,6 @@ switch:
     pin:
       number: 22
     restore_mode: ALWAYS_ON
-
-  ## Turn screen power on/off
-  - platform: gpio
-    name: Screen Power
-    id: screen_power
-    entity_category: config
-    pin:
-      number: 4
-      inverted: true
-    restore_mode: ALWAYS_ON
-
-sensor:
-  ## WiFi signal strength sensor
-  - platform: wifi_signal
-    name: WiFi Signal
-    update_interval: 300s
-  ## Internal temperature sensor, adc value
-  - platform: adc
-    id: ntc_source
-    pin: 38
-    update_interval: 60s
-    attenuation: 11db
-  ## Internal temperature sensor, adc reading converted to resistance (calculation)
-  - platform: resistance
-    id: resistance_sensor
-    sensor: ntc_source
-    configuration: DOWNSTREAM
-    resistor: 11.2kOhm
-  ## Internal temperature sensor, resistance to temperature (calculation)
-  - platform: ntc
-    id: temperature
-    sensor: resistance_sensor
-    calibration:
-      b_constant: 3950
-      reference_temperature: 25°C
-      reference_resistance: 10kOhm
-    name: Temperature
 
 binary_sensor:
   ## Left button below the display
@@ -246,45 +102,8 @@ binary_sensor:
       inverted: true
     id: left_button
     internal: true
-    on_multi_click:
-      ####### Single click - toggle front_room_inner
-      - timing:
-          - ON for at most 1s
-          - OFF for at least 0.4s
-        then:
-          - if:
-              condition:
-                  api.connected:
-              then:
-                - if:
-                    condition:
-                      switch.is_off: relay_1
-                    then:
-                      - switch.turn_on: relay_1
-                    else:
-                      - homeassistant.service:
-                          service: light.toggle
-                          data:
-                            entity_id: light.front_room_inner
-              else:
-                - switch.toggle: relay_1
-        ####### Triple click - restart the ESP32
-      - timing:
-          - ON for at most 1s
-          - OFF for at most 0.3s
-          - ON for at most 1s
-          - OFF for at most 0.3s
-          - ON for at most 1s
-          - OFF for at least 0.3s
-        then:
-          - button.press: restart_switch
-      ####### Single long click - toggle light relay 1
-      - timing:
-          - ON for 1.2s to 4s
-          - OFF for at least 0.3s
-        then:
-          - switch.toggle: relay_1
-
+    on_click:
+      - switch.toggle: relay_1
   ## Right button below the display
   - platform: gpio
     name: Right Button
@@ -293,48 +112,5 @@ binary_sensor:
       inverted: true
     id: right_button
     internal: true
-    on_multi_click:
-    ####### Single click - toggle light front_room_outer
-      - timing:
-          - ON for at most 1s
-          - OFF for at least 0.4s
-        then:
-          - if:
-              condition:
-                  api.connected:
-              then:
-                - if:
-                    condition:
-                      switch.is_off: relay_2
-                    then:
-                      - switch.turn_on: relay_2
-                    else:
-                      - homeassistant.service:
-                          service: light.toggle
-                          data:
-                            entity_id: light.front_room_outer
-              else:
-                - switch.toggle: relay_2
-      ####### Triple click - restart TFT
-      - timing:
-          - ON for at most 1s
-          - OFF for at most 0.3s
-          - ON for at most 1s
-          - OFF for at most 0.3s
-          - ON for at most 1s
-          - OFF for at least 0.3s
-        then:
-          - switch.turn_off: screen_power
-          - delay: 0.5s
-          - switch.turn_on: screen_power
-      ####### Single long click - toggle light relay 2
-      - timing:
-          - ON for 1.2s to 4s
-          - OFF for at least 0.4s
-        then:
-          - switch.toggle: relay_2
-
-button:
-  - platform: restart
-    id: restart_switch
-    name: Restart
+    on_click:
+      - switch.toggle: relay_2

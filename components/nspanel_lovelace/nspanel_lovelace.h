@@ -110,6 +110,9 @@ public:
   void render_previous_page() { this->render_page_(render_page_option::prev); }
   void render_first_page() { this->render_page_(render_page_option::default_page); }
 
+  void notify_on_screensaver(const std::string &heading,
+      const std::string &message, uint32_t timeout_ms = 0);
+
   void send_display_command(const std::string &command);
   /**
    * Softreset the Nextion

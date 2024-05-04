@@ -744,6 +744,28 @@ void NSPanelLovelace::send_buffered_command_() {
   this->process_display_command_queue_();
 }
 
+void NSPanelLovelace::notify_on_screensaver(
+    const std::string &heading, const std::string &message,
+    uint32_t timeout_ms) {
+  // notification will not show up if we are not on the screensaver
+  // todo: could force a switch to screensaver or show the notification if
+  //       the user navigates back to screensaver within the timeout period
+  if (!this->current_page_->is_type(page_type::screensaver)) return;
+  
+  this->send_display_command(
+    std::string("notify").append(1,SEPARATOR)
+      .append(heading).append(1, SEPARATOR)
+      .append(message));
+  
+  if (timeout_ms > 0) {
+    // hide the notification after a period of time
+    this->set_timeout(timeout_ms, [this]() {
+      if (!this->current_page_->is_type(page_type::screensaver)) return;
+      this->render_screensaver();
+    });
+  }
+}
+
 void NSPanelLovelace::send_display_command(const std::string &command) {
   this->command_buffer_.assign(command);
   this->send_buffered_command_();

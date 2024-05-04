@@ -105,7 +105,12 @@ public:
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
   void set_day_of_week_override(DayOfWeekMap::dow dow, const std::array<const char *, 2> &value);
 
-  void send_display_command(const char *command);
+  void render_screensaver() { this->render_page_(render_page_option::screensaver); }
+  void render_next_page() { this->render_page_(render_page_option::next); }
+  void render_previous_page() { this->render_page_(render_page_option::prev); }
+  void render_first_page() { this->render_page_(render_page_option::default_page); }
+
+  void send_display_command(const std::string &command);
   /**
    * Softreset the Nextion
    */

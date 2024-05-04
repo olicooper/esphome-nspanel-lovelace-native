@@ -15,7 +15,7 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-enum class render_page_option : uint8_t { prev, next, down, screensaver, default_page };
+enum class render_page_option : uint8_t { prev, next, screensaver, default_page };
 
 enum class alarm_arm_action : uint8_t { arm_home, arm_away, arm_night, arm_vacation };
 struct alarm_entity_state {

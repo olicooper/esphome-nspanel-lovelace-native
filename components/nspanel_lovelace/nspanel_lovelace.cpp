@@ -458,8 +458,6 @@ void NSPanelLovelace::render_page_(render_page_option d) {
       this->current_page_index_ = this->pages_.size() - 1;
     else
       --this->current_page_index_;
-  } else if (d == render_page_option::down) {
-    // todo?
   }
   this->current_page_ = this->pages_.at(this->current_page_index_).get();
   this->force_current_page_update_ = false;
@@ -746,7 +744,7 @@ void NSPanelLovelace::send_buffered_command_() {
   this->process_display_command_queue_();
 }
 
-void NSPanelLovelace::send_display_command(const char *command) {
+void NSPanelLovelace::send_display_command(const std::string &command) {
   this->command_buffer_.assign(command);
   this->send_buffered_command_();
 }

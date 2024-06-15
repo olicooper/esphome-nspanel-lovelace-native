@@ -533,11 +533,181 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
       }
       this->render_timer_detail_update_(item);
     });
+  } else if (item->is_type(entity_type::cover)) {
+    this->render_cover_detail_update_(item);
   } else {
     return;
   }
 
   this->send_buffered_command_();
+}
+
+// entityUpdateDetail~{entity_id}~{pos}~{pos_translation}: {pos_status}~{pos_translation}~{icon_id}~{icon_up}~{icon_stop}~{icon_down}~{icon_up_status}~{icon_stop_status}~{icon_down_status}~{textTilt}~{iconTiltLeft}~{iconTiltStop}~{iconTiltRight}~{iconTiltLeftStatus}~{iconTiltStopStatus}~{iconTiltRightStatus}~{tilt_pos}"
+void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
+  if(item == nullptr) return;
+
+  auto entity = item->get_entity();
+
+  auto cover_icons = get_icon_by_name(
+    COVER_MAP,
+    entity->get_attribute(ha_attr_type::device_class),
+    entity_cover_type::window);
+
+  auto &position_str = entity->
+    get_attribute(ha_attr_type::current_position);
+  auto &supported_features_str = entity->
+    get_attribute(ha_attr_type::supported_features);
+  auto &tilt_position_str = entity->
+    get_attribute(ha_attr_type::current_tilt_position);
+
+  uint8_t position = 0;
+  uint8_t tilt_position = 0;
+  uint8_t supported_features = 0;
+  // Icons
+  const char* cover_icon = generic_type::disable;
+  const char* icon_up   = generic_type::disable;
+  const char* icon_stop = generic_type::disable;
+  const char* icon_down = generic_type::disable;
+  const char* icon_tilt_left   = generic_type::empty;
+  const char* icon_tilt_stop = generic_type::empty;
+  const char* icon_tilt_right = generic_type::empty;
+
+  const char* text_position = "";
+  const char* text_tilt = "";
+
+  // Icon Status
+  bool icon_up_status = false;
+  bool icon_stop_status = false;
+  bool icon_down_status = false;
+  bool position_status = false;
+  bool icon_tilt_left_status = false;
+  bool icon_tilt_stop_status = false;
+  bool icon_tilt_right_status = false;
+  bool tilt_position_status = false;
+
+  if (!position_str.empty()) {
+    position = std::stoi(position_str);
+  }
+
+  if (!tilt_position_str.empty()){
+    tilt_position = std::stoi(tilt_position_str);
+  }
+
+  if (!supported_features_str.empty()) {
+    supported_features = std::stoi(supported_features_str);
+  }
+
+
+  if (cover_icons != nullptr) {
+    if (entity->is_state("closed"))
+        cover_icon = cover_icons->at(1);
+    else
+        cover_icon = cover_icons->at(0);
+  }
+
+  //Position
+  if (supported_features & 0b00001111) {
+    text_position = "Position";
+    position_status = true;
+  }
+  // OPEN
+  if (supported_features & 0b00000001) {
+    if (position != 100 && !((entity->is_state("open") ||
+        entity->is_state(generic_type::unknown)) &&
+        position_str.empty())) {
+      icon_up_status = true;
+    }
+    icon_up = cover_icons->at(2);
+  }
+  // CLOSE
+  if (supported_features & 0b00000010) {
+    if (position != 0 && !((entity->is_state("closed") ||
+        entity->is_state(generic_type::unknown)) &&
+        position_str.empty())) {
+      icon_down_status = true;
+    }
+    icon_down = cover_icons->at(3);
+  }
+  // STOP
+  if (supported_features & 0b00001000) {
+    icon_stop_status = !entity->is_state(generic_type::unknown);
+    icon_stop = u8"\uE4DA"; // stop
+  }
+
+  // Tilt supported
+  if(supported_features & 0b11110000) {
+    text_tilt = "Tilt position";
+  }
+  // SUPPORT_OPEN_TILT
+  if(supported_features & 0b00010000) {
+    icon_tilt_left = u8"\uE05B";
+    icon_tilt_left_status = true;
+  }
+  // SUPPORT_CLOSE_TILT
+  if(supported_features & 0b00100000) {
+    icon_tilt_right = u8"\uE041";
+    icon_tilt_right_status = true;
+  }
+  // SUPPORT_STOP_TILT
+  if(supported_features & 0b01000000) {
+    icon_tilt_stop = u8"\uE4DA";
+    icon_tilt_stop_status = true;
+  }
+    // SUPPORT_SET_TILT_POSITION
+  if(supported_features & 0b10000000) {
+    tilt_position_status = true;
+    if(tilt_position == 0)
+    {
+      icon_tilt_right_status = false;
+    }
+    if(tilt_position == 100)
+    {
+      icon_tilt_left_status = false;
+    }
+  }
+
+  this->command_buffer_
+      // entityUpdateDetail~
+      .assign("entityUpdateDetail").append(1, SEPARATOR)
+      // entity_id~
+      .append("uuid.").append(item->get_uuid()).append(1, SEPARATOR)
+      // slider_pos~
+      .append(std::to_string(position)).append(1, SEPARATOR)
+      // position text + state / value~
+      .append(text_position).append(": ").append(position_status ? std::to_string(position) : entity->get_state()).append("%").append(1, SEPARATOR)
+      // position text~
+      .append(text_position).append(1, SEPARATOR)
+      // icon~
+      .append(cover_icon).append(1, SEPARATOR)
+      // icon_up~
+      .append(icon_up).append(1, SEPARATOR)
+      // icon_stop~
+      .append(icon_stop).append(1, SEPARATOR)
+      // icon_down~
+      .append(icon_down).append(1, SEPARATOR)
+      // icon_up_status~
+      .append(icon_up_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // icon_stop_status~
+      .append(icon_stop_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // icon_down_status~
+      .append(icon_down_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // tilt text~
+      .append(text_tilt).append(1, SEPARATOR)
+      // icon_tilt_left~
+      .append(icon_tilt_left).append(1, SEPARATOR)
+      // icon_tilt_stop~
+      .append(icon_tilt_stop).append(1, SEPARATOR)
+      // icon_tilt_right~
+      .append(icon_tilt_right).append(1, SEPARATOR)
+      // icon_tilt_left_status~
+      .append(icon_tilt_left_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // icon_tilt_stop_status~
+      .append(icon_tilt_stop_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // icon_tilt_right_status~
+      .append(icon_tilt_right_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+      // tilt_position_status
+      .append(tilt_position_status ? std::to_string(tilt_position) : generic_type::disable);
+
 }
 
 // entityUpdateDetail~{entity_id}~~{icon_color}~{switch_val}~{brightness}~{color_temp}~{color}~{color_translation}~{color_temp_translation}~{brightness_translation}~{effect_supported}
@@ -1049,15 +1219,30 @@ void NSPanelLovelace::process_button_press_(
     this->call_ha_service_(
       entity_type, ha_action_type::close_cover, entity_id);
   } else if (button_type == button_type::positionSlider) {
-    // todo
+    this->call_ha_service_(
+      entity_type, 
+      ha_action_type::set_cover_position, 
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::set_position), value}
+      }});
   } else if (button_type == button_type::tiltOpen) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::open_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltStop) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::stop_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltClose) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::close_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltSlider) {
-    // todo
+    this->call_ha_service_(
+      entity_type, 
+      ha_action_type::set_cover_position_tilt, 
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::set_tilt_position), value}
+      }});
   } else if (button_type == button_type::button) {
     if (entity_type == entity_type::navigate ||
         entity_type == entity_type::navigate_uuid) {

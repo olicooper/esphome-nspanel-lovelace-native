@@ -674,7 +674,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
       // slider_pos~
       .append(std::to_string(position)).append(1, SEPARATOR)
       // position text + state / value~
-      .append(text_position).append(": ").append(position_status ? std::to_string(position) : entity->get_state()).append("%").append(1, SEPARATOR)
+      .append(text_position).append(": ").append(position_status ? std::to_string(position).append("%") : entity->get_state()).append(1, SEPARATOR)
       // position text~
       .append(text_position).append(1, SEPARATOR)
       // icon~

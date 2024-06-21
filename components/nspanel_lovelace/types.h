@@ -462,7 +462,7 @@ struct ha_action_type {
   static constexpr const char* open_cover_tilt = "open_cover_tilt";
   static constexpr const char* close_cover_tilt = "close_cover_tilt";
   static constexpr const char* stop_cover_tilt = "stop_cover_tilt";
-  static constexpr const char* set_cover_position_tilt = "set_cover_position_tilt";
+  static constexpr const char* set_cover_tilt_position = "set_cover_tilt_position";
 };
 
 enum class ha_attr_type : uint8_t {
@@ -486,9 +486,9 @@ enum class ha_attr_type : uint8_t {
   code_arm_required,
   // cover
   current_position,
-  set_position,
+  position,
   current_tilt_position,
-  set_tilt_position,
+  tilt_position,
   // weather
   temperature,
   temperature_unit,

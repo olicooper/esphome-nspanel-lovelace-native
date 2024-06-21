@@ -176,6 +176,9 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state_attr(
           &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::current_position));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::current_tilt_position));
     }
     else if (entity->is_type(entity_type::alarm_control_panel)) {
       add_state_subscription = true;
@@ -560,14 +563,17 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   auto &tilt_position_str = entity->
     get_attribute(ha_attr_type::current_tilt_position);
 
-  uint8_t position = 0;
-  uint8_t tilt_position = 0;
-  uint8_t supported_features = 0;
+  uint8_t position = value_or_default(position_str, 0U);
+  uint8_t tilt_position = value_or_default(entity->
+    get_attribute(ha_attr_type::current_tilt_position), 0U);
+  uint16_t supported_features = value_or_default(entity->
+    get_attribute(ha_attr_type::supported_features), 0U);
+
   // Icons
-  const char* cover_icon = generic_type::disable;
-  const char* icon_up   = generic_type::disable;
-  const char* icon_stop = generic_type::disable;
-  const char* icon_down = generic_type::disable;
+  const char* cover_icon = generic_type::empty;
+  const char* icon_up   = generic_type::empty;
+  const char* icon_stop = generic_type::empty;
+  const char* icon_down = generic_type::empty;
   const char* icon_tilt_left   = generic_type::empty;
   const char* icon_tilt_stop = generic_type::empty;
   const char* icon_tilt_right = generic_type::empty;
@@ -584,19 +590,6 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   bool icon_tilt_stop_status = false;
   bool icon_tilt_right_status = false;
   bool tilt_position_status = false;
-
-  if (!position_str.empty()) {
-    position = std::stoi(position_str);
-  }
-
-  if (!tilt_position_str.empty()){
-    tilt_position = std::stoi(tilt_position_str);
-  }
-
-  if (!supported_features_str.empty()) {
-    supported_features = std::stoi(supported_features_str);
-  }
-
 
   if (cover_icons != nullptr) {
     if (entity->is_state("closed"))
@@ -706,7 +699,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
       // icon_tilt_right_status~
       .append(icon_tilt_right_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
       // tilt_position_status
-      .append(tilt_position_status ? std::to_string(tilt_position) : generic_type::disable);
+      .append(tilt_position_status ? std::to_string(tilt_position).append("%") : generic_type::disable);
 
 }
 
@@ -1224,7 +1217,7 @@ void NSPanelLovelace::process_button_press_(
       ha_action_type::set_cover_position, 
       {{
         {to_string(ha_attr_type::entity_id), entity_id},
-        {to_string(ha_attr_type::set_position), value}
+        {to_string(ha_attr_type::position), value}
       }});
   } else if (button_type == button_type::tiltOpen) {
     this->call_ha_service_(
@@ -1238,10 +1231,10 @@ void NSPanelLovelace::process_button_press_(
   } else if (button_type == button_type::tiltSlider) {
     this->call_ha_service_(
       entity_type, 
-      ha_action_type::set_cover_position_tilt, 
+      ha_action_type::set_cover_tilt_position, 
       {{
         {to_string(ha_attr_type::entity_id), entity_id},
-        {to_string(ha_attr_type::set_tilt_position), value}
+        {to_string(ha_attr_type::tilt_position), value}
       }});
   } else if (button_type == button_type::button) {
     if (entity_type == entity_type::navigate ||

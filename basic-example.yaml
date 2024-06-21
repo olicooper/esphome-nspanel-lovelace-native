@@ -64,6 +64,7 @@ api:
         - lambda: 'id(nspanel).upload_tft(url);'
 
 ota:
+  platform: esphome
 
 ## UART for the Nextion display
 uart:

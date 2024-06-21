@@ -157,6 +157,7 @@ api:
         - lambda: 'id(nspanel).process_command(cmd);'
 
 ota:
+  platform: esphome
 
 # Uart for the Nextion display
 uart:

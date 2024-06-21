@@ -151,6 +151,7 @@ api:
     #     - lambda: 'id(nspanel).send_display_command(cmd);'
 
 ota:
+  platform: esphome
   password: !secret ota_password
 
 ## UART for the Nextion display
@@ -219,7 +220,7 @@ sensor:
     id: ntc_source
     pin: 38
     update_interval: 60s
-    attenuation: 11db
+    attenuation: 12db
   ## Internal temperature sensor, adc reading converted to resistance (calculation)
   - platform: resistance
     id: resistance_sensor

@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <ctype.h>
 #include <esp_heap_caps.h>
 #include <math.h>
 #include <stdint.h>
@@ -52,6 +53,25 @@ inline void replace_all(
 
 inline const char* value_or_empty(const char* s) {
   return s == nullptr ? "" : s; 
+}
+
+inline unsigned long value_or_default(const std::string &str, unsigned long default_value) {
+  return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
+    ? default_value : std::stoul(str);
+}
+
+inline int value_or_default(const std::string &str, int default_value) {
+  return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
+    ? default_value : std::stoi(str);
+}
+
+inline unsigned int value_or_default(const std::string &str, unsigned int default_value) {
+  return value_or_default(str, static_cast<unsigned long>(default_value));
+}
+
+inline double value_or_default(const std::string &str, double default_value) {
+  return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
+    ? default_value : std::stod(str);
 }
 
 inline bool starts_with(const std::string &input, const std::string &value) {

@@ -109,10 +109,9 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 
 def load_icons():
     global iconJson
-    iconJsonPath = core.CORE.relative_build_path("nspanel_icons.json")
+    current_directory = os.path.dirname(__file__)
+    iconJsonPath = os.path.join(current_directory, 'icons.json')
     _LOGGER.debug(f"[nspanel_lovelace] Attempting to load icons from '{iconJsonPath}'")
-    if not os.path.exists(core.CORE.build_path):
-        os.mkdir(core.CORE.build_path)
     try:
         with open(iconJsonPath, encoding="utf-8") as read_file:
             iconJson = json.load(read_file)

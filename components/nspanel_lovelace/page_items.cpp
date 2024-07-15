@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include "esphome/core/helpers.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -152,7 +153,7 @@ std::string &WeatherItem::render_(std::string &buffer) {
   PageItem_Icon::render_(buffer).append(1, SEPARATOR);
   PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
   // allow the value to be fomatted based on locale instead of using the raw string value
-  return buffer.append(string_sprintf("%.1f", this->float_value_))
+  return buffer.append(esphome::str_snprintf("%.1f", 6, this->float_value_))
       .append(WeatherItem::temperature_unit);
 }
 

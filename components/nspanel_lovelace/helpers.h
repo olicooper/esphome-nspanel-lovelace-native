@@ -88,10 +88,6 @@ inline double value_or_default(const std::string &str, double default_value) {
     ? default_value : std::stod(str);
 }
 
-inline bool starts_with(const std::string &input, const std::string &value) {
-  return input.rfind(value, 0) == 0;
-}
-
 inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
 	// note: don't need to know the timezone
 	static constexpr const char* format = "%d-%d-%dT%d:%d:%d";// "%d-%d-%dT%d:%d:%d+%d:%d";
@@ -255,20 +251,6 @@ inline std::string to_string(const std::vector<uint8_t> &array,
     str_array.push_back(std::to_string(value));
   }
   return to_string(str_array, delimiter, prepend_char, append_char);
-}
-
-// see: https://stackoverflow.com/a/32821650/2634818
-template <typename... Args>
-std::string string_sprintf(const char *format, Args... args) {
-  size_t length = std::snprintf(nullptr, 0, format, args...);
-  assert(length >= 0);
-
-  char *buf = new char[length + 1];
-  std::snprintf(buf, length + 1, format, args...);
-
-  std::string str(buf);
-  delete[] buf;
-  return str;
 }
 
 inline bool psram_available() {

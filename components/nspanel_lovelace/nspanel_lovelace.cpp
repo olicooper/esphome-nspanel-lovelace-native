@@ -1221,7 +1221,7 @@ const std::string &NSPanelLovelace::try_replace_uuid_with_entity_id_(
     const std::string &uuid_or_entity_id) {
   // not a uuid if it does not begin with the uuid prefix
   // (navigation uuids are dealt with separately)
-  if (!starts_with(uuid_or_entity_id, entity_type::uuid))
+  if (!esphome::str_startswith(uuid_or_entity_id, entity_type::uuid))
     return uuid_or_entity_id;
 
   auto uuid = uuid_or_entity_id.substr(5);
@@ -1456,7 +1456,7 @@ void NSPanelLovelace::process_button_press_(
   }
   // thermo/climate card
   else if (button_type == button_type::tempUpd) {
-    auto val = string_sprintf("%.1f", std::stoi(value) * 0.1);
+    auto val = esphome::str_snprintf("%.1f", 6, std::stoi(value) * 0.1);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -1467,8 +1467,10 @@ void NSPanelLovelace::process_button_press_(
   } else if (button_type == button_type::tempUpdHighLow) {
     std::vector<std::string> temp_values;
     split_str('|', value, temp_values);
-    auto temp_high = string_sprintf("%.1f", std::stoi(temp_values[0]) * 0.1);
-    auto temp_low = string_sprintf("%.1f", std::stoi(temp_values[1]) * 0.1);
+    auto temp_high = esphome::str_snprintf(
+      "%.1f", 6, std::stoi(temp_values[0]) * 0.1);
+    auto temp_low = esphome::str_snprintf(
+      "%.1f", 6, std::stoi(temp_values[1]) * 0.1);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -1550,7 +1552,7 @@ void NSPanelLovelace::process_button_press_(
           {to_string(ha_attr_type::code), value}
         }});
     }
-  } else if (starts_with(button_type, entity_type::timer)) {
+  } else if (esphome::str_startswith(button_type, entity_type::timer)) {
     std::string service(button_type);
     service[5] = '.';
     if (value.empty()) {

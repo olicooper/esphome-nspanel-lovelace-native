@@ -92,6 +92,11 @@ void Entity::set_state(const std::string &state) {
   }
 }
 
+bool Entity::has_attribute(ha_attr_type attr) const {
+  auto it = attributes_.find(attr);
+  return it != attributes_.end();
+}
+
 const std::string &Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
   auto it = attributes_.find(attr);
   return it == attributes_.end() ? default_value : it->second;
@@ -117,6 +122,12 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
         std::stoi(value),
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
         {0, 100}))));
+  } else if (attr == ha_attr_type::supported_color_modes ||
+      attr == ha_attr_type::preset_modes ||
+      attr == ha_attr_type::swing_modes ||
+      attr == ha_attr_type::fan_modes ||
+      attr == ha_attr_type::hvac_modes) {
+    this->attributes_[attr] = convert_python_arr_str(value);
   } else {
     this->attributes_[attr] = value;
   }

@@ -1,11 +1,12 @@
 #include "cards.h"
 
+#include "card_base.h"
 #include "config.h"
 #include "entity.h"
 #include "helpers.h"
-#include "types.h"
-#include "card_base.h"
 #include "page_items.h"
+#include "translations.h"
+#include "types.h"
 #include <string>
 #include <memory>
 
@@ -214,6 +215,171 @@ std::string &AlarmCard::render(std::string &buffer) {
   // if (this->info_icon_ && /* ?? */) {
   //   buffer.append(1, SEPARATOR).append(this->info_icon_->render());
   // }
+
+  return buffer;
+}
+
+/*
+ * =============== ThermoCard ===============
+ */
+
+ThermoCard::ThermoCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &thermo_entity) :
+    Card(page_type::cardThermo, uuid),
+    thermo_entity_(thermo_entity) {
+  this->configure_temperature_unit();
+  thermo_entity->add_subscriber(this);
+}
+
+ThermoCard::ThermoCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &thermo_entity,
+    const std::string &title) :
+    Card(page_type::cardThermo, uuid, title),
+    thermo_entity_(thermo_entity) {
+  this->configure_temperature_unit();
+  thermo_entity->add_subscriber(this);
+}
+
+ThermoCard::ThermoCard(
+    const std::string &uuid,
+    const std::shared_ptr<Entity> &thermo_entity,
+    const std::string &title, const uint16_t sleep_timeout) :
+    Card(page_type::cardThermo, uuid, title, sleep_timeout),
+    thermo_entity_(thermo_entity) {
+  this->configure_temperature_unit();
+  thermo_entity->add_subscriber(this);
+}
+
+ThermoCard::~ThermoCard() {
+  thermo_entity_->remove_subscriber(this);
+}
+
+void ThermoCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
+void ThermoCard::configure_temperature_unit() {
+  if (Configuration::get_temperature_unit() == temperature_unit_t::celcius) {
+    this->temperature_unit_icon_ = u8"\uE503"; // temperature-celsius
+  } else {
+    this->temperature_unit_icon_ = u8"\uE504"; // temperature-fahrenheit
+  }
+}
+
+std::string &ThermoCard::render(std::string &buffer) {
+  buffer.assign(this->get_render_instruction())
+      .append(1, SEPARATOR)
+      .append(this->get_title())
+      .append(1, SEPARATOR);
+  
+  this->render_nav(buffer).append(1, SEPARATOR);
+
+  buffer.append(this->thermo_entity_->get_entity_id());
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(this->thermo_entity_->get_attribute(
+    ha_attr_type::current_temperature));
+  buffer.append(1, ' ');
+  
+  buffer.append(Configuration::get_temperature_unit_str());
+  buffer.append(1, SEPARATOR);
+
+  std::string dest_temp_str = 
+    this->thermo_entity_->get_attribute(ha_attr_type::temperature);
+  std::string dest_temp2_str;
+
+  if (dest_temp_str.empty()) {
+    dest_temp_str = this->thermo_entity_->get_attribute(
+      ha_attr_type::target_temp_high, "0");
+    dest_temp2_str = this->thermo_entity_->get_attribute(
+      ha_attr_type::target_temp_low);
+    if (!dest_temp2_str.empty()) {
+      dest_temp2_str = std::to_string(
+        static_cast<int>(std::stof(dest_temp2_str) * 10));
+    }
+  }
+  dest_temp_str = std::to_string(
+    static_cast<int>(std::stof(dest_temp_str) * 10));
+
+  buffer.append(dest_temp_str).append(1, SEPARATOR);
+
+  auto hvac_action = this->thermo_entity_->get_attribute(
+    ha_attr_type::hvac_action);
+  if (!hvac_action.empty()) {
+    buffer
+      .append(get_translation(hvac_action.c_str()))
+      .append("\r\n(");
+  }
+  buffer.append(get_translation(this->thermo_entity_->get_state().c_str()));
+  if (!hvac_action.empty()) {
+    buffer.append(1, ')');
+  }
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(std::to_string(static_cast<int>(
+    std::stof(this->thermo_entity_->get_attribute(
+      ha_attr_type::min_temp, "0")) * 10)));
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(std::to_string(static_cast<int>(
+    std::stof(this->thermo_entity_->get_attribute(
+      ha_attr_type::max_temp, "0")) * 10)));
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(std::to_string(static_cast<int>(
+    std::stof(this->thermo_entity_->get_attribute(
+      ha_attr_type::target_temp_step, "0.5")) * 10)));
+  
+  //TODO: add overwrite_supported_modes
+  auto& hvac_modes_str = 
+    this->thermo_entity_->get_attribute(ha_attr_type::hvac_modes);
+  if (hvac_modes_str.empty()) {
+    buffer.append(4 * 8, SEPARATOR);
+  } else {
+    std::vector<std::string> hvac_modes;
+    hvac_modes.reserve(6);
+    split_str(',', hvac_modes_str, hvac_modes);
+
+    for (auto& mode : hvac_modes) {
+      uint16_t active_colour = 64512U;
+      if (mode == ha_attr_hvac_mode::auto_ ||
+          mode == ha_attr_hvac_mode::heat_cool) {
+        active_colour = 1024U;
+      } else if (mode == ha_attr_hvac_mode::off ||
+          mode == ha_attr_hvac_mode::fan_only) {
+        active_colour = 35921U;
+      } else if (mode == ha_attr_hvac_mode::cool) {
+        active_colour = 11487U;
+      } else if (mode == ha_attr_hvac_mode::dry) {
+        active_colour = 60897U;
+      }
+      auto icon = get_icon_by_name(CLIMATE_ICON_MAP, mode);
+      buffer.append(1, SEPARATOR);
+      buffer.append(icon == nullptr ? u8"\uE5D5" : icon).append(1, SEPARATOR);
+      buffer.append(std::to_string(active_colour)).append(1, SEPARATOR);
+      buffer.append(1, this->thermo_entity_->is_state(mode) ? '1' : '0');
+      buffer.append(1, SEPARATOR);
+      buffer.append(mode);
+    }
+    
+    // todo: disperse icons evenly based on size of hvac_modes
+    buffer.append(4 * (8 - hvac_modes.size()), SEPARATOR);
+  }
+
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(get_translation("currently")).append(1, SEPARATOR);
+  buffer.append(get_translation("state")).append(1, SEPARATOR);
+  // buffer.append(get_translation("action")).append(1, SEPARATOR); // depreciated
+  buffer.append(1, SEPARATOR);
+  buffer.append(this->temperature_unit_icon_).append(1, SEPARATOR);
+  buffer.append(dest_temp2_str).append(1, SEPARATOR);
+  
+  if (this->thermo_entity_->has_attribute(ha_attr_type::preset_modes) || 
+      this->thermo_entity_->has_attribute(ha_attr_type::swing_modes) || 
+      this->thermo_entity_->has_attribute(ha_attr_type::fan_modes)) {
+    buffer.append(1, '0');
+  } else {
+    buffer.append(1, '1');
+  }
 
   return buffer;
 }

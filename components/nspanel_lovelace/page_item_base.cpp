@@ -267,6 +267,8 @@ void StatefulPageItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = StatefulPageItem::state_binary_sensor_fn;
   } else if (type == entity_type::cover) {
     this->on_state_callback_ = StatefulPageItem::state_cover_fn;
+  } else if (type == entity_type::climate) {
+    this->on_state_callback_ = StatefulPageItem::state_climate_fn;
   } /* else if (
       type == entity_type::button ||
       type == entity_type::input_button) {
@@ -357,6 +359,30 @@ void StatefulPageItem::state_cover_fn(StatefulPageItem *me) {
         me->icon_value_ = icons->at(1);
       else
         me->icon_value_ = icons->at(0);
+    }
+  }
+}
+
+void StatefulPageItem::state_climate_fn(StatefulPageItem *me) {
+  auto &state = me->get_state();
+
+  if (!me->icon_value_overridden_) {
+    auto icon = get_icon_by_name(CLIMATE_ICON_MAP, state);
+    me->icon_value_ = icon == nullptr ? u8"\uE132" : icon; // default: checkbox-marked-circle
+  }
+
+  if (!me->icon_color_overridden_) {
+    me->icon_color_ = 64512U;
+    if (state == ha_attr_hvac_mode::auto_ ||
+        state == ha_attr_hvac_mode::heat_cool) {
+      me->icon_color_ = 1024U;
+    } else if (state == ha_attr_hvac_mode::off ||
+        state == ha_attr_hvac_mode::fan_only) {
+      me->icon_color_ = 35921U;
+    } else if (state == ha_attr_hvac_mode::cool) {
+      me->icon_color_ = 11487U;
+    } else if (state == ha_attr_hvac_mode::dry) {
+      me->icon_color_ = 60897U;
     }
   }
 }

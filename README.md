@@ -29,10 +29,10 @@ There are many UI components missing and the [python build script](components/ns
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display
-- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`
+- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`
 - Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` and `popupTimer` pages.
 
-There is currently no support for cards such as: `cardMedia`, `cardThermo`, `cardPower` etc. but these are planned for the future.
+There is currently no support for cards such as: `cardMedia`, `cardPower` etc. but these are planned for the future.
 Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.
 
 PRs to expand the functionality or fix bugs are very welcome!
@@ -41,7 +41,7 @@ PRs to expand the functionality or fix bugs are very welcome!
 
 ### 1. Weather forecast is not displayed on the screensaver when using Home Assistant 2024.4 or later
 
-This issue is due to the `forcast` attribute being removed from weather entities. There is currently no alternative way to fetch this data with the current ESPHome functionality but I hope to get this fixed (see [this feature request](https://github.com/esphome/feature-requests/issues/2703)).
+This issue is due to the `forecast` attribute being removed from weather entities. There is currently no alternative way to fetch this data with the current ESPHome functionality but I hope to get this fixed (see [this feature request](https://github.com/esphome/feature-requests/issues/2703)).
 More info on the issue can be [found here](https://github.com/olicooper/esphome-nspanel-lovelace-native/issues/8).
 
 As a workaround, please add the following to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`) - thanks @CultusMechanicus for this snippet!

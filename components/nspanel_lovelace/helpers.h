@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <ctype.h>
 #include <esp_heap_caps.h>
 #include <math.h>
@@ -15,6 +16,12 @@
 
 namespace esphome {
 namespace nspanel_lovelace {
+
+struct compare_char_str {
+  bool operator()(const char *a, const char *b) const {
+    return a != nullptr && b != nullptr && std::strcmp(a, b) < 0;
+  }
+};
 
 // see: https://stackoverflow.com/a/13890501/2634818
 inline void replace_first(
@@ -49,6 +56,13 @@ inline void replace_all(
 
   buf.append(s, prevPos, s.size() - prevPos);
   s.swap(buf);
+}
+
+inline void replace_all(std::string &s, const char oldChar, const char newChar) {
+  size_t pos = std::string::npos;
+  while ((pos = s.find(oldChar, pos + 1)) != std::string::npos) {
+    s.at(pos) = newChar;
+  }
 }
 
 inline const char* value_or_empty(const char* s) {
@@ -188,6 +202,27 @@ inline void split_str(char delimiter, const std::string &str, std::vector<std::s
     if (!item.empty()) { array.push_back(item); }
   }
   if (!item.empty()) { array.push_back(str.substr(pos_start)); }
+}
+
+// Takes the string representation of a Python array (enums, strings etc) and extracts the 
+// values to a new string separated by delimiter.
+inline std::string convert_python_arr_str(const std::string &str, const char delimiter = ',') {
+  if (str.empty()) return str;
+  size_t pos_start = std::string::npos, pos_end = pos_start;
+  std::string tmp;
+  do {
+      pos_start = str.find('\'', pos_end + 1);
+      if (pos_start == std::string::npos) {
+        if (tmp.back() == delimiter) tmp.pop_back();
+        break;
+      }
+      pos_end = str.find('\'', pos_start + 1);
+      if (pos_end == std::string::npos) break;
+      // ignore empty entries
+      if (pos_end - pos_start - 1 == 0) continue;
+      tmp.append(str.substr(pos_start + 1, pos_end - pos_start - 1)).append(1, delimiter);
+  } while (true);
+  return tmp.empty() ? str : tmp;
 }
 
 inline std::string to_string(const std::vector<std::string> &array, 

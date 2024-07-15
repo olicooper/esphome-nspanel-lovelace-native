@@ -41,7 +41,8 @@ external_components:
 
 nspanel_lovelace:
   id: nspanel
-  model: eu # eu us-l us-p
+  locale:
+    temperature_unit: celcius
   sleep_timeout: 10
   screensaver:
     time_id: homeassistant_time
@@ -98,6 +99,11 @@ nspanel_lovelace:
       entities:
         - entity_id: cover.living_room_window
           name: Tilt Cover (Window)
+        - entity_id: climate.ecobee
+          name: Climate Ecobee
+        - entity_id: climate.hvac
+          name: Climate HVAC
+        
 
     - type: cardQR
       id: qr_card
@@ -118,6 +124,21 @@ nspanel_lovelace:
       sleep_timeout: 60
       title: Alarm
       alarm_entity_id: alarm_control_panel.security
+
+    - type: cardThermo
+      sleep_timeout: 60
+      title: Thermo Ecobee
+      thermo_entity_id: climate.ecobee
+
+    - type: cardThermo
+      sleep_timeout: 60
+      title: Thermo HVAC
+      thermo_entity_id: climate.hvac
+
+    - type: cardThermo
+      sleep_timeout: 60
+      title: Thermo heatpump
+      thermo_entity_id: climate.heatpump
 
 logger:
   baud_rate: 115200

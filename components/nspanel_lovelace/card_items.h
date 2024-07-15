@@ -53,6 +53,7 @@ protected:
   static void state_script_fn(StatefulPageItem *me);
   static void state_timer_fn(StatefulPageItem *me);
   static void state_cover_fn(StatefulPageItem *me);
+  static void state_climate_fn(StatefulPageItem *me);
 
   void set_on_state_callback_(const char *type) override;
 

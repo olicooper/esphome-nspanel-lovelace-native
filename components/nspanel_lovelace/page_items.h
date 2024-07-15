@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 #include "entity.h"
 #include "helpers.h"
 #include "page_item_base.h"

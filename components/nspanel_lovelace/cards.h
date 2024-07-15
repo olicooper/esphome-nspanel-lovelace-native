@@ -109,5 +109,33 @@ protected:
   std::unique_ptr<AlarmIconItem> info_icon_;
 };
 
+/*
+ * =============== ThermoCard ===============
+ */
+
+class ThermoCard : public Card, public IEntitySubscriber {
+public:
+  ThermoCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &thermo_entity);
+  ThermoCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &thermo_entity,
+      const std::string &title);
+  ThermoCard(
+      const std::string &uuid,
+      const std::shared_ptr<Entity> &thermo_entity,
+      const std::string &title, const uint16_t sleep_timeout);
+  virtual ~ThermoCard();
+
+  void accept(PageVisitor& visitor) override;
+
+  void configure_temperature_unit();
+
+  std::string &render(std::string &buffer) override;
+
+protected:
+  std::shared_ptr<Entity> thermo_entity_;
+  const char* temperature_unit_icon_;
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

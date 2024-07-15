@@ -16,6 +16,7 @@ class GridCard;
 class EntitiesCard;
 class QRCard;
 class AlarmCard;
+class ThermoCard;
 
 class PageVisitor {
 public:
@@ -26,6 +27,7 @@ public:
   virtual bool visit(EntitiesCard &) = 0;
   virtual bool visit(QRCard &) = 0;
   virtual bool visit(AlarmCard &) = 0;
+  virtual bool visit(ThermoCard &) = 0;
 };
 
 class InheritancePageVisitor : public PageVisitor {
@@ -37,6 +39,7 @@ public:
   virtual bool visit(EntitiesCard &);
   virtual bool visit(QRCard &);
   virtual bool visit(AlarmCard &);
+  virtual bool visit(ThermoCard &);
 };
 
 template<class T = Page>

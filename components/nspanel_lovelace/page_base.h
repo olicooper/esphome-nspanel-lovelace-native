@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 #include "page_item_base.h"
 #include "page_visitor.h"
 #include <algorithm>

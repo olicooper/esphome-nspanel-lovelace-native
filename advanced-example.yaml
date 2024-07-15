@@ -32,10 +32,9 @@ external_components:
 
 nspanel_lovelace:
   id: nspanel
-  ## Options: eu, us-l, us-p
-  # model: eu
   sleep_timeout: 10
   # locale:
+    # temperature_unit: celcius
     # day_of_week_map:
     #   sunday: ['Sun', 'Sunday']
     #   monday: ['Mon', 'Monday']
@@ -117,6 +116,12 @@ nspanel_lovelace:
       sleep_timeout: 60
       title: Home Alarm
       alarm_entity_id: alarm_control_panel.home_alarm
+
+    - type: cardThermo
+      sleep_timeout: 60
+      title: Thermo Ecobee
+      thermo_entity_id: climate.ecobee
+      # temperature_unit: fahrenheit
 
 logger:
   baud_rate: 115200

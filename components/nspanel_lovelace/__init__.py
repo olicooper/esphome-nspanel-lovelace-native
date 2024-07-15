@@ -49,6 +49,13 @@ ALARM_ARM_OPTION_MAP = {
     'arm_vacation': [ALARM_ARM_ACTION.arm_vacation, "Arm Vacation"],
 }
 
+TEMPERATURE_UNIT = nspanel_lovelace_ns.enum("temperature_unit_t", True)
+TEMPERATURE_UNIT_OPTIONS = ['celcius','fahrenheit']
+TEMPERATURE_UNIT_OPTION_MAP = {
+    'celcius': TEMPERATURE_UNIT.celcius,
+    'fahrenheit': TEMPERATURE_UNIT.fahrenheit,
+}
+
 NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
     "NSPanelLovelaceMsgIncomingTrigger",
     automation.Trigger.template(cg.std_string)
@@ -59,7 +66,7 @@ ENTITY_ID_RE = re.compile(r"^(?:(delete)|([\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9])|(i
 ENTITY_TYPES = [
     'sensor','binary_sensor','light','switch','scene','timer','weather','navigate',
     'alarm_control_panel','input_boolean','input_button','cover','fan','automation',
-    'script'
+    'script', 'climate'
 ]
 
 CONF_INCOMING_MSG = "on_incoming_msg"
@@ -70,6 +77,7 @@ CONF_ENTITY_ID = "entity_id"
 CONF_SLEEP_TIMEOUT = "sleep_timeout"
 
 CONF_LOCALE = "locale"
+CONF_TEMPERATURE_UNIT = "temperature_unit"
 CONF_DAY_OF_WEEK_MAP = "day_of_week_map"
 CONF_DOW_SUNDAY = "sunday"
 CONF_DOW_MONDAY = "monday"
@@ -101,11 +109,13 @@ CARD_GRID="cardGrid"
 CARD_GRID2="cardGrid2"
 CARD_QR="cardQR"
 CARD_ALARM="cardAlarm"
-CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_GRID2, CARD_QR, CARD_ALARM]
+CARD_THERMO="cardThermo"
+CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_GRID2, CARD_QR, CARD_ALARM, CARD_THERMO]
 
 CONF_CARD_QR_TEXT = "qr_text"
 CONF_CARD_ALARM_ENTITY_ID = "alarm_entity_id"
 CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
+CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 
 def load_icons():
     global iconJson
@@ -242,7 +252,8 @@ SCHEMA_DOW_MAP = cv.Schema({
 })
 
 SCHEMA_LOCALE = cv.Schema({
-    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP,
+    cv.Optional(CONF_TEMPERATURE_UNIT): cv.one_of(*TEMPERATURE_UNIT_OPTIONS),
+    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP
 })
 
 SCHEMA_ICON = cv.Any(
@@ -322,7 +333,7 @@ def validate_config(config):
         if len(entities) < length_limits[0]:
             raise cv.Invalid(f"There must be at least {length_limits[0]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
         if len(entities) > length_limits[1]:
-            raise cv.Invalid(f"There must be st most {length_limits[1]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
+            raise cv.Invalid(f"There must be at most {length_limits[1]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
 
         for entity_config in entities:
             entity_id = entity_config.get(CONF_ENTITY_ID)
@@ -338,6 +349,8 @@ def validate_config(config):
                 add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
+        if CONF_CARD_THERMO_ENTITY_ID in card_config:
+            add_entity_id(card_config.get(CONF_CARD_THERMO_ENTITY_ID))
 
     if CONF_SCREENSAVER in config:
         screensaver_config = config.get(CONF_SCREENSAVER)
@@ -387,6 +400,9 @@ CONFIG_SCHEMA = cv.All(
                             ensure_unique
                         )
                 }),
+                CARD_THERMO: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_THERMO_ENTITY_ID): valid_entity_id(['climate'])
+                }),
             },
             default_type=CARD_GRID))
         ),
@@ -397,12 +413,16 @@ CONFIG_SCHEMA = cv.All(
     validate_config
 )
 
+GlobalConfig = nspanel_lovelace_ns.class_("Configuration")
+GlobalConfig.op = "::"
+
 Screensaver = nspanel_lovelace_ns.class_("Screensaver")
 EntitiesCard = nspanel_lovelace_ns.class_("EntitiesCard")
 GridCard = nspanel_lovelace_ns.class_("GridCard")
 # GridCard2 = nspanel_lovelace_ns.class_("GridCard2")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
 AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
+ThermoCard = nspanel_lovelace_ns.class_("ThermoCard")
 
 DeleteItem = nspanel_lovelace_ns.class_("DeleteItem")
 NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
@@ -421,7 +441,8 @@ PAGE_MAP = {
     CARD_GRID: ["nspanel_card_", GridCard, PageType.cardGrid, GridCardEntityItem],
     CARD_GRID2: ["nspanel_card_", GridCard, PageType.cardGrid2, GridCardEntityItem],
     CARD_QR: ["nspanel_card_", QRCard, PageType.cardQR, EntitiesCardEntityItem],
-    CARD_ALARM: ["nspanel_card_", AlarmCard, PageType.cardAlarm, AlarmButtonItem]
+    CARD_ALARM: ["nspanel_card_", AlarmCard, PageType.cardAlarm, AlarmButtonItem],
+    CARD_THERMO: ["nspanel_card_", ThermoCard, PageType.cardThermo, None],
 }
 
 def get_new_uuid(prefix: str = ""):
@@ -546,6 +567,8 @@ async def to_code(config):
 
     if CONF_LOCALE in config:
         locale_config = config[CONF_LOCALE]
+        if CONF_TEMPERATURE_UNIT in locale_config:
+            cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
         if CONF_DAY_OF_WEEK_MAP in locale_config:
             dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
             if CONF_DOW_SUNDAY in dow_config:
@@ -688,6 +711,10 @@ async def to_code(config):
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
                 f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], get_entity_id(card_config[CONF_CARD_ALARM_ENTITY_ID]), title, sleep_timeout)}"))
+        elif card_config[CONF_CARD_TYPE] == CARD_THERMO:
+            cg.add(cg.RawExpression(
+                f"auto {card_variable} = "
+                f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], get_entity_id(card_config[CONF_CARD_THERMO_ENTITY_ID]), title, sleep_timeout)}"))
         else:
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
@@ -731,7 +758,7 @@ async def to_code(config):
         if card_config[CONF_CARD_TYPE] == CARD_QR:
             if CONF_CARD_QR_TEXT in card_config:
                 cg.add(card_class.set_qr_text(card_config[CONF_CARD_QR_TEXT]))
-        if card_config[CONF_CARD_TYPE] == CARD_ALARM:
+        elif card_config[CONF_CARD_TYPE] == CARD_ALARM:
             for mode in card_config[CONF_CARD_ALARM_SUPPORTED_MODES]:
                 cg.add(card_class.set_arm_button(ALARM_ARM_OPTION_MAP[mode][0], ALARM_ARM_OPTION_MAP[mode][1]))
 

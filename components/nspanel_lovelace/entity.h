@@ -38,6 +38,7 @@ public:
   const std::string &get_state() const;
   void set_state(const std::string &state);
 
+  bool has_attribute(ha_attr_type attr) const;
   const std::string &get_attribute(ha_attr_type attr, const std::string &default_value = "") const;
   void set_attribute(ha_attr_type attr, const std::string &value);
 

@@ -1,10 +1,10 @@
 #include "card_items.h"
 
 #include "config.h"
-#include "helpers.h"
-#include "types.h"
 #include "card_base.h"
-
+#include "helpers.h"
+#include "translations.h"
+#include "types.h"
 #include <type_traits>
 
 namespace esphome {
@@ -57,22 +57,33 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
     ha_attr_type attr, const std::string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
 
-  // this class only needs to react to the following attributes
   if (attr == ha_attr_type::unit_of_measurement) {
     this->set_value_postfix(value);
-  } else if (this->is_type(entity_type::cover)) {
+    return;
+  }
+
+  // Sometimes attribute changes also require updating the state for certain
+  // entity types seen below
+  if (!this->on_state_callback_) return;
+
+  if (this->is_type(entity_type::cover)) {
     if (attr == ha_attr_type::current_position) {
-      // this is a cheat/shortcut to avoid state change spamming,
-      // remove this if it doesn't work
-      if (!value.empty() && value != "100" && value != "0") return;
+      // this is a cheat/shortcut to avoid state change spamming
+      if (!value.empty() && value != "100" && value != "0") {
+        return;
+      }
     }
-    // any attribute change requires re-evaluating other attributes too,
-    // so it is easier to execute the state callback to handle all changes
-    if (this->on_state_callback_) {
-      this->on_state_callback_(this);
-      this->set_render_invalid();
+  } else if (this->is_type(entity_type::climate)) {
+    // Only these two attributes affect the visual output
+    // so avoid the state callback for anything else
+    if (attr != ha_attr_type::temperature &&
+        attr != ha_attr_type::current_temperature) {
+      return;
     }
   }
+
+  this->on_state_callback_(this);
+  this->set_render_invalid();
 }
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {
@@ -180,6 +191,20 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
     .append(icon_down_status ? generic_type::enable : generic_type::disable);
 }
 
+void EntitiesCardEntityItem::state_climate_fn(StatefulPageItem *me) {
+  StatefulPageItem::state_climate_fn(me);
+  auto me_ = static_cast<EntitiesCardEntityItem*>(me);
+  auto state = me_->get_state();
+  auto temp_unit = Configuration::get_temperature_unit_str();
+  me_->value_.assign(get_translation(state.c_str()))
+    .append(1, ' ')
+    .append(me_->get_attribute(ha_attr_type::temperature))
+    .append(temp_unit).append("\r\n")
+    .append(get_translation("currently")).append(": ")
+    .append(me_->get_attribute(ha_attr_type::current_temperature))
+    .append(temp_unit);
+}
+
 void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
   if (type == entity_type::light ||
       type == entity_type::switch_ ||
@@ -200,6 +225,8 @@ void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_timer_fn;
   } else if (type == entity_type::cover) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_cover_fn;
+  } else if (type == entity_type::climate) {
+    this->on_state_callback_ = EntitiesCardEntityItem::state_climate_fn;
   } else {
     this->on_state_callback_ = EntitiesCardEntityItem::state_generic_fn;
   }

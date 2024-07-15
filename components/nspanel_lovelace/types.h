@@ -2,14 +2,12 @@
 
 #include <array>
 #include <cassert>
-#include <cstring>
 #include <map>
 #include <stdint.h>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "config.h"
 #include "helpers.h"
 
 namespace esphome {
@@ -185,12 +183,6 @@ struct Icon {
 
   Icon() : Icon(u8"\uE5D5", 63878u) { }
   Icon(const std::string value, const uint16_t color) : value(value), color(color) { }
-};
-
-struct compare_char_str {
-  bool operator()(const char *a, const char *b) const {
-    return a != nullptr && b != nullptr && std::strcmp(a, b) < 0;
-  }
 };
 
 struct generic_type {
@@ -463,6 +455,11 @@ struct ha_action_type {
   static constexpr const char* close_cover_tilt = "close_cover_tilt";
   static constexpr const char* stop_cover_tilt = "stop_cover_tilt";
   static constexpr const char* set_cover_tilt_position = "set_cover_tilt_position";
+  static constexpr const char* set_temperature = "set_temperature";
+  static constexpr const char* set_hvac_mode = "set_hvac_mode";
+  static constexpr const char* set_preset_mode = "set_preset_mode";
+  static constexpr const char* set_swing_mode = "set_swing_mode";
+  static constexpr const char* set_fan_mode = "set_fan_mode";
 };
 
 enum class ha_attr_type : uint8_t {
@@ -489,14 +486,30 @@ enum class ha_attr_type : uint8_t {
   position,
   current_tilt_position,
   tilt_position,
-  // weather
+  // weather & climate
   temperature,
   temperature_unit,
   // timer
   duration,
   remaining,
   editable,
-  finishes_at
+  finishes_at,
+  // climate
+  current_temperature,
+  target_temp_high,
+  target_temp_low,
+  target_temp_step,
+  min_temp,
+  max_temp,
+  hvac_action,
+  preset_mode,
+  preset_modes,
+  swing_mode,
+  swing_modes,
+  fan_mode,
+  fan_modes,
+  hvac_mode,
+  hvac_modes,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -523,7 +536,7 @@ static constexpr const char* ha_attr_names [] = {
   "position",
   "current_tilt_position",
   "tilt_position",
-  // weather
+  // weather & climate
   "temperature",
   "temperature_unit",
   // timer
@@ -531,6 +544,22 @@ static constexpr const char* ha_attr_names [] = {
   "remaining",
   "editable",
   "finishes_at",
+  // climate
+  "current_temperature",
+  "target_temp_high",
+  "target_temp_low",
+  "target_temp_step",
+  "min_temp",
+  "max_temp",
+  "hvac_action",
+  "preset_mode",
+  "preset_modes",
+  "swing_mode",
+  "swing_modes",
+  "fan_mode",
+  "fan_modes",
+  "hvac_mode",
+  "hvac_modes",
 };
 
 inline const char *to_string(ha_attr_type attr) {
@@ -554,6 +583,16 @@ struct ha_attr_color_mode {
   static constexpr const char* rgb = "rgb";
   static constexpr const char* rgbw = "rgbw";
   static constexpr const char* rgbww = "rgbww";
+};
+
+struct ha_attr_hvac_mode {
+  static constexpr const char* auto_ = "auto";
+  static constexpr const char* heat_cool = "heat_cool";
+  static constexpr const char* heat = "heat";
+  static constexpr const char* off = "off";
+  static constexpr const char* cool = "cool";
+  static constexpr const char* dry = "dry";
+  static constexpr const char* fan_only = "fan_only";
 };
 
 enum class datetime_mode : uint8_t {
@@ -755,6 +794,17 @@ const char_map SENSOR_ICON_MAP {
   {sensor_type::timestamp, u8"\uE0EF"}, // calendar-clock
   {sensor_type::volatile_organic_compounds, u8"\uEA70"}, // smog
   {sensor_type::voltage, u8"\uE240"} // flash
+};
+
+// climate_mapping
+const char_map CLIMATE_ICON_MAP {
+  {ha_attr_hvac_mode::auto_, u8"\uEE8D"}, // calendar-sync
+  {ha_attr_hvac_mode::heat_cool, u8"\uEE8D"}, // calendar-sync
+  {ha_attr_hvac_mode::heat, u8"\uE237"}, // fire
+  {ha_attr_hvac_mode::off, u8"\uE424"}, // power
+  {ha_attr_hvac_mode::cool, u8"\uE716"}, // snowflake
+  {ha_attr_hvac_mode::dry, u8"\uE58D"}, // water-percent
+  {ha_attr_hvac_mode::fan_only, u8"\uE20F"}, // fan
 };
 
 // cover_mapping

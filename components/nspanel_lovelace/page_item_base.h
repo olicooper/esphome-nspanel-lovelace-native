@@ -214,6 +214,7 @@ protected:
   static void state_binary_sensor_fn(StatefulPageItem *me);
   static void state_cover_fn(StatefulPageItem *me);
   static void state_climate_fn(StatefulPageItem *me);
+  static void state_media_fn(StatefulPageItem *me);
   // static void state_button_fn(StatefulPageItem *me);
   // static void state_scene_fn(StatefulPageItem *me);
   // static void state_script_fn(StatefulPageItem *me);

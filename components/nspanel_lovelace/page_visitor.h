@@ -17,6 +17,7 @@ class EntitiesCard;
 class QRCard;
 class AlarmCard;
 class ThermoCard;
+class MediaCard;
 
 class PageVisitor {
 public:
@@ -28,6 +29,7 @@ public:
   virtual bool visit(QRCard &) = 0;
   virtual bool visit(AlarmCard &) = 0;
   virtual bool visit(ThermoCard &) = 0;
+  virtual bool visit(MediaCard &) = 0;
 };
 
 class InheritancePageVisitor : public PageVisitor {
@@ -40,6 +42,7 @@ public:
   virtual bool visit(QRCard &);
   virtual bool visit(AlarmCard &);
   virtual bool visit(ThermoCard &);
+  virtual bool visit(MediaCard &);
 };
 
 template<class T = Page>

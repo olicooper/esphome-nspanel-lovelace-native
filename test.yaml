@@ -103,7 +103,6 @@ nspanel_lovelace:
           name: Climate Ecobee
         - entity_id: climate.hvac
           name: Climate HVAC
-        
 
     - type: cardQR
       id: qr_card
@@ -139,6 +138,13 @@ nspanel_lovelace:
       sleep_timeout: 60
       title: Thermo heatpump
       thermo_entity_id: climate.heatpump
+
+    - type: cardMedia
+      sleep_timeout: 60
+      title: Media Lounge
+      media_entity_id: media_player.lounge_room
+      entities:
+        - entity_id: sensor.carbon_dioxide
 
 logger:
   baud_rate: 115200

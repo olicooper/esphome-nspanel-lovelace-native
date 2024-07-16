@@ -137,5 +137,30 @@ protected:
   const char* temperature_unit_icon_;
 };
 
+/*
+ * =============== MediaCard ===============
+ */
+
+class MediaCard : public Card, public IEntitySubscriber {
+public:
+  MediaCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &media_entity);
+  MediaCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &media_entity,
+      const std::string &title);
+  MediaCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &media_entity,
+      const std::string &title, 
+      const uint16_t sleep_timeout);
+  virtual ~MediaCard();
+
+  void accept(PageVisitor& visitor) override;
+
+  std::string &render(std::string &buffer) override;
+
+protected:
+  std::shared_ptr<Entity> media_entity_;
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

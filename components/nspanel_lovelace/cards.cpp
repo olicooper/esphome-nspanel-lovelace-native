@@ -383,5 +383,110 @@ std::string &ThermoCard::render(std::string &buffer) {
   return buffer;
 }
 
+/*
+ * =============== MediaCard ===============
+ */
+
+MediaCard::MediaCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &media_entity) :
+    Card(page_type::cardMedia, uuid),
+    media_entity_(media_entity) {
+  media_entity->add_subscriber(this);
+}
+
+MediaCard::MediaCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &media_entity,
+    const std::string &title) :
+    Card(page_type::cardMedia, uuid, title),
+    media_entity_(media_entity) {
+  media_entity->add_subscriber(this);
+}
+
+MediaCard::MediaCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &media_entity,
+    const std::string &title, const uint16_t sleep_timeout) :
+    Card(page_type::cardMedia, uuid, title, sleep_timeout),
+    media_entity_(media_entity) {
+  media_entity->add_subscriber(this);
+}
+
+MediaCard::~MediaCard() {
+  media_entity_->remove_subscriber(this);
+}
+
+void MediaCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
+// entityUpd~{heading}~{navigation}~{entityId}~{title}~~{author}~~{volume}~{iconplaypause}~{onoffbutton}~{shuffleBtn}{media_icon}{item_str}
+std::string &MediaCard::render(std::string &buffer) {
+  buffer.assign(this->get_render_instruction())
+      .append(1, SEPARATOR)
+      .append(this->get_title())
+      .append(1, SEPARATOR);
+  
+  this->render_nav(buffer).append(1, SEPARATOR);
+
+  buffer.append(this->media_entity_->get_entity_id());
+  buffer.append(1, SEPARATOR);
+
+  buffer.append(this->media_entity_->get_attribute(
+    ha_attr_type::media_title));
+  buffer.append(2, SEPARATOR);
+
+  buffer.append(this->media_entity_->get_attribute(
+    ha_attr_type::media_artist));
+  buffer.append(2, SEPARATOR);
+
+  buffer.append(std::to_string(
+    std::stoi(this->media_entity_->get_attribute(
+      ha_attr_type::volume_level, "0")) * 100));
+  buffer.append(1, SEPARATOR);
+
+  auto icon = this->media_entity_->is_state("playing")
+    ? icon_t::pause : icon_t::play;
+  buffer.append(icon).append(1, SEPARATOR);
+
+  uint32_t supported_features = value_or_default(this->media_entity_->
+    get_attribute(ha_attr_type::supported_features), 0UL);
+
+  // on/off button colour
+  if (supported_features & 0b10000000) {
+    if (this->media_entity_->is_state(generic_type::off))
+      buffer.append(std::to_string(1374)); // light blue
+    else
+      buffer.append(std::to_string(64704)); // orange
+  } else {
+    buffer.append(generic_type::disable);
+  }
+  buffer.append(1, SEPARATOR);
+  
+  // shuffle button icon
+  if (supported_features & 0b100000000000000) {
+    if (this->media_entity_->get_attribute(ha_attr_type::shuffle) == generic_type::on)
+      buffer.append(icon_t::shuffle);
+    else
+      buffer.append(icon_t::shuffle_disable);
+  } else {
+    buffer.append(generic_type::disable);
+  }
+  buffer.append(1, SEPARATOR);
+
+  // todo: create PageItem for this?
+  // media icon/button: type~internalName~icon~iconColor~displayName~
+  //      on btn press: event,buttonPress2,{entity_id},button
+  buffer.append(entity_render_type::media_pl).append(1, SEPARATOR);
+  buffer.append(this->media_entity_->get_entity_id()).append(1, SEPARATOR);
+  auto media_icon = get_icon_by_name(MEDIA_TYPE_MAP, 
+    this->media_entity_->get_attribute(ha_attr_type::media_content_type));
+  buffer.append(media_icon).append(1, SEPARATOR);
+  buffer.append(std::to_string(17299)).append(2, SEPARATOR);
+  
+  for (auto& item : this->items_) {
+    buffer.append(1, SEPARATOR).append(item->render());
+  }
+  if (this->items_.size() > 0) buffer.append(1, SEPARATOR);
+
+  return buffer;
+}
+
 } // namespace nspanel_lovelace
 } // namespace esphome

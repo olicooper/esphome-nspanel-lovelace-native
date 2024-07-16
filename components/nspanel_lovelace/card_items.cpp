@@ -80,6 +80,9 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
         attr != ha_attr_type::current_temperature) {
       return;
     }
+  } else if (!this->is_type(entity_type::media_player)) {
+    // Any entity type not mentioned above doesn't need re-rendering
+    return;
   }
 
   this->on_state_callback_(this);

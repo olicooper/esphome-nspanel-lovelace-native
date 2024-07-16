@@ -174,6 +174,10 @@ private:
 // todo: populate a list of all used icons
 struct icon_t {
   static constexpr const char* alert_circle_outline = u8"\uE5D5";
+  static constexpr const char* pause = u8"\uE3E3";
+  static constexpr const char* play = u8"\uE409";
+  static constexpr const char* shuffle = u8"\uE49C";
+  static constexpr const char* shuffle_disable = u8"\uE49D";
 };
 
 struct Icon {
@@ -465,6 +469,12 @@ struct ha_action_type {
   static constexpr const char* set_preset_mode = "set_preset_mode";
   static constexpr const char* set_swing_mode = "set_swing_mode";
   static constexpr const char* set_fan_mode = "set_fan_mode";
+  static constexpr const char* media_next_track = "media_next_track";
+  static constexpr const char* media_previous_track = "media_previous_track";
+  static constexpr const char* media_play_pause = "media_play_pause";
+  static constexpr const char* shuffle_set = "shuffle_set";
+  static constexpr const char* volume_set = "volume_set";
+  static constexpr const char* select_source = "select_source";
 };
 
 enum class ha_attr_type : uint8_t {
@@ -515,6 +525,14 @@ enum class ha_attr_type : uint8_t {
   fan_modes,
   hvac_mode,
   hvac_modes,
+  // media
+  media_title,
+  media_artist,
+  volume_level,
+  shuffle,
+  media_content_type,
+  source,
+  source_list,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -565,6 +583,14 @@ static constexpr const char* ha_attr_names [] = {
   "fan_modes",
   "hvac_mode",
   "hvac_modes",
+  // media
+  "media_title",
+  "media_artist",
+  "volume_level",
+  "shuffle",
+  "media_content_type",
+  "source",
+  "source_list",
 };
 
 inline const char *to_string(ha_attr_type attr) {
@@ -598,6 +624,17 @@ struct ha_attr_hvac_mode {
   static constexpr const char* cool = "cool";
   static constexpr const char* dry = "dry";
   static constexpr const char* fan_only = "fan_only";
+};
+
+struct ha_attr_media_content_type {
+  static constexpr const char* music = "music";
+  static constexpr const char* tvshow = "tvshow";
+  static constexpr const char* video = "video";
+  static constexpr const char* episode = "episode";
+  static constexpr const char* channel = "channel";
+  static constexpr const char* playlist = "playlist";
+  static constexpr const char* app = "app";
+  static constexpr const char* url = "url";
 };
 
 enum class datetime_mode : uint8_t {
@@ -805,6 +842,18 @@ const char_map CLIMATE_ICON_MAP {
   {ha_attr_hvac_mode::cool, u8"\uE716"}, // snowflake
   {ha_attr_hvac_mode::dry, u8"\uE58D"}, // water-percent
   {ha_attr_hvac_mode::fan_only, u8"\uE20F"}, // fan
+};
+
+const char_map MEDIA_TYPE_MAP {
+  {generic_type::off, u8"\uE4C3"}, // speaker-off
+  {ha_attr_media_content_type::music, u8"\uE759"}, // music
+  {ha_attr_media_content_type::tvshow, u8"\uE380"}, // movie
+  {ha_attr_media_content_type::video, u8"\uE566"}, // video
+  {ha_attr_media_content_type::episode, u8"\uE410"}, // playlist-play (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::channel, u8"\uEDF1"}, //  playlist-star (OR radio-tower E43A / broadcast F71F?) (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::playlist, u8"\uECB7"}, // playlist-music (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::app, u8"\uE3CA"}, // newly added! open-in-app
+  {ha_attr_media_content_type::url, u8"\uED1A"}, // newly added! link-box-outline (OR cast E117?)
 };
 
 // cover_mapping

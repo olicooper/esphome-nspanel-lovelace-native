@@ -126,7 +126,10 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
       attr == ha_attr_type::preset_modes ||
       attr == ha_attr_type::swing_modes ||
       attr == ha_attr_type::fan_modes ||
-      attr == ha_attr_type::hvac_modes) {
+      attr == ha_attr_type::hvac_modes ||
+      // todo: this list can contain any value (including ones with commas),
+      //       convert_python_arr_str does not support this scenario!
+      attr == ha_attr_type::source_list) {
     this->attributes_[attr] = convert_python_arr_str(value);
   } else {
     this->attributes_[attr] = value;

@@ -245,6 +245,12 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
         this->icon_value_ = (icon == nullptr ? this->icon_default_value_ : icon);
       }
     }
+  } else if (attr == ha_attr_type::media_content_type) {
+    if (this->icon_value_overridden_) return;
+    this->icon_value_ = get_icon_by_name(
+      MEDIA_TYPE_MAP, 
+      this->entity_->get_attribute(ha_attr_type::media_content_type),
+      generic_type::off);
   } else {
     return;
   }
@@ -269,6 +275,8 @@ void StatefulPageItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = StatefulPageItem::state_cover_fn;
   } else if (type == entity_type::climate) {
     this->on_state_callback_ = StatefulPageItem::state_climate_fn;
+  } else if (type == entity_type::media_player) {
+    this->on_state_callback_ = StatefulPageItem::state_media_fn;
   } /* else if (
       type == entity_type::button ||
       type == entity_type::input_button) {
@@ -384,6 +392,20 @@ void StatefulPageItem::state_climate_fn(StatefulPageItem *me) {
     } else if (state == ha_attr_hvac_mode::dry) {
       me->icon_color_ = 60897U;
     }
+  }
+}
+
+void StatefulPageItem::state_media_fn(StatefulPageItem *me) {
+  if (me->icon_color_overridden_) {
+    return;
+  }
+
+  if (me->entity_->is_state(generic_type::off)) {
+    me->icon_color_ = 17299u; // blue
+  } else if (!me->entity_->is_state(generic_type::unavailable)) {
+    me->icon_color_ = 64909u; // yellow
+  } else {
+    me->icon_color_ = 38066u; // grey
   }
 }
 

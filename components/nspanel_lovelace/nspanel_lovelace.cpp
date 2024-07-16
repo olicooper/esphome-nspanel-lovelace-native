@@ -239,6 +239,30 @@ void NSPanelLovelace::setup() {
           &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::hvac_modes));
     }
+    else if (entity->is_type(entity_type::media_player)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::supported_features));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::media_content_type));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::media_title));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::media_artist));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::volume_level));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::shuffle));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::source_list));
+    }
 
     if (add_state_subscription) {
       this->subscribe_homeassistant_state(
@@ -1375,19 +1399,70 @@ void NSPanelLovelace::process_button_press_(
   }
   // media cards
   else if (button_type == button_type::mediaNext) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::media_next_track, entity_id);
   } else if (button_type == button_type::mediaBack) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::media_previous_track, entity_id);
   } else if (button_type == button_type::mediaPause) {
-    // todo
+    this->call_ha_service_(
+      entity_type, ha_action_type::media_play_pause, entity_id);
   } else if (button_type == button_type::mediaOnOff) {
-    // todo
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    this->call_ha_service_(
+      entity_type,
+      entity->is_state(generic_type::on) 
+        ? ha_action_type::turn_off 
+        : ha_action_type::turn_on,
+      entity_id);
   } else if (button_type == button_type::mediaShuffle) {
-    // todo
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto shuffle = entity->get_attribute(ha_attr_type::shuffle);
+    if (shuffle.empty()) return;
+    shuffle = shuffle == generic_type::off 
+      ? generic_type::on : generic_type::off;
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::shuffle_set,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::shuffle), shuffle}
+      }});
   } else if (button_type == button_type::volumeSlider) {
-    // todo
+    auto volume = esphome::str_snprintf("%.2f", 6, std::stoi(value) * 0.01f);
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::volume_set,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::volume_level), volume}
+      }});
   } else if (button_type == button_type::speakerSel) {
-    // todo
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::select_source,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::source), value}
+      }});
+  } else if (button_type == button_type::modeMediaPlayer) {
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto source_list_str = entity->get_attribute(ha_attr_type::source_list);
+    if (source_list_str.empty()) return;
+    std::vector<std::string> source_list;
+    split_str(',', source_list_str, source_list);
+    uint8_t index = stoi(value);
+    if (source_list.size() <= index) return;
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::select_source,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::source), source_list.at(index)}
+      }});
   }
   // light cards
   else if (button_type == button_type::brightnessSlider) {
@@ -1405,7 +1480,7 @@ void NSPanelLovelace::process_button_press_(
       }});
   } else if (button_type == button_type::colorTempSlider) {
     if (value.empty()) return;
-    auto entity = get_entity_(entity_id);
+    auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto &minstr = entity->get_attribute(ha_attr_type::min_mireds);
     auto &maxstr = entity->get_attribute(ha_attr_type::max_mireds);
@@ -1487,7 +1562,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::hvac_mode), value}
       }});
   } else if (button_type == button_type::modePresetModes) {
-    auto entity = get_entity_(entity_id);
+    auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto &modes_str = entity->get_attribute(ha_attr_type::preset_modes);
     if (modes_str.empty()) return;
@@ -1502,7 +1577,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::preset_mode), selected_mode}
       }});
   } else if (button_type == button_type::modeSwingModes) {
-    auto entity = get_entity_(entity_id);
+    auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto &modes_str = entity->get_attribute(ha_attr_type::swing_modes);
     if (modes_str.empty()) return;
@@ -1517,7 +1592,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::swing_mode), selected_mode}
       }});
   } else if (button_type == button_type::modeFanModes) {
-    auto entity = get_entity_(entity_id);
+    auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto &modes_str = entity->get_attribute(ha_attr_type::fan_modes);
     if (modes_str.empty()) return;
@@ -1686,10 +1761,16 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
       }
     }
 
+    auto entity_type = get_entity_type(entity_id);
     // Thermo cards don't have items to check, only a single thermo entity
     // render updates when climate entitites are updated
-    if (get_entity_type(entity_id) == entity_type::climate &&
+    if (entity_type == entity_type::climate &&
         this->current_page_->is_type(page_type::cardThermo)) {
+      force_current_page_update_ = true;
+      return;
+    }
+    else if (entity_type == entity_type::media_player &&
+        this->current_page_->is_type(page_type::cardMedia)) {
       force_current_page_update_ = true;
       return;
     }

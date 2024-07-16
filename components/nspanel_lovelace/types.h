@@ -171,6 +171,11 @@ private:
   std::array<const char *, 2> saturday_;
 };
 
+// todo: populate a list of all used icons
+struct icon_t {
+  static constexpr const char* alert_circle_outline = u8"\uE5D5";
+};
+
 struct Icon {
   // The codepoint value
   // default: mdi:05D6 (alert-circle-outline)
@@ -181,7 +186,7 @@ struct Icon {
   // The string representation of the rgb565 color
   const std::string color_str() const { return std::to_string(color); }
 
-  Icon() : Icon(u8"\uE5D5", 63878u) { }
+  Icon() : Icon(icon_t::alert_circle_outline, 63878u) { }
   Icon(const std::string value, const uint16_t color) : value(value), color(color) { }
 };
 
@@ -610,68 +615,63 @@ inline datetime_mode operator&(datetime_mode a, datetime_mode b) {
 inline const char *get_icon_by_name(
     const char_map &map,
     const std::string& icon_name,
-    const std::string& default_icon_name = "") {
-  if (map.size() == 0)
-    return nullptr;
-  auto tmp_icon_name(icon_name);
-  if (icon_name.empty()) {
-    if (!default_icon_name.empty()) {
-      tmp_icon_name = default_icon_name;
-    }
-    else {
-      return nullptr;
+    const std::string& fallback_icon_name = "",
+    const char *default_icon = nullptr) {
+  if (map.size() > 0) {
+    if (icon_name.empty()) {
+      if (!fallback_icon_name.empty()) {
+        auto icon_it = map.find(fallback_icon_name.c_str());
+        if (icon_it != map.end()) return icon_it->second;
+      }
+    } else {
+      auto icon_it = map.find(icon_name.c_str());
+      if (icon_it != map.end()) return icon_it->second;
     }
   }
-  auto icon_it = map.find(tmp_icon_name.c_str());
-  // todo: no icon found in the map, fall back to a default?
-  if (icon_it != map.end()) {
-    return icon_it->second;
-  }
-  return nullptr;
+  return default_icon == nullptr 
+    ? icon_t::alert_circle_outline
+    : default_icon;
 }
 
 inline const std::vector<const char*> *get_icon_by_name(
     const char_list_map &map,
-    std::string icon_name,
-    const std::string& default_icon_name = "") {
-  if (map.size() == 0)
-    return nullptr;
-  if (icon_name.empty()) {
-    if (!default_icon_name.empty()) {
-      icon_name = default_icon_name;
-    }
-    else {
-      return nullptr;
+    const std::string &icon_name,
+    const std::string& fallback_icon_name = "",
+    const std::vector<const char*> *default_icon_list = nullptr) {
+  if (map.size() > 0) {
+    if (icon_name.empty()) {
+      if (!fallback_icon_name.empty()) {
+        auto icon_it = map.find(fallback_icon_name.c_str());
+        if (icon_it != map.end()) return &icon_it->second;
+      }
+    } else {
+      auto icon_it = map.find(icon_name.c_str());
+      if (icon_it != map.end()) return &icon_it->second;
     }
   }
-  auto icon_it = map.find(icon_name.c_str());
-  // todo: no icon found in the map, fall back to a default?
-  if (icon_it != map.end()) {
-    return &icon_it->second;
-  }
-  return nullptr;
+  return default_icon_list;
 }
 
 inline const Icon *get_icon_by_name(
     const char_icon_map &map,
-    std::string icon_name,
-    const std::string& default_icon_name = "") {
-  if (map.size() == 0)
-    return nullptr;
-  if (icon_name.empty()) {
-    if (!default_icon_name.empty()) {
-      icon_name = default_icon_name;
-    }
-    else {
-      return nullptr;
+    const std::string &icon_name,
+    const std::string& fallback_icon_name = "",
+    const Icon *default_icon = nullptr) {
+  if (map.size() > 0) {
+    if (icon_name.empty()) {
+      if (!fallback_icon_name.empty()) {
+        auto icon_it = map.find(fallback_icon_name.c_str());
+        if (icon_it != map.end()) return &icon_it->second;
+      }
+    } else {
+      auto icon_it = map.find(icon_name.c_str());
+      if (icon_it != map.end()) return &icon_it->second;
     }
   }
-  auto icon_it = map.find(icon_name.c_str());
-  // todo: no icon found in the map, fall back to a default?
-  if (icon_it != map.end()) {
-    return &icon_it->second;
-  }
-  return nullptr;
+  static const Icon default_icon_obj;
+  return default_icon == nullptr 
+    ? &default_icon_obj
+    : default_icon;
 }
 
 // simple_type_mapping
@@ -838,7 +838,7 @@ const char_icon_map WEATHER_ICON_MAP {
   {weather_type::cloudy, {u8"\uE58F", 31728u}}, //mdi:0590,#7b7d84
   {weather_type::partlycloudy, {u8"\uE594", 38066u}}, //mdi:0595,#949694
   {weather_type::clear_night, {u8"\uE593", 38060u}}, //mdi:0594,#949663 // weather-night
-  {weather_type::exceptional, {u8"\uE5D5", 63878u}}, //mdi:05D6,#ff3131 // alert-circle-outline
+  {weather_type::exceptional, {icon_t::alert_circle_outline, 63878u}}, //mdi:05D6,#ff3131
   {weather_type::rainy, {u8"\uE596", 25375u}}, //mdi:0597,#6361ff
   {weather_type::pouring, {u8"\uE595", 12703u}}, //mdi:0596,#3131ff
   {weather_type::snowy, {u8"\uE597", 65535u}}, //mdi:E598,#ffffff

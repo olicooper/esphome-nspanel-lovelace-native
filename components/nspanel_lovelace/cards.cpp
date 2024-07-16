@@ -351,9 +351,8 @@ std::string &ThermoCard::render(std::string &buffer) {
       } else if (mode == ha_attr_hvac_mode::dry) {
         active_colour = 60897U;
       }
-      auto icon = get_icon_by_name(CLIMATE_ICON_MAP, mode);
       buffer.append(1, SEPARATOR);
-      buffer.append(icon == nullptr ? u8"\uE5D5" : icon).append(1, SEPARATOR);
+      buffer.append(get_icon_by_name(CLIMATE_ICON_MAP, mode)).append(1, SEPARATOR);
       buffer.append(std::to_string(active_colour)).append(1, SEPARATOR);
       buffer.append(1, this->thermo_entity_->is_state(mode) ? '1' : '0');
       buffer.append(1, SEPARATOR);

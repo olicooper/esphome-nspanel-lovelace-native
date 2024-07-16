@@ -165,7 +165,7 @@ char_icon_map WeatherItem::icon_color_map = {
   {weather_type::cloudy,          {u8"\uE58F", 31728u}}, // mdi:0590,#7b7d84
   {weather_type::partlycloudy,    {u8"\uE594", 38066u}}, // mdi:0595,#949694
   {weather_type::clear_night,     {u8"\uE593", 38060u}}, // mdi:0594,#949663 // weather-night
-  {weather_type::exceptional,     {u8"\uE5D5", 63878u}}, // mdi:05D6,#ff3131 // alert-circle-outline
+  {weather_type::exceptional,     {icon_t::alert_circle_outline, 63878u}}, // mdi:05D6,#ff3131
   {weather_type::rainy,           {u8"\uE596", 25375u}}, // mdi:0597,#6361ff
   {weather_type::pouring,         {u8"\uE595", 12703u}}, // mdi:0596,#3131ff
   {weather_type::snowy,           {u8"\uE597", 65535u}}, // mdi:E598,#ffffff

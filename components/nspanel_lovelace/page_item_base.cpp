@@ -240,7 +240,7 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
   if (attr == ha_attr_type::device_class) {
     if (!this->icon_value_overridden_) {
       if (this->entity_->is_type(entity_type::sensor)) {
-        this->icon_default_value_ = u8"\uE5D5"; // default: alert-circle-outline
+        this->icon_default_value_ = icon_t::alert_circle_outline;
         auto icon = get_icon_by_name(SENSOR_ICON_MAP, value);
         this->icon_value_ = (icon == nullptr ? this->icon_default_value_ : icon);
       }

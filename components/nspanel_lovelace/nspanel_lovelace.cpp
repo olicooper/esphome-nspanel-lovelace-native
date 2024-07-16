@@ -886,7 +886,6 @@ void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
 
   auto icon = get_icon_by_name(
     CLIMATE_ICON_MAP, entity->get_state());
-  if (icon == nullptr) icon = u8"\uE5D5"; // alert-circle-outline
   uint16_t icon_colour = 64512U;
   auto &state = entity->get_state();
   if (state == ha_attr_hvac_mode::auto_ ||

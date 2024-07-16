@@ -189,13 +189,16 @@ inline bool char_printable(const char value) {
   return value >= 0x20 && value <= 0x7e;
 }
 
-inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array) {
+inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {
   size_t pos_start = 0, pos_end = 0;
   std::string item;
+  uint16_t item_count = 0;
   while ((pos_end = str.find(delimiter, pos_start)) != std::string::npos) {
+    if (item_count == max_items) return;
     item = str.substr(pos_start, pos_end - pos_start);
     pos_start = pos_end + 1;
     if (!item.empty()) { array.push_back(item); }
+    item_count++;
   }
   if (!item.empty()) { array.push_back(str.substr(pos_start)); }
 }

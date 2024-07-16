@@ -203,6 +203,19 @@ inline void split_str(char delimiter, const std::string &str, std::vector<std::s
   if (!item.empty()) { array.push_back(str.substr(pos_start)); }
 }
 
+inline size_t find_nth_of(char delimiter, uint16_t count, const std::string &str) {
+  size_t pos = std::string::npos;
+  if (count == 0) return pos;
+
+  uint16_t idx = 0;
+  do {
+    pos = str.find(delimiter, pos + 1);
+    idx++;
+  } while (pos != std::string::npos && idx < count);
+
+  return pos;
+}
+
 // Takes the string representation of a Python array (enums, strings etc) and extracts the 
 // values to a new string separated by delimiter.
 inline std::string convert_python_arr_str(const std::string &str, const char delimiter = ',') {

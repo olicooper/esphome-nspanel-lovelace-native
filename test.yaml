@@ -103,6 +103,8 @@ nspanel_lovelace:
           name: Climate Ecobee
         - entity_id: climate.hvac
           name: Climate HVAC
+        - entity_id: select.speed
+          name: Select Speed
 
     - type: cardQR
       id: qr_card

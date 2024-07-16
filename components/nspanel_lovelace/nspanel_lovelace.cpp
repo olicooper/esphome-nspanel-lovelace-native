@@ -144,6 +144,9 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state_attr(
           &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::brightness));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::effect_list));
     }
     else if (entity->is_type(entity_type::switch_) ||
         entity->is_type(entity_type::input_boolean) ||
@@ -262,6 +265,13 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state_attr(
           &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::source_list));
+    }
+    else if (entity->is_type(entity_type::select) ||
+        entity->is_type(entity_type::input_select)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::options));
     }
 
     if (add_state_subscription) {
@@ -602,6 +612,11 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
     this->render_cover_detail_update_(item);
   } else if (item->is_type(entity_type::climate)) {
     this->render_climate_detail_update_(item);
+  } else if (
+      item->is_type(entity_type::select) ||
+      item->is_type(entity_type::input_select) ||
+      item->is_type(entity_type::media_player)) {
+    this->render_input_select_detail_update_(item);
   } else {
     return;
   }
@@ -974,6 +989,43 @@ void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
       // mode_res~ (mode names separated by '?')
       .append(mode_res).append(1, SEPARATOR);
   }
+}
+
+// entityUpdateDetail2~{entity_id}~~{icon_color}~{ha_type}~{state}~{options}~
+void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item) {
+  if(item == nullptr) return;
+
+  auto state = item->get_state();
+  std::string options;
+  if (item->is_type(entity_type::input_select) || 
+      item->is_type(entity_type::select)) {
+    options = item->get_attribute(ha_attr_type::options);
+  }
+  else if (item->is_type(entity_type::light)) {
+    auto split_pos = find_nth_of(',', 15, options);
+    if (split_pos != std::string::npos) {
+      options = options.substr(0, split_pos);
+    }
+  }
+  else if (item->is_type(entity_type::media_player)) {
+    options = item->get_attribute(ha_attr_type::source_list);
+    state = item->get_attribute(ha_attr_type::source);
+  }
+  if (!options.empty()) replace_all(options, ',', '?');
+
+  this->command_buffer_
+    // entityUpdateDetail2~
+    .assign("entityUpdateDetail2").append(1, SEPARATOR)
+    // entity_id~~
+    .append("uuid.").append(item->get_uuid()).append(2, SEPARATOR)
+    // icon_color~
+    .append(item->get_icon_color_str()).append(1, SEPARATOR)
+    // ha_type~
+    .append(item->get_type()).append(1, SEPARATOR)
+    // state~
+    .append(state).append(1, SEPARATOR)
+    // options~
+    .append(options).append(1, SEPARATOR);
 }
 
 void NSPanelLovelace::dump_config() {

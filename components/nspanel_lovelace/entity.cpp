@@ -123,13 +123,15 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
         {0, 100}))));
   } else if (attr == ha_attr_type::supported_color_modes ||
+      attr == ha_attr_type::effect_list ||
       attr == ha_attr_type::preset_modes ||
       attr == ha_attr_type::swing_modes ||
       attr == ha_attr_type::fan_modes ||
       attr == ha_attr_type::hvac_modes ||
       // todo: this list can contain any value (including ones with commas),
       //       convert_python_arr_str does not support this scenario!
-      attr == ha_attr_type::source_list) {
+      attr == ha_attr_type::source_list ||
+      attr == ha_attr_type::options) {
     this->attributes_[attr] = convert_python_arr_str(value);
   } else {
     this->attributes_[attr] = value;

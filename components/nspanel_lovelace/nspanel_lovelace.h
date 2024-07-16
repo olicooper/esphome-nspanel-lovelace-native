@@ -184,6 +184,7 @@ protected:
   void render_timer_detail_update_(StatefulPageItem *entity);
   void render_cover_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(StatefulPageItem *item);
+  void render_input_select_detail_update_(StatefulPageItem *item);
 
 #ifdef USE_TIME
   void setup_time_();

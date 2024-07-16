@@ -493,6 +493,7 @@ enum class ha_attr_type : uint8_t {
   color_mode,
   color_temp,
   rgb_color,
+  effect_list,
   // alarm_control_panel
   code,
   code_arm_required,
@@ -533,6 +534,8 @@ enum class ha_attr_type : uint8_t {
   media_content_type,
   source,
   source_list,
+  // input & input_select
+  options,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -551,6 +554,7 @@ static constexpr const char* ha_attr_names [] = {
   "color_mode",
   "color_temp",
   "rgb_color",
+  "effect_list",
   // alarm_control_panel
   "code",
   "code_arm_required",
@@ -591,6 +595,8 @@ static constexpr const char* ha_attr_names [] = {
   "media_content_type",
   "source",
   "source_list",
+  // input & input_select
+  "options",
 };
 
 inline const char *to_string(ha_attr_type attr) {

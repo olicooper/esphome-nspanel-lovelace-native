@@ -805,7 +805,11 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     // slider_pos~
     .append(std::to_string(position)).append(1, SEPARATOR)
     // position text + state / value~
-    .append(text_position).append(": ").append(position_status ? std::to_string(position).append("%") : entity->get_state()).append(1, SEPARATOR)
+    .append(text_position).append(": ")
+    .append(position_status
+      ? std::to_string(position).append("%")
+      : entity->get_state())
+    .append(1, SEPARATOR)
     // position text~
     .append(text_position).append(1, SEPARATOR)
     // icon~
@@ -817,11 +821,16 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     // icon_down~
     .append(icon_down).append(1, SEPARATOR)
     // icon_up_status~
-    .append(icon_up_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_up_status ? generic_type::enable : generic_type::disable)
+    .append(1, SEPARATOR)
     // icon_stop_status~
-    .append(icon_stop_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_stop_status
+      ? generic_type::enable
+      : generic_type::disable)
+    .append(1, SEPARATOR)
     // icon_down_status~
-    .append(icon_down_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_down_status ? generic_type::enable : generic_type::disable)
+    .append(1, SEPARATOR)
     // tilt text~
     .append(text_tilt).append(1, SEPARATOR)
     // icon_tilt_left~
@@ -831,9 +840,13 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     // icon_tilt_right~
     .append(icon_tilt_right).append(1, SEPARATOR)
     // icon_tilt_left_status~
-    .append(icon_tilt_left_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_tilt_left_status
+      ? generic_type::enable : generic_type::disable)
+    .append(1, SEPARATOR)
     // icon_tilt_stop_status~
-    .append(icon_tilt_stop_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_tilt_stop_status
+      ? generic_type::enable : generic_type::disable)
+    .append(1, SEPARATOR)
     // icon_tilt_right_status~
     .append(icon_tilt_right_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
     // tilt_position_status

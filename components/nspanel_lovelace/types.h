@@ -171,15 +171,135 @@ private:
   std::array<const char *, 2> saturday_;
 };
 
-// todo: populate a list of all used icons
 struct icon_t {
+  static constexpr const char* account = u8"\uE003";
+  static constexpr const char* air_humidifier = u8"\uF098";
+  static constexpr const char* alert_circle = u8"\uE027";
   static constexpr const char* alert_circle_outline = u8"\uE5D5";
+  static constexpr const char* arrow_bottom_left = u8"\uE041";
+  static constexpr const char* arrow_collapse_horizontal = u8"\uE84B";
+  static constexpr const char* arrow_down = u8"\uE044";
+  static constexpr const char* arrow_expand_horizontal = u8"\uE84D";
+  static constexpr const char* arrow_left_bold = u8"\uE730";
+  static constexpr const char* arrow_right_bold = u8"\uE733";
+  static constexpr const char* arrow_top_right = u8"\uE05B";
+  static constexpr const char* arrow_up = u8"\uE05C";
+  static constexpr const char* arrow_up_bold = u8"\uE736";
+  static constexpr const char* battery = u8"\uE078";
+  static constexpr const char* battery_charging = u8"\uE083";
+  static constexpr const char* battery_outline = u8"\uE08D";
+  static constexpr const char* bell_ring = u8"\uE09D";
+  static constexpr const char* blinds = u8"\uE0AB";
+  static constexpr const char* blinds_open = u8"\uF010";
+  static constexpr const char* brightness_5 = u8"\uE0DD";
+  static constexpr const char* brightness_7 = u8"\uE0DF";
+  static constexpr const char* calendar = u8"\uE0EC";
+  static constexpr const char* calendar_clock = u8"\uE0EF";
+  static constexpr const char* calendar_sync = u8"\uEE8D";
+  static constexpr const char* cash = u8"\uE113";
+  static constexpr const char* chart_bell_curve = u8"\uEC4F";
+  static constexpr const char* check_circle = u8"\uE5DF";
+  static constexpr const char* check_network_outline = u8"\uEC53";
+  static constexpr const char* checkbox_blank_circle = u8"\uE12E";
+  static constexpr const char* checkbox_marked_circle = u8"\uE132";
+  static constexpr const char* circle_slice_8 = u8"\uEAA4";
+  static constexpr const char* close_network_outline = u8"\uEC5E";
+  static constexpr const char* crop_portrait = u8"\uE1A0";
+  static constexpr const char* cursor_text = u8"\uE5E6";
+  static constexpr const char* curtains = u8"\uF845";
+  static constexpr const char* curtains_closed = u8"\uF846";
+  static constexpr const char* door_closed = u8"\uE81A";
+  static constexpr const char* door_open = u8"\uE81B";
+  static constexpr const char* fan = u8"\uE20F";
+  static constexpr const char* fire = u8"\uE237";
+  static constexpr const char* flash = u8"\uE240";
+  static constexpr const char* format_color_text = u8"\uE69D";
+  static constexpr const char* garage = u8"\uE6D8";
+  static constexpr const char* garage_open = u8"\uE6D9";
+  static constexpr const char* gas_cylinder = u8"\uE646";
+  static constexpr const char* gate = u8"\uE298";
+  static constexpr const char* gate_open = u8"\uF169";
+  static constexpr const char* gauge = u8"\uE299";
+  static constexpr const char* gesture_tap_button = u8"\uF2A7";
+  static constexpr const char* help_circle_outline = u8"\uE624";
+  static constexpr const char* home = u8"\uE2DB";
+  static constexpr const char* home_outline = u8"\uE6A0";
+  static constexpr const char* light_switch = u8"\uE97D";
+  static constexpr const char* lightbulb = u8"\uE334";
+  static constexpr const char* link_box_outline = u8"\uED1A";
+  static constexpr const char* lock = u8"\uE33D";
+  static constexpr const char* lock_open = u8"\uE33E";
+  static constexpr const char* motion_sensor = u8"\uED90";
+  static constexpr const char* motion_sensor_off = u8"\uF434";
+  static constexpr const char* movie = u8"\uE380";
+  static constexpr const char* music = u8"\uE759";
+  static constexpr const char* music_note = u8"\uE386";
+  static constexpr const char* music_note_off = u8"\uE389";
+  static constexpr const char* open_in_app = u8"\uE3CA";
+  static constexpr const char* package = u8"\uE3D2";
+  static constexpr const char* package_up = u8"\uE3D4";
+  static constexpr const char* palette = u8"\uE3D7";
   static constexpr const char* pause = u8"\uE3E3";
   static constexpr const char* play = u8"\uE409";
+  static constexpr const char* playlist_music = u8"\uECB7";
+  static constexpr const char* playlist_play = u8"\uE410";
+  static constexpr const char* playlist_star = u8"\uEDF1";
+  static constexpr const char* power = u8"\uE424";
+  static constexpr const char* power_plug = u8"\uE6A4";
+  static constexpr const char* power_plug_off = u8"\uE6A5";
   static constexpr const char* progress_alert = u8"\uECBB";
+  static constexpr const char* radiobox_blank = u8"\uE43C";
+  static constexpr const char* ray_vertex = u8"\uE444";
+  static constexpr const char* robot = u8"\uE6A8";
+  static constexpr const char* robot_vacuum = u8"\uE70C";
+  static constexpr const char* script_text = u8"\uEBC1";
+  static constexpr const char* shield = u8"\uE497";
+  static constexpr const char* shield_airplane = u8"\uE6BA";
+  static constexpr const char* shield_home = u8"\uE689";
+  static constexpr const char* shield_lock = u8"\uE99C";
+  static constexpr const char* shield_moon = u8"\uF827";
   static constexpr const char* shield_off = u8"\uE99D";
   static constexpr const char* shuffle = u8"\uE49C";
   static constexpr const char* shuffle_disable = u8"\uE49D";
+  static constexpr const char* signal = u8"\uE4A1";
+  static constexpr const char* smog = u8"\uEA70";
+  static constexpr const char* smoke_detector = u8"\uE391";
+  static constexpr const char* smoke_detector_alert = u8"\uF92D";
+  static constexpr const char* smoke_detector_variant = u8"\uF80A";
+  static constexpr const char* smoke_detector_variant_alert = u8"\uF92F";
+  static constexpr const char* snowflake = u8"\uE716";
+  static constexpr const char* speaker_off = u8"\uE4C3";
+  static constexpr const char* square = u8"\uE763";
+  static constexpr const char* square_outline = u8"\uE762";
+  static constexpr const char* stop = u8"\uE4DA";
+  static constexpr const char* temperature_celsius = u8"\uE503";
+  static constexpr const char* temperature_fahrenheit = u8"\uE504";
+  static constexpr const char* thermometer = u8"\uE50E";
+  static constexpr const char* timer = u8"\uF3AA";
+  static constexpr const char* timer_outline = u8"\uE51A";
+  static constexpr const char* vibrate = u8"\uE565";
+  static constexpr const char* video = u8"\uE566";
+  static constexpr const char* water = u8"\uE58B";
+  static constexpr const char* water_off = u8"\uE58C";
+  static constexpr const char* water_percent = u8"\uE58D";
+  static constexpr const char* weather_cloudy = u8"\uE58F";
+  static constexpr const char* weather_fog = u8"\uE590";
+  static constexpr const char* weather_hail = u8"\uE591";
+  static constexpr const char* weather_lightning = u8"\uE592";
+  static constexpr const char* weather_lightning_rainy = u8"\uE67D";
+  static constexpr const char* weather_night = u8"\uE593";
+  static constexpr const char* weather_partly_cloudy = u8"\uE594";
+  static constexpr const char* weather_partly_snowy_rainy = u8"\uEF34";
+  static constexpr const char* weather_pouring = u8"\uE595";
+  static constexpr const char* weather_rainy = u8"\uE596";
+  static constexpr const char* weather_snowy = u8"\uE597";
+  static constexpr const char* weather_sunny = u8"\uE598";
+  static constexpr const char* weather_windy = u8"\uE59C";
+  static constexpr const char* weather_windy_variant = u8"\uE59D";
+  static constexpr const char* window_closed = u8"\uE5AD";
+  static constexpr const char* window_open = u8"\uE5B0";
+  static constexpr const char* window_shutter = u8"\uF11B";
+  static constexpr const char* window_shutter_open = u8"\uF11D";
 };
 
 struct Icon {
@@ -731,189 +851,162 @@ inline const Icon *get_icon_by_name(
 
 // simple_type_mapping
 const char_map ENTITY_ICON_MAP {
-  {entity_type::button, u8"\uF2A7"}, // gesture-tap-button
-  {entity_type::navigate, u8"\uF2A7"}, // gesture-tap-button
-  {entity_type::input_button, u8"\uF2A7"}, // gesture-tap-button
-  {entity_type::input_select, u8"\uF2A7"}, // gesture-tap-button
-  {entity_type::scene, u8"\uE3D7"}, // palette
-  {entity_type::script, u8"\uEBC1"}, // script-text
-  {entity_type::switch_, u8"\uE97D"}, // light-switch
-  {entity_type::automation, u8"\uE6A8"}, // robot
-  {entity_type::number, u8"\uE444"}, // ray-vertex
-  {entity_type::input_number, u8"\uE444"}, // ray-vertex
-  {entity_type::light, u8"\uE334"}, // lightbulb
-  {entity_type::fan, u8"\uE20F"}, // fan
-  {entity_type::person, u8"\uE003"}, // account
-  {entity_type::vacuum, u8"\uE70C"}, // robot-vacuum
-  {entity_type::timer, u8"\uE51A"}, // timer-outline
+  {entity_type::button, icon_t::gesture_tap_button},
+  {entity_type::navigate, icon_t::gesture_tap_button},
+  {entity_type::input_button, icon_t::gesture_tap_button},
+  {entity_type::input_select, icon_t::gesture_tap_button},
+  {entity_type::scene, icon_t::palette},
+  {entity_type::script, icon_t::script_text},
+  {entity_type::switch_, icon_t::light_switch},
+  {entity_type::automation, icon_t::robot},
+  {entity_type::number, icon_t::ray_vertex},
+  {entity_type::input_number, icon_t::ray_vertex},
+  {entity_type::light, icon_t::lightbulb},
+  {entity_type::fan, icon_t::fan},
+  {entity_type::person, icon_t::account},
+  {entity_type::vacuum, icon_t::robot_vacuum},
+  {entity_type::timer, icon_t::timer_outline},
 
-  {entity_type::nav_up, u8"\uE736"}, // arrow-up-bold
-  {entity_type::nav_prev, u8"\uE730"}, // arrow-left-bold
-  {entity_type::nav_next, u8"\uE733"}, //arrow-right-bold
-  {entity_type::itext, u8"\uE69D"}, // format-color-text
-  {entity_type::input_text, u8"\uE5E6"}, // cursor-text
+  {entity_type::nav_up, icon_t::arrow_up_bold},
+  {entity_type::nav_prev, icon_t::arrow_left_bold},
+  {entity_type::nav_next, icon_t::arrow_right_bold},
+  {entity_type::itext, icon_t::format_color_text},
+  {entity_type::input_text, icon_t::cursor_text},
 };
 
 // sensor_mapping_on
 const char_map SENSOR_ON_ICON_MAP {
-  {sensor_type::battery, u8"\uE08D"}, // battery-outline
-  {sensor_type::battery_charging, u8"\uE083"}, // battery-charging
-  {sensor_type::carbon_monoxide, u8"\uF92D"}, // smoke-detector-alert
-  {sensor_type::cold, u8"\uE716"}, // snowflake
-  {sensor_type::connectivity, u8"\uEC53"}, // check-network-outline
-  {sensor_type::door, u8"\uE81B"}, // door-open
-  {sensor_type::garage_door, u8"\uE6D9"}, // garage-open
-  {sensor_type::power, u8"\uE6A4"}, // power-plug
-  {sensor_type::gas, u8"\uE027"}, // alert-circle
-  {sensor_type::problem, u8"\uE027"}, // alert-circle
-  {sensor_type::safety, u8"\uE027"}, // alert-circle
-  {sensor_type::tamper, u8"\uE027"}, // alert-circle
-  {sensor_type::smoke, u8"\uF92F"}, // smoke-detector-variant-alert
-  {sensor_type::heat, u8"\uE237"}, // fire
-  {sensor_type::light, u8"\uE0DF"}, // brightness-7
-  {sensor_type::lock, u8"\uE33E"}, // lock-open
-  {sensor_type::moisture, u8"\uE58B"}, // water
-  {sensor_type::motion, u8"\uED90"}, // motion-sensor
-  {sensor_type::occupancy, u8"\uE2DB"}, // home
-  {sensor_type::opening, u8"\uE762"}, // square-outline
-  {sensor_type::plug, u8"\uE6A4"}, // power-plug
-  {sensor_type::presence, u8"\uE2DB"}, // home
-  {sensor_type::running, u8"\uE409"}, // play
-  {sensor_type::sound, u8"\uE386"}, // music-note
-  {sensor_type::update, u8"\uE3D4"}, // package-up
-  {sensor_type::vibration, u8"\uE565"}, // vibrate
-  {sensor_type::window, u8"\uE5B0"} // window-open
+  {sensor_type::battery, icon_t::battery_outline},
+  {sensor_type::battery_charging, icon_t::battery_charging},
+  {sensor_type::carbon_monoxide, icon_t::smoke_detector_alert},
+  {sensor_type::cold, icon_t::snowflake},
+  {sensor_type::connectivity, icon_t::check_network_outline},
+  {sensor_type::door, icon_t::door_open},
+  {sensor_type::garage_door, icon_t::garage_open},
+  {sensor_type::power, icon_t::power_plug},
+  {sensor_type::gas, icon_t::alert_circle},
+  {sensor_type::problem, icon_t::alert_circle},
+  {sensor_type::safety, icon_t::alert_circle},
+  {sensor_type::tamper, icon_t::alert_circle},
+  {sensor_type::smoke, icon_t::smoke_detector_variant_alert},
+  {sensor_type::heat, icon_t::fire},
+  {sensor_type::light, icon_t::brightness_7},
+  {sensor_type::lock, icon_t::lock_open},
+  {sensor_type::moisture, icon_t::water},
+  {sensor_type::motion, icon_t::motion_sensor},
+  {sensor_type::occupancy, icon_t::home},
+  {sensor_type::opening, icon_t::square_outline},
+  {sensor_type::plug, icon_t::power_plug},
+  {sensor_type::presence, icon_t::home},
+  {sensor_type::running, icon_t::play},
+  {sensor_type::sound, icon_t::music_note},
+  {sensor_type::update, icon_t::package_up},
+  {sensor_type::vibration, icon_t::vibrate},
+  {sensor_type::window, icon_t::window_open}
 };
 
 // sensor_mapping_off
 const char_map SENSOR_OFF_ICON_MAP {
-  {sensor_type::battery, u8"\uE078"}, // battery
-  {sensor_type::battery_charging, u8"\uE078"}, // battery
-  {sensor_type::carbon_monoxide, u8"\uE391"}, // smoke-detector
-  {sensor_type::cold, u8"\uE50E"}, // thermometer
-  {sensor_type::connectivity, u8"\uEC5E"}, // close-network-outline
-  {sensor_type::door, u8"\uE81A"}, // door-closed
-  {sensor_type::garage_door, u8"\uE6D8"}, // garage
-  {sensor_type::power, u8"\uE6A5"}, // power-plug-off
-  {sensor_type::gas, u8"\uE132"}, // checkbox-marked-circle
-  {sensor_type::problem, u8"\uE132"}, // checkbox-marked-circle
-  {sensor_type::safety, u8"\uE132"}, // checkbox-marked-circle
-  {sensor_type::tamper, u8"\uE5DF"}, // check-circle
-  {sensor_type::smoke, u8"\uF80A"}, // smoke-detector-variant
-  {sensor_type::heat, u8"\uE50E"}, // thermometer
-  {sensor_type::light, u8"\uE0DD"}, // brightness-5
-  {sensor_type::lock, u8"\uE33D"}, // lock
-  {sensor_type::moisture, u8"\uE58C"}, // water-off
-  {sensor_type::motion, u8"\uF434"}, // motion-sensor-off
-  {sensor_type::occupancy, u8"\uE6A0"}, // home-outline
-  {sensor_type::opening, u8"\uE763"}, // square
-  {sensor_type::plug, u8"\uE6A5"}, // power-plug-off
-  {sensor_type::presence, u8"\uE6A0"}, // home-outline
-  {sensor_type::running, u8"\uE4DA"}, // stop
-  {sensor_type::sound, u8"\uE389"}, // music-note-off
-  {sensor_type::update, u8"\uE3D2"}, // package
-  {sensor_type::vibration, u8"\uE1A0"}, // crop-portrait
-  {sensor_type::window, u8"\uE5AD"}, // window-closed
+  {sensor_type::battery, icon_t::battery},
+  {sensor_type::battery_charging, icon_t::battery},
+  {sensor_type::carbon_monoxide, icon_t::smoke_detector},
+  {sensor_type::cold, icon_t::thermometer},
+  {sensor_type::connectivity, icon_t::close_network_outline},
+  {sensor_type::door, icon_t::door_closed},
+  {sensor_type::garage_door, icon_t::garage},
+  {sensor_type::power, icon_t::power_plug_off},
+  {sensor_type::gas, icon_t::checkbox_marked_circle},
+  {sensor_type::problem, icon_t::checkbox_marked_circle},
+  {sensor_type::safety, icon_t::checkbox_marked_circle},
+  {sensor_type::tamper, icon_t::check_circle},
+  {sensor_type::smoke, icon_t::smoke_detector_variant},
+  {sensor_type::heat, icon_t::thermometer},
+  {sensor_type::light, icon_t::brightness_5},
+  {sensor_type::lock, icon_t::lock},
+  {sensor_type::moisture, icon_t::water_off},
+  {sensor_type::motion, icon_t::motion_sensor_off},
+  {sensor_type::occupancy, icon_t::home_outline},
+  {sensor_type::opening, icon_t::square},
+  {sensor_type::plug, icon_t::power_plug_off},
+  {sensor_type::presence, icon_t::home_outline},
+  {sensor_type::running, icon_t::stop},
+  {sensor_type::sound, icon_t::music_note_off},
+  {sensor_type::update, icon_t::package},
+  {sensor_type::vibration, icon_t::crop_portrait},
+  {sensor_type::window, icon_t::window_closed},
 };
 
 // sensor_mapping
 const char_map SENSOR_ICON_MAP {
-  {sensor_type::apparent_power, u8"\uE240"}, // flash
-  {sensor_type::aqi, u8"\uEA70"}, // smog
-  {sensor_type::battery, u8"\uE078"}, // battery
-  {sensor_type::carbon_dioxide, u8"\uEA70"}, // smog
-  {sensor_type::carbon_monoxide, u8"\uEA70"}, // smog
-  {sensor_type::current, u8"\uE240"}, // flash
-  {sensor_type::date, u8"\uE0EC"}, // calendar
-  {sensor_type::duration, u8"\uF3AA"}, // timer
-  {sensor_type::energy, u8"\uE240"}, // flash
-  {sensor_type::frequency, u8"\uEC4F"}, // chart-bell-curve
-  {sensor_type::gas, u8"\uE646"}, // gas-cylinder
-  {sensor_type::humidity, u8"\uF098"}, // air-humidifier
-  {sensor_type::illuminance, u8"\uE334"}, // lightbulb
-  {sensor_type::monetary, u8"\uE113"}, // cash
-  {sensor_type::nitrogen_dioxide, u8"\uEA70"}, // smog
-  {sensor_type::nitrogen_monoxide, u8"\uEA70"}, // smog
-  {sensor_type::nitrous_oxide, u8"\uEA70"}, // smog
-  {sensor_type::ozone, u8"\uEA70"}, // smog
-  {sensor_type::pm1, u8"\uEA70"}, // smog
-  {sensor_type::pm10, u8"\uEA70"}, // smog
-  {sensor_type::pm25, u8"\uEA70"}, // smog
-  {sensor_type::power_factor, u8"\uE240"}, // flash
-  {sensor_type::power, u8"\uE240"}, // flash
-  {sensor_type::pressure, u8"\uE299"}, // gauge
-  {sensor_type::reactive_power, u8"\uE240"}, // flash
-  {sensor_type::signal_strength, u8"\uE4A1"}, // signal
-  {sensor_type::sulphur_dioxide, u8"\uEA70"}, // smog
-  {sensor_type::temperature, u8"\uE50E"}, // thermometer
-  {sensor_type::timestamp, u8"\uE0EF"}, // calendar-clock
-  {sensor_type::volatile_organic_compounds, u8"\uEA70"}, // smog
-  {sensor_type::voltage, u8"\uE240"} // flash
+  {sensor_type::apparent_power, icon_t::flash},
+  {sensor_type::aqi, icon_t::smog},
+  {sensor_type::battery, icon_t::battery},
+  {sensor_type::carbon_dioxide, icon_t::smog},
+  {sensor_type::carbon_monoxide, icon_t::smog},
+  {sensor_type::current, icon_t::flash},
+  {sensor_type::date, icon_t::calendar},
+  {sensor_type::duration, icon_t::timer},
+  {sensor_type::energy, icon_t::flash},
+  {sensor_type::frequency, icon_t::chart_bell_curve},
+  {sensor_type::gas, icon_t::gas_cylinder},
+  {sensor_type::humidity, icon_t::air_humidifier},
+  {sensor_type::illuminance, icon_t::lightbulb},
+  {sensor_type::monetary, icon_t::cash},
+  {sensor_type::nitrogen_dioxide, icon_t::smog},
+  {sensor_type::nitrogen_monoxide, icon_t::smog},
+  {sensor_type::nitrous_oxide, icon_t::smog},
+  {sensor_type::ozone, icon_t::smog},
+  {sensor_type::pm1, icon_t::smog},
+  {sensor_type::pm10, icon_t::smog},
+  {sensor_type::pm25, icon_t::smog},
+  {sensor_type::power_factor, icon_t::flash},
+  {sensor_type::power, icon_t::flash},
+  {sensor_type::pressure, icon_t::gauge},
+  {sensor_type::reactive_power, icon_t::flash},
+  {sensor_type::signal_strength, icon_t::signal},
+  {sensor_type::sulphur_dioxide, icon_t::smog},
+  {sensor_type::temperature, icon_t::thermometer},
+  {sensor_type::timestamp, icon_t::calendar_clock},
+  {sensor_type::volatile_organic_compounds, icon_t::smog},
+  {sensor_type::voltage, icon_t::flash}
 };
 
 // climate_mapping
 const char_map CLIMATE_ICON_MAP {
-  {ha_attr_hvac_mode::auto_, u8"\uEE8D"}, // calendar-sync
-  {ha_attr_hvac_mode::heat_cool, u8"\uEE8D"}, // calendar-sync
-  {ha_attr_hvac_mode::heat, u8"\uE237"}, // fire
-  {ha_attr_hvac_mode::off, u8"\uE424"}, // power
-  {ha_attr_hvac_mode::cool, u8"\uE716"}, // snowflake
-  {ha_attr_hvac_mode::dry, u8"\uE58D"}, // water-percent
-  {ha_attr_hvac_mode::fan_only, u8"\uE20F"}, // fan
+  {ha_attr_hvac_mode::auto_, icon_t::calendar_sync},
+  {ha_attr_hvac_mode::heat_cool, icon_t::calendar_sync},
+  {ha_attr_hvac_mode::heat, icon_t::fire},
+  {ha_attr_hvac_mode::off, icon_t::power},
+  {ha_attr_hvac_mode::cool, icon_t::snowflake},
+  {ha_attr_hvac_mode::dry, icon_t::water_percent},
+  {ha_attr_hvac_mode::fan_only, icon_t::fan},
 };
 
 const char_map MEDIA_TYPE_MAP {
-  {generic_type::off, u8"\uE4C3"}, // speaker-off
-  {ha_attr_media_content_type::music, u8"\uE759"}, // music
-  {ha_attr_media_content_type::tvshow, u8"\uE380"}, // movie
-  {ha_attr_media_content_type::video, u8"\uE566"}, // video
-  {ha_attr_media_content_type::episode, u8"\uE410"}, // playlist-play (originally: icon_t::alert_circle_outline)
-  {ha_attr_media_content_type::channel, u8"\uEDF1"}, //  playlist-star (OR radio-tower E43A / broadcast F71F?) (originally: icon_t::alert_circle_outline)
-  {ha_attr_media_content_type::playlist, u8"\uECB7"}, // playlist-music (originally: icon_t::alert_circle_outline)
-  {ha_attr_media_content_type::app, u8"\uE3CA"}, // newly added! open-in-app
-  {ha_attr_media_content_type::url, u8"\uED1A"}, // newly added! link-box-outline (OR cast E117?)
+  {generic_type::off, icon_t::speaker_off},
+  {ha_attr_media_content_type::music, icon_t::music},
+  {ha_attr_media_content_type::tvshow, icon_t::movie},
+  {ha_attr_media_content_type::video, icon_t::video},
+  {ha_attr_media_content_type::episode, icon_t::playlist_play}, // (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::channel, icon_t:: playlist_star}, // (OR radio-tower E43A / broadcast F71F?) (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::playlist, icon_t::playlist_music}, // (originally: icon_t::alert_circle_outline)
+  {ha_attr_media_content_type::app, icon_t::open_in_app}, // newly added!
+  {ha_attr_media_content_type::url, icon_t::link_box_outline}, // newly added! (OR cast E117?)
 };
 
 // cover_mapping
 const char_list_map COVER_MAP {
   // "device_class": ("icon-open", "icon-closed", "icon-cover-open", "icon-cover-close")
-  {entity_cover_type::awning, {u8"\uE5B0", u8"\uE5AD", u8"\uE05C", u8"\uE044"}}, // window-open, window-closed, arrow-up, arrow-down
-  {entity_cover_type::blind, {u8"\uF010", u8"\uE0AB", u8"\uE05C", u8"\uE044"}}, // blinds-open, blinds, arrow-up
-  {entity_cover_type::curtain, {u8"\uF845", u8"\uF846", u8"\uE84D", u8"\uE84B"}}, // curtains, curtains-closed, arrow-expand-horizontal, arrow-collapse-horizontal
-  {entity_cover_type::damper, {u8"\uE12E", u8"\uEAA4", u8"\uE05C", u8"\uE044"}}, // checkbox-blank-circle, circle-slice-8, arrow-up
-  {entity_cover_type::door, {u8"\uE81B", u8"\uE81A", u8"\uE84D", u8"\uE84B"}}, // door-open, door-closed, arrow-expand-horizontal, arrow-collapse-horizontal
-  {entity_cover_type::garage, {u8"\uE6D9", u8"\uE6D8", u8"\uE05C", u8"\uE044"}}, // garage-open, garage, arrow-up
-  {entity_cover_type::gate, {u8"\uF169", u8"\uE298", u8"\uE84D", u8"\uE84B"}}, // gate-open, gate, arrow-expand-horizontal, arrow-collapse-horizontal
-  {entity_cover_type::shade, {u8"\uF010", u8"\uE0AB", u8"\uE05C", u8"\uE044"}}, // blinds-open, blinds, arrow-up
-  {entity_cover_type::shutter, {u8"\uF11D", u8"\uF11B", u8"\uE05C", u8"\uE044"}}, // window-shutter-open, window-shutter, arrow-up
-  {entity_cover_type::window, {u8"\uE5B0", u8"\uE5AD", u8"\uE05C", u8"\uE044"}}, // window-open, window-closed, arrow-up
-};
-
-// see: 
-//  - https://www.home-assistant.io/integrations/weather/
-//  - 'get_entity_color' function in: https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/pages.py
-//  - icon lookup:
-//      - codepoint values: https://docs.nspanel.pky.eu/icon-cheatsheet.html
-//      - icon mapping: https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/icon_mapping.py
-//      - mdi icons: https://pictogrammers.com/library/mdi/
-//  - color lookup:
-//      - https://rgbcolorpicker.com/565
-const char_icon_map WEATHER_ICON_MAP {
-  {weather_type::sunny, {u8"\uE598", 65504u}}, //mdi:0599,#ffff00
-  {weather_type::windy, {u8"\uE59C", 38066u}}, //mdi:059D,#949694
-  {weather_type::windy_variant, {u8"\uE59D", 64495u}}, //mdi:059E,#ff7d7b
-  {weather_type::cloudy, {u8"\uE58F", 31728u}}, //mdi:0590,#7b7d84
-  {weather_type::partlycloudy, {u8"\uE594", 38066u}}, //mdi:0595,#949694
-  {weather_type::clear_night, {u8"\uE593", 38060u}}, //mdi:0594,#949663 // weather-night
-  {weather_type::exceptional, {icon_t::alert_circle_outline, 63878u}}, //mdi:05D6,#ff3131
-  {weather_type::rainy, {u8"\uE596", 25375u}}, //mdi:0597,#6361ff
-  {weather_type::pouring, {u8"\uE595", 12703u}}, //mdi:0596,#3131ff
-  {weather_type::snowy, {u8"\uE597", 65535u}}, //mdi:E598,#ffffff
-  {weather_type::snowy_rainy, {u8"\uEF34", 38079u}}, //mdi:067F,#9496ff
-  {weather_type::fog, {u8"\uE590", 38066u}}, //mdi:0591,#949694
-  {weather_type::hail, {u8"\uE591", 65535u}}, //mdi:0592,#ffffff
-  {weather_type::lightning, {u8"\uE592", 65120u}}, //mdi:0593,#ffce00
-  {weather_type::lightning_rainy, {u8"\uE67D", 50400u}} //mdi:067E,#c59e00
+  {entity_cover_type::awning, {icon_t::window_open, icon_t::window_closed, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::blind, {icon_t::blinds_open, icon_t::blinds, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::curtain, {icon_t::curtains, icon_t::curtains_closed, icon_t::arrow_expand_horizontal, icon_t::arrow_collapse_horizontal}},
+  {entity_cover_type::damper, {icon_t::checkbox_blank_circle, icon_t::circle_slice_8, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::door, {icon_t::door_open, icon_t::door_closed, icon_t::arrow_expand_horizontal, icon_t::arrow_collapse_horizontal}},
+  {entity_cover_type::garage, {icon_t::garage_open, icon_t::garage, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::gate, {icon_t::gate_open, icon_t::gate, icon_t::arrow_expand_horizontal, icon_t::arrow_collapse_horizontal}},
+  {entity_cover_type::shade, {icon_t::blinds_open, icon_t::blinds, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::shutter, {icon_t::window_shutter_open, icon_t::window_shutter, icon_t::arrow_up, icon_t::arrow_down}},
+  {entity_cover_type::window, {icon_t::window_open, icon_t::window_closed, icon_t::arrow_up, icon_t::arrow_down}},
 };
 
 const char_map ENTITY_RENDER_TYPE_MAP {

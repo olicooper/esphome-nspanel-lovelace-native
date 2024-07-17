@@ -738,9 +738,9 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     }
   }
 
-  //Position
+  // Position
   if (supported_features & 0b00001111) {
-    text_position = "Position";
+    text_position = "Position"; // todo: translate
     position_status = true;
   }
   // OPEN
@@ -764,26 +764,26 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   // STOP
   if (supported_features & 0b00001000) {
     icon_stop_status = !entity->is_state(generic_type::unknown);
-    icon_stop = u8"\uE4DA"; // stop
+    icon_stop = icon_t::stop;
   }
 
   // Tilt supported
   if (supported_features & 0b11110000) {
-    text_tilt = "Tilt position";
+    text_tilt = "Tilt position"; // todo: translate
   }
   // SUPPORT_OPEN_TILT
   if (supported_features & 0b00010000) {
-    icon_tilt_left = u8"\uE05B";
+    icon_tilt_left = icon_t::arrow_top_right;
     icon_tilt_left_status = true;
   }
   // SUPPORT_CLOSE_TILT
   if (supported_features & 0b00100000) {
-    icon_tilt_right = u8"\uE041";
+    icon_tilt_right = icon_t::arrow_bottom_left;
     icon_tilt_right_status = true;
   }
   // SUPPORT_STOP_TILT
   if (supported_features & 0b01000000) {
-    icon_tilt_stop = u8"\uE4DA";
+    icon_tilt_stop = icon_t::stop;
     icon_tilt_stop_status = true;
   }
   // SUPPORT_SET_TILT_POSITION

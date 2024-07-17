@@ -181,7 +181,7 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
   // STOP
   if (supported_features & 0b1000) {
     icon_stop_status = !me_->entity_->is_state(generic_type::unknown);
-    icon_stop = u8"\uE4DA"; // stop
+    icon_stop = icon_t::stop;
   }
   me_->value_
     .assign(icon_up).append(1, '|')

@@ -41,7 +41,7 @@ std::string &PageItem::render_(std::string &buffer) {
 
 PageItem_Icon::PageItem_Icon(IHaveRenderInvalid *const parent) :
     ISetRenderInvalid(parent), 
-    icon_default_value_(u8"\uE624"), icon_default_color_(17299u),
+    icon_default_value_(icon_t::help_circle_outline), icon_default_color_(17299u),
     icon_value_(icon_default_value_), icon_color_(icon_default_color_),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
@@ -55,7 +55,7 @@ PageItem_Icon::PageItem_Icon(
 PageItem_Icon::PageItem_Icon(
     IHaveRenderInvalid *const parent, const uint16_t icon_default_color) :
     ISetRenderInvalid(parent),
-    icon_default_value_(u8"\uE624"), icon_default_color_(icon_default_color),
+    icon_default_value_(icon_t::help_circle_outline), icon_default_color_(icon_default_color),
     icon_value_(icon_default_value_), icon_color_(icon_default_color),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
@@ -332,7 +332,7 @@ void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
     if (!me->icon_value_overridden_) {
       icon = get_icon_by_name(SENSOR_ON_ICON_MAP,
         me->entity_->get_attribute(ha_attr_type::device_class));
-      me->icon_value_ = icon == nullptr ? u8"\uE132" : icon; // default: checkbox-marked-circle
+      me->icon_value_ = icon == nullptr ? icon_t::checkbox_marked_circle : icon;
     }
   } else {
     if (!me->icon_color_overridden_) {
@@ -344,7 +344,7 @@ void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
     if (!me->icon_value_overridden_) {
       icon = get_icon_by_name(SENSOR_OFF_ICON_MAP,
         me->entity_->get_attribute(ha_attr_type::device_class));
-      me->icon_value_ = icon == nullptr ? u8"\uE43C" : icon; // default: radiobox-blank
+      me->icon_value_ = icon == nullptr ? icon_t::radiobox_blank : icon;
     }
   }
 }
@@ -376,7 +376,7 @@ void StatefulPageItem::state_climate_fn(StatefulPageItem *me) {
 
   if (!me->icon_value_overridden_) {
     auto icon = get_icon_by_name(CLIMATE_ICON_MAP, state);
-    me->icon_value_ = icon == nullptr ? u8"\uE132" : icon; // default: checkbox-marked-circle
+    me->icon_value_ = icon == nullptr ? icon_t::checkbox_marked_circle : icon;
   }
 
   if (!me->icon_color_overridden_) {

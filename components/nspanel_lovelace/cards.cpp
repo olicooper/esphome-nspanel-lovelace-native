@@ -149,31 +149,31 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
     this->status_icon_->reset_icon_value(); //shield-off
   } else if (state == alarm_entity_state::triggered) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uE09D"); //bell-ring
+    this->status_icon_->set_icon_value(icon_t::bell_ring);
     this->status_icon_flashing_ = true;
   } else if (state == alarm_entity_state::armed_home) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uE689"); //shield-home
+    this->status_icon_->set_icon_value(icon_t::shield_home);
   } else if (state == alarm_entity_state::armed_away) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uE99C"); //shield-lock
+    this->status_icon_->set_icon_value(icon_t::shield_lock);
   } else if (state == alarm_entity_state::armed_night) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uF827"); //shield-moon (was E593:weather-night)
+    this->status_icon_->set_icon_value(icon_t::shield_moon); // was E593:weather-night
   } else if (state == alarm_entity_state::armed_vacation) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uE6BA"); //shield-airplane
+    this->status_icon_->set_icon_value(icon_t::shield_airplane);
   } else if (state == alarm_entity_state::armed_custom_bypass) {
     this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(u8"\uE497"); //shield
+    this->status_icon_->set_icon_value(icon_t::shield);
   } else if (state == alarm_entity_state::arming || 
       state == alarm_entity_state::pending) {
     this->status_icon_->set_icon_color(0xED80); //orange
-    this->status_icon_->set_icon_value(u8"\uE497"); //shield
+    this->status_icon_->set_icon_value(icon_t::shield);
     this->status_icon_flashing_ = true;
   } else {
     this->status_icon_->set_icon_color(38066u); //grey
-    this->status_icon_->set_icon_value(u8"\uE624"); //help-circle-outline
+    this->status_icon_->set_icon_value(icon_t::help_circle_outline);
   }
 }
 
@@ -264,9 +264,9 @@ void ThermoCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
 void ThermoCard::configure_temperature_unit() {
   if (Configuration::get_temperature_unit() == temperature_unit_t::celcius) {
-    this->temperature_unit_icon_ = u8"\uE503"; // temperature-celsius
+    this->temperature_unit_icon_ = icon_t::temperature_celsius;
   } else {
-    this->temperature_unit_icon_ = u8"\uE504"; // temperature-fahrenheit
+    this->temperature_unit_icon_ = icon_t::temperature_fahrenheit;
   }
 }
 

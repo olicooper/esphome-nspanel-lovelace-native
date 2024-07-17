@@ -199,10 +199,13 @@ void EntitiesCardEntityItem::state_climate_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
   auto state = me_->get_state();
   auto temp_unit = Configuration::get_temperature_unit_str();
-  me_->value_.assign(get_translation(state.c_str()))
-    .append(1, ' ')
-    .append(me_->get_attribute(ha_attr_type::temperature))
-    .append(temp_unit).append("\r\n")
+  auto temp = me_->get_attribute(ha_attr_type::temperature);
+
+  me_->value_.assign(get_translation(state.c_str()));
+  if (!temp.empty()) {
+    me_->value_.append(1, ' ').append(temp).append(temp_unit);
+  }
+  me_->value_.append("\r\n")
     .append(get_translation("currently")).append(": ")
     .append(me_->get_attribute(ha_attr_type::current_temperature))
     .append(temp_unit);

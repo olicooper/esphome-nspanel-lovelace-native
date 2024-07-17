@@ -59,7 +59,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true), status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
+    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+  this->info_icon_ = std::unique_ptr<AlarmIconItem>(
+    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
       button_type::disarm, "Disarm"));
@@ -72,7 +74,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true),status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
+    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+  this->info_icon_ = std::unique_ptr<AlarmIconItem>(
+    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
       button_type::disarm, "Disarm"));
@@ -85,7 +89,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true),status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), u8"\uE99D", 3302)); //shield-off, green
+    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+  this->info_icon_ = std::unique_ptr<AlarmIconItem>(
+    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"), 
       button_type::disarm, "Disarm"));
@@ -210,11 +216,11 @@ std::string &AlarmCard::render(std::string &buffer) {
     .append(this->status_icon_flashing_ ? 
       generic_type::enable : generic_type::disable);
   
-  // todo: 
-  //   if "open_sensors" in entity.attributes and entity.attributes.open_sensors is not None:
-  // if (this->info_icon_ && /* ?? */) {
-  //   buffer.append(1, SEPARATOR).append(this->info_icon_->render());
-  // }
+  // todo: not finished/tested
+  auto &open_sensors = this->alarm_entity_->get_attribute(ha_attr_type::open_sensors);
+  if (!open_sensors.empty()) {
+    buffer.append(1, SEPARATOR).append(this->info_icon_->render());
+  }
 
   return buffer;
 }

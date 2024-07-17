@@ -177,6 +177,9 @@ protected:
   void render_page_(render_page_option d);
   void render_current_page_();
   void render_item_update_(Page *page);
+  void render_popup_notify_page_(const std::string &internal_id,
+    const std::string &heading, const std::string &message, uint16_t timeout = 0U,
+    const std::string &btn1_text = "", const std::string &btn2_text = "");
   void render_popup_page_(const std::string &internal_id);
   void render_popup_page_update_(const std::string &internal_id);
   void render_popup_page_update_(StatefulPageItem *entity);

@@ -176,6 +176,8 @@ struct icon_t {
   static constexpr const char* alert_circle_outline = u8"\uE5D5";
   static constexpr const char* pause = u8"\uE3E3";
   static constexpr const char* play = u8"\uE409";
+  static constexpr const char* progress_alert = u8"\uECBB";
+  static constexpr const char* shield_off = u8"\uE99D";
   static constexpr const char* shuffle = u8"\uE49C";
   static constexpr const char* shuffle_disable = u8"\uE49D";
 };
@@ -475,6 +477,12 @@ struct ha_action_type {
   static constexpr const char* shuffle_set = "shuffle_set";
   static constexpr const char* volume_set = "volume_set";
   static constexpr const char* select_source = "select_source";
+  static constexpr const char* select_next = "select_next";
+  static constexpr const char* start = "start";
+  static constexpr const char* return_to_base = "return_to_base";
+  static constexpr const char* lock = "lock";
+  static constexpr const char* unlock = "unlock";
+  static constexpr const char* select_option = "select_option";
 };
 
 enum class ha_attr_type : uint8_t {
@@ -497,6 +505,7 @@ enum class ha_attr_type : uint8_t {
   // alarm_control_panel
   code,
   code_arm_required,
+  open_sensors,
   // cover
   current_position,
   position,
@@ -536,6 +545,7 @@ enum class ha_attr_type : uint8_t {
   source_list,
   // input & input_select
   options,
+  option,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -558,6 +568,7 @@ static constexpr const char* ha_attr_names [] = {
   // alarm_control_panel
   "code",
   "code_arm_required",
+  "open_sensors",
   // cover
   "current_position",
   "position",
@@ -597,6 +608,7 @@ static constexpr const char* ha_attr_names [] = {
   "source_list",
   // input & input_select
   "options",
+  "option",
 };
 
 inline const char *to_string(ha_attr_type attr) {

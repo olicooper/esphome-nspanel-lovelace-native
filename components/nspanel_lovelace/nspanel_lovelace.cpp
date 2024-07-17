@@ -187,6 +187,9 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state_attr(
         &NSPanelLovelace::on_entity_attribute_update_,
         entity_id, to_string(ha_attr_type::code_arm_required));
+      this->subscribe_homeassistant_state_attr(
+        &NSPanelLovelace::on_entity_attribute_update_,
+        entity_id, to_string(ha_attr_type::open_sensors));
     }
     else if (entity->is_type(entity_type::timer)) {
       add_state_subscription = true;
@@ -564,6 +567,44 @@ void NSPanelLovelace::render_item_update_(Page *page) {
       this->send_buffered_command_();
     }
   }
+}
+
+// entityUpdateDetail~{internalName}~{tHeading}~{tHeadingColor}~{b1}~{tB1Color}~{b2}~[tB2Color}~{tText}~{tTextColor}~{sleepTimeout}~{font}~{alt_icon}~{altIconColor}
+// Possible 'font' options:
+//    Font 0 - Default - Size 24 (No Icons, Support for various special chars from different langs)
+//    Font 1 - Size 32 (Icons and limited chars)
+//    Font 2 - Size 32 (No Icons, Support for various special chars from different langs)
+//    Font 3 - Size 48 (Icons and limited chars)
+//    Font 4 - Size 80 (Icons and limited chars)
+//    Font 5 - Size 128 (ascii only)
+void NSPanelLovelace::render_popup_notify_page_(const std::string &internal_id,
+    const std::string &heading, const std::string &message, uint16_t timeout,
+    const std::string &btn1_text, const std::string &btn2_text) {
+
+  this->command_buffer_.assign("pageType")
+      .append(1, SEPARATOR).append("popupNotify");
+  this->send_buffered_command_();
+
+  auto text_colour = std::to_string(65535U);
+  this->command_buffer_
+    .assign("entityUpdateDetail").append(1, SEPARATOR)
+    .append(internal_id).append(1, SEPARATOR)
+    // heading
+    .append(heading).append(1, SEPARATOR)
+    .append(text_colour).append(1, SEPARATOR)
+    // 'no' button
+    .append(btn1_text).append(1, SEPARATOR)
+    .append(text_colour).append(1, SEPARATOR)
+    // 'yes' button
+    .append(btn2_text).append(1, SEPARATOR)
+    .append(text_colour).append(1, SEPARATOR)
+    // message
+    .append(message).append(1, SEPARATOR)
+    .append(text_colour).append(1, SEPARATOR)
+    // timeout
+    .append(std::to_string(timeout));
+
+  this->send_buffered_command_();
 }
 
 void NSPanelLovelace::render_popup_page_(const std::string &internal_id) {
@@ -1447,6 +1488,25 @@ void NSPanelLovelace::process_button_press_(
         entity_type == entity_type::input_button) {
       this->call_ha_service_(
         entity_type, ha_action_type::press, entity_id);
+    } else if (entity_type == entity_type::input_select) {
+      this->call_ha_service_(
+        entity_type, ha_action_type::select_next, entity_id);
+    } else if (entity_type == entity_type::vacuum) {
+      auto entity = this->get_entity_(entity_id);
+      if (entity == nullptr) return;
+      this->call_ha_service_(entity_type,
+        entity->is_state("docked") 
+          ? ha_action_type::start 
+          : ha_action_type::return_to_base,
+        entity_id);
+    } else if (entity_type == entity_type::lock) {
+      auto entity = this->get_entity_(entity_id);
+      if (entity == nullptr) return;
+      this->call_ha_service_(entity_type,
+        entity->is_state("locked") 
+          ? ha_action_type::unlock 
+          : ha_action_type::lock,
+        entity_id);
     }
   }
   // media cards
@@ -1661,12 +1721,11 @@ void NSPanelLovelace::process_button_press_(
   }
   // alarm card
   else if (
-    button_type == button_type::armHome ||
-    button_type == button_type::armAway ||
-    button_type == button_type::armNight ||
-    button_type == button_type::armVacation ||
-    button_type == button_type::disarm)
-  {
+      button_type == button_type::armHome ||
+      button_type == button_type::armAway ||
+      button_type == button_type::armNight ||
+      button_type == button_type::armVacation ||
+      button_type == button_type::disarm) {
     auto action = std::string("alarm_").append(button_type);
     if (value.empty()) {
       this->call_ha_service_(entity_type, action.c_str(), entity_id);
@@ -1678,7 +1737,46 @@ void NSPanelLovelace::process_button_press_(
           {to_string(ha_attr_type::code), value}
         }});
     }
-  } else if (esphome::str_startswith(button_type, entity_type::timer)) {
+  } else if (button_type == button_type::opnSensorNotify) {
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto &open_sensors_str = entity->get_attribute(ha_attr_type::open_sensors);
+    if (open_sensors_str.empty()) return;
+    std::string message;
+    message.reserve(open_sensors_str.size());
+    std::vector<std::string> open_sensors;
+    split_str(',', open_sensors_str, open_sensors);
+    // todo: Find a way to populate entitity 'friendly_name' without subscribing to all entities
+    for (auto &&sensor : open_sensors) {
+      message.append("- ").append(sensor).append("\r\n");
+    }
+    this->render_popup_notify_page_("", "", message);
+  }
+  // unlock card
+  else if (button_type == button_type::cardUnlockUnlock) {
+    if (!this->current_page_->is_type(page_type::cardUnlock)) return;
+    // todo
+  }
+  // input select
+  else if (button_type == button_type::modeInputSelect) {
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto options_str = entity->get_attribute(ha_attr_type::options);
+    if (options_str.empty()) return;
+    std::vector<std::string> options;
+    split_str(',', options_str, options);
+    uint8_t index = stoi(value);
+    if (options.size() <= index) return;
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::select_option,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::option), options.at(index)}
+      }});
+  }
+  // timer card
+  else if (esphome::str_startswith(button_type, entity_type::timer)) {
     std::string service(button_type);
     service[5] = '.';
     if (value.empty()) {

@@ -609,15 +609,33 @@ void NSPanelLovelace::render_popup_notify_page_(const std::string &internal_id,
 
 void NSPanelLovelace::render_popup_page_(const std::string &internal_id) {
   if (this->current_page_ == nullptr) return;
-  this->render_popup_page_update_(internal_id);
+  if (!this->render_popup_page_update_(internal_id)) return;
   this->set_display_timeout(10);
 }
 
-void NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) {
-  if (this->current_page_ == nullptr) return;
+bool NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) {
+  if (this->current_page_ == nullptr) return false;
+
+  // Sometimes a StatefulPageItem does not exist for an entity,
+  // handle this edge case. Only certain cards support this.
+  if (!str_startswith(internal_id, "uuid.")) {
+    auto entity = this->get_entity_(internal_id);
+    if (entity == nullptr) return false;
+    bool rendered = false;
+    if (this->current_page_->is_type(page_type::cardThermo)) {
+      if (entity->is_type(entity_type::climate)) {
+        this->render_climate_detail_update_(entity);
+        rendered = true;
+      }
+    }
+    if (rendered) this->send_buffered_command_();
+    return rendered;
+  }
+
   auto uuid = internal_id.substr(5);
 
   if (this->cached_page_item_ == nullptr || this->cached_page_item_->get_uuid() != uuid) {
+    if (this->current_page_->get_items().size() == 0) return false;
     // Only search for items in the current page to reduce processing time
     for (auto &item : this->current_page_->get_items()) {
       if (item->get_uuid() != uuid) continue;
@@ -625,17 +643,17 @@ void NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
         this->cached_page_item_ = page_item;
         break;
       } else {
-        return;
+        return false;
       }
     }
   }
   
   this->popup_page_current_uuid_ = uuid;
-  this->render_popup_page_update_(this->cached_page_item_);
+  return this->render_popup_page_update_(this->cached_page_item_);
 }
 
-void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
-  if (item == nullptr) return;
+bool NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
+  if (item == nullptr) return false;
 
   if (item->is_type(entity_type::light)) {
     this->render_light_detail_update_(item);
@@ -659,10 +677,11 @@ void NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
       item->is_type(entity_type::media_player)) {
     this->render_input_select_detail_update_(item);
   } else {
-    return;
+    return false;
   }
 
   this->send_buffered_command_();
+  return true;
 }
 
 // entityUpdateDetail~{entity_id}~{pos}~{pos_translation}: {pos_status}~{pos_translation}~{icon_id}~{icon_up}~{icon_stop}~{icon_down}~{icon_up_status}~{icon_stop_status}~{icon_down_status}~{textTilt}~{iconTiltLeft}~{iconTiltStop}~{iconTiltRight}~{iconTiltLeftStatus}~{iconTiltStopStatus}~{iconTiltRightStatus}~{tilt_pos}"
@@ -958,11 +977,14 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     .append(idle ? "" : "Finish");
 }
 
-// entityUpdateDetail~{entity_id}~{icon_id}~{icon_color}~(3x)[{heading}~{mode}~{cur_mode}~{modes_res}~]
 void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
   if(item == nullptr) return;
+  this->render_climate_detail_update_(item->get_entity(), item->get_uuid());
+}
 
-  auto entity = item->get_entity();
+// entityUpdateDetail~{entity_id}~{icon_id}~{icon_color}~(3x)[{heading}~{mode}~{cur_mode}~{modes_res}~]
+void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::string &uuid) {
+  if(entity == nullptr) return;
 
   auto icon = get_icon_by_name(
     CLIMATE_ICON_MAP, entity->get_state());
@@ -982,9 +1004,15 @@ void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
 
   this->command_buffer_
     // entityUpdateDetail~
-    .assign("entityUpdateDetail").append(1, SEPARATOR)
-    // entity_id~
-    .append("uuid.").append(item->get_uuid()).append(1, SEPARATOR)
+    .assign("entityUpdateDetail").append(1, SEPARATOR);
+
+  // entity_id~
+  if (!uuid.empty())
+    this->command_buffer_.append("uuid.").append(uuid);
+  else
+    this->command_buffer_.append(entity->get_entity_id());
+
+  this->command_buffer_.append(1, SEPARATOR)
     // icon_id~
     .append(icon).append(1, SEPARATOR)
     // icon_color~

@@ -181,12 +181,13 @@ protected:
     const std::string &heading, const std::string &message, uint16_t timeout = 0U,
     const std::string &btn1_text = "", const std::string &btn2_text = "");
   void render_popup_page_(const std::string &internal_id);
-  void render_popup_page_update_(const std::string &internal_id);
-  void render_popup_page_update_(StatefulPageItem *entity);
+  bool render_popup_page_update_(const std::string &internal_id);
+  bool render_popup_page_update_(StatefulPageItem *entity);
   void render_light_detail_update_(StatefulPageItem *entity);
   void render_timer_detail_update_(StatefulPageItem *entity);
   void render_cover_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(StatefulPageItem *item);
+  void render_climate_detail_update_(Entity *entity, const std::string &uuid = "");
   void render_input_select_detail_update_(StatefulPageItem *item);
 
 #ifdef USE_TIME

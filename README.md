@@ -24,8 +24,8 @@ A basic configuration can be found in the [basic example](basic-example.yaml), b
 
 ### Icons
 
-- Icon values can be an icon name or hex value (e.g. `hex:E549`) can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
-- Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value (e.g. `#ce79`) and convert it to a number (e.g. `52857`).
+- Icon values can be an icon name or hex value (e.g. `hex:E549`). A list of icons can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
+- Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value and convert it to a number (e.g. `#ce79` -> `52857`).
 
 
 # Help Needed!

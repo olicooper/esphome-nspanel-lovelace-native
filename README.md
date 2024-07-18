@@ -18,7 +18,15 @@ For the GUI, this project relies on the HMI TFT firmware from the [ESPHome NSPan
 The firmware version reported by the screen needs to be `52` or `53` for it to be compatible with this project.
 If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L60)) exposed by the device in HomeAssistant.
 
+# Configuration
+
 A basic configuration can be found in the [basic example](basic-example.yaml), but you'll probably also want to look at the [advanced example](advanced-example.yaml) which shows the features currently available. This is loosely based on the appdaemon configuration format ([found here](https://github.com/joBr99/nspanel-lovelace-ui/blob/v4.3.3/appdaemon/apps-simple.yaml)) to make it easier to transition to this native ESPHome solution, but please don't expect this to translate exactly as it is not possible to make it work in the exact same way given the limitations of the ESP32.
+
+### Icons
+
+- Icon values can be an icon name or hex value (e.g. `hex:E549`) can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
+- Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value (e.g. `#ce79`) and convert it to a number (e.g. `52857`).
+
 
 # Help Needed!
 
@@ -29,10 +37,10 @@ There are many UI components missing and the [python build script](components/ns
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display
-- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`
+- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`, `cardMedia`
 - Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` and `popupTimer` pages.
 
-There is currently no support for cards such as: `cardMedia`, `cardPower` etc. but these are planned for the future.
+There is currently no support for these cards: `cardPower`. `cardUnlock`, `cardChart` - but these are planned for the future.
 Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.
 
 PRs to expand the functionality or fix bugs are very welcome!

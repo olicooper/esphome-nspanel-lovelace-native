@@ -618,7 +618,7 @@ bool NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
 
   // Sometimes a StatefulPageItem does not exist for an entity,
   // handle this edge case. Only certain cards support this.
-  if (!str_startswith(internal_id, "uuid.")) {
+  if (!esphome::str_startswith(internal_id, entity_type::uuid)) {
     auto entity = this->get_entity_(internal_id);
     if (entity == nullptr) return false;
     bool rendered = false;
@@ -848,9 +848,12 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
       ? generic_type::enable : generic_type::disable)
     .append(1, SEPARATOR)
     // icon_tilt_right_status~
-    .append(icon_tilt_right_status ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
+    .append(icon_tilt_right_status
+      ? generic_type::enable : generic_type::disable)
+    .append(1, SEPARATOR)
     // tilt_position_status
-    .append(tilt_position_status ? std::to_string(tilt_position).append("%") : generic_type::disable);
+    .append(tilt_position_status
+      ? std::to_string(tilt_position).append("%") : generic_type::disable);
 }
 
 // entityUpdateDetail~{entity_id}~~{icon_color}~{switch_val}~{brightness}~{color_temp}~{color}~{color_translation}~{color_temp_translation}~{brightness_translation}~{effect_supported}

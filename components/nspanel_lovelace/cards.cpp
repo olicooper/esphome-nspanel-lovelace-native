@@ -345,17 +345,17 @@ std::string &ThermoCard::render(std::string &buffer) {
     split_str(',', hvac_modes_str, hvac_modes);
 
     for (auto& mode : hvac_modes) {
-      uint16_t active_colour = 64512U;
+      uint16_t active_colour = 64512U; //dark orange
       if (mode == ha_attr_hvac_mode::auto_ ||
           mode == ha_attr_hvac_mode::heat_cool) {
-        active_colour = 1024U;
+        active_colour = 1024U; //dark green
       } else if (mode == ha_attr_hvac_mode::off ||
           mode == ha_attr_hvac_mode::fan_only) {
-        active_colour = 35921U;
+        active_colour = 52857U; // light grey (was: muddy grey|35921)
       } else if (mode == ha_attr_hvac_mode::cool) {
-        active_colour = 11487U;
+        active_colour = 11487U; //light blue
       } else if (mode == ha_attr_hvac_mode::dry) {
-        active_colour = 60897U;
+        active_colour = 60897U; //light orange
       }
       buffer.append(1, SEPARATOR);
       buffer.append(get_icon_by_name(CLIMATE_ICON_MAP, mode)).append(1, SEPARATOR);
@@ -435,11 +435,11 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(1, SEPARATOR);
 
   buffer.append(this->media_entity_->get_attribute(
-    ha_attr_type::media_title));
+    ha_attr_type::media_title).substr(0, 40));
   buffer.append(2, SEPARATOR);
 
   buffer.append(this->media_entity_->get_attribute(
-    ha_attr_type::media_artist));
+    ha_attr_type::media_artist).substr(0, 40));
   buffer.append(2, SEPARATOR);
 
   buffer.append(std::to_string(
@@ -482,9 +482,10 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(entity_render_type::media_pl).append(1, SEPARATOR);
   buffer.append(this->media_entity_->get_entity_id()).append(1, SEPARATOR);
   auto media_icon = get_icon_by_name(MEDIA_TYPE_MAP, 
-    this->media_entity_->get_attribute(ha_attr_type::media_content_type));
+    this->media_entity_->get_attribute(ha_attr_type::media_content_type),
+    "", icon_t::speaker_off);
   buffer.append(media_icon).append(1, SEPARATOR);
-  buffer.append(std::to_string(17299)).append(2, SEPARATOR);
+  buffer.append(std::to_string(17299U)).append(2, SEPARATOR);
   
   for (auto& item : this->items_) {
     buffer.append(1, SEPARATOR).append(item->render());

@@ -26,6 +26,7 @@ esphome:
   platformio_options:
     build_flags:
       - -DTEST_DEVICE_MODE
+      - -DFAKE_TFT_UPLOAD
 
 esp32:
   board: lolin32_lite

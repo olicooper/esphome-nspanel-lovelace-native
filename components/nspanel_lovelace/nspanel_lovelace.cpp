@@ -1209,6 +1209,10 @@ void NSPanelLovelace::send_display_command(const std::string &command) {
 
 #ifdef USE_NSPANEL_TFT_UPLOAD
 uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag) {
+#ifdef FAKE_TFT_UPLOAD
+  response.assign(1, 0x05); //ok response
+  return 0U;
+#else
   uint16_t ret;
   uint8_t c = 0;
   uint8_t nr_of_ff_bytes = 0;
@@ -1254,6 +1258,7 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
 
   ret = response.length();
   return ret;
+#endif
 }
 
 void NSPanelLovelace::start_reparse_mode_() {

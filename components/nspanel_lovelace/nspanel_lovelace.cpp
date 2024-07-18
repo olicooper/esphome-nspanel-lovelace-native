@@ -1801,8 +1801,10 @@ void NSPanelLovelace::process_button_press_(
     if (!this->current_page_->is_type(page_type::cardUnlock)) return;
     // todo
   }
-  // input select
-  else if (button_type == button_type::modeInputSelect) {
+  // select & input_select
+  else if (
+      button_type == button_type::modeInputSelect ||
+      button_type == button_type::modeSelect) {
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto options_str = entity->get_attribute(ha_attr_type::options);

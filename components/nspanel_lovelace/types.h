@@ -373,16 +373,21 @@ struct button_type {
   static constexpr const char* mediaShuffle = "media-shuffle";
   static constexpr const char* volumeSlider = "volumeSlider";
   static constexpr const char* speakerSel = "speaker-sel";
+  static constexpr const char* modeMediaPlayer = "mode-media_player";
 
   // light page
   static constexpr const char* brightnessSlider = "brightnessSlider";
   static constexpr const char* colorTempSlider = "colorTempSlider";
   static constexpr const char* colorWheel = "colorWheel";
+  static constexpr const char* modeLight = "mode-light";
 
   // climate page
   static constexpr const char* tempUpd = "tempUpd";
   static constexpr const char* tempUpdHighLow = "tempUpdHighLow";
   static constexpr const char* hvacAction = "hvac_action";
+  static constexpr const char* modePresetModes = "mode-preset_modes";
+  static constexpr const char* modeSwingModes = "mode-swing_modes";
+  static constexpr const char* modeFanModes = "mode-fan_modes";
 
   // alarm page
   static constexpr const char* disarm = "disarm";
@@ -392,20 +397,17 @@ struct button_type {
   static constexpr const char* armVacation = "arm_vacation";
   static constexpr const char* opnSensorNotify = "opnSensorNotify";
 
-  // cardUnlock
+  // unlock page
   static constexpr const char* cardUnlockUnlock = "cardUnlock-unlock";
-  static constexpr const char* modePresetModes = "mode-preset_modes";
-  static constexpr const char* modeSwingModes = "mode-swing_modes";
-  static constexpr const char* modeFanModes = "mode-fan_modes";
-  static constexpr const char* modeInputSelect = "mode-input_select";
-  static constexpr const char* modeLight = "mode-light";
-  static constexpr const char* modeMediaPlayer = "mode-media_player";
 
   // timer detail page
   static constexpr const char* timerStart = "timer-start";
   static constexpr const char* timerCancel = "timer-cancel";
   static constexpr const char* timerPause = "timer-pause";
   static constexpr const char* timerFinish = "timer-finish";
+
+  static constexpr const char* modeInputSelect = "mode-input_select";
+  static constexpr const char* modeSelect = "mode-select";
 };
 
 struct entity_type {

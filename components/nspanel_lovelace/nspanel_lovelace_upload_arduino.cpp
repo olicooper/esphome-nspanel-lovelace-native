@@ -34,7 +34,7 @@ int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url,
   char range_header[64];
   sprintf(range_header, "bytes=%d-%d", range_start, range_end);
 
-  ESP_LOGD(TAG, "Requesting range: %s", range_header);
+  ESP_LOGV(TAG, "Requesting range: %s", range_header);
 
   int tries = 1;
   int code;
@@ -72,6 +72,11 @@ int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url,
 
   // fetch next segment from HTTP stream
   while (fetched < range) {
+    if (!http->connected()) {
+      http->end();
+      ESP_LOGW(TAG, "HTTP disconnected! Restart upload to continue");
+      return -1;
+    }
     size = http->getStreamPtr()->available();
     if (!size) {
       App.feed_wdt();
@@ -83,7 +88,7 @@ int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url,
     fetched += c;
   }
   http->end();
-  ESP_LOGD(TAG, "fetched %d bytes", fetched);
+  ESP_LOGV(TAG, "fetched %d bytes", fetched);
 
   // upload fetched segments to the display in 4KB chunks
   for (int i = 0; i < range; i += 4096) {
@@ -270,7 +275,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url) {
     }
     App.feed_wdt();
     // NOLINTNEXTLINE(readability-static-accessed-through-instance)
-    ESP_LOGD(TAG, "Heap Size %d, Bytes left %d", ESP.getFreeHeap(), this->content_length_);
+    ESP_LOGV(TAG, "Heap Size %d, Bytes left %d", ESP.getFreeHeap(), this->content_length_);
   }
   ESP_LOGD(TAG, "Successfully updated Nextion!");
 

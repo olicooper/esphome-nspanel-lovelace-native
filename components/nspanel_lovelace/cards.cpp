@@ -59,9 +59,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true), status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+    new AlarmIconItem(std::string(uuid).append("_s"), CHAR8_CAST(icon_t::shield_off), 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
+    new AlarmIconItem(std::string(uuid).append("_i"), CHAR8_CAST(icon_t::progress_alert), 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
       button_type::disarm, "Disarm"));
@@ -74,9 +74,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true),status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+    new AlarmIconItem(std::string(uuid).append("_s"), CHAR8_CAST(icon_t::shield_off), 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
+    new AlarmIconItem(std::string(uuid).append("_i"), CHAR8_CAST(icon_t::progress_alert), 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
       button_type::disarm, "Disarm"));
@@ -89,9 +89,9 @@ AlarmCard::AlarmCard(
     show_keypad_(true),status_icon_flashing_(false) {
   alarm_entity_->add_subscriber(this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
+    new AlarmIconItem(std::string(uuid).append("_s"), CHAR8_CAST(icon_t::shield_off), 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
-    new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
+    new AlarmIconItem(std::string(uuid).append("_i"), CHAR8_CAST(icon_t::progress_alert), 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"), 
       button_type::disarm, "Disarm"));
@@ -375,7 +375,7 @@ std::string &ThermoCard::render(std::string &buffer) {
   buffer.append(get_translation("state")).append(1, SEPARATOR);
   // buffer.append(get_translation("action")).append(1, SEPARATOR); // depreciated
   buffer.append(1, SEPARATOR);
-  buffer.append(this->temperature_unit_icon_).append(1, SEPARATOR);
+  buffer.append(CHAR8_CAST(this->temperature_unit_icon_)).append(1, SEPARATOR);
   buffer.append(dest_temp2_str).append(1, SEPARATOR);
   
   if (this->thermo_entity_->has_attribute(ha_attr_type::preset_modes) || 
@@ -447,8 +447,8 @@ std::string &MediaCard::render(std::string &buffer) {
       ha_attr_type::volume_level, "0")) * 100));
   buffer.append(1, SEPARATOR);
 
-  auto icon = this->media_entity_->is_state("playing")
-    ? icon_t::pause : icon_t::play;
+  auto icon = CHAR8_CAST(this->media_entity_->is_state("playing")
+    ? icon_t::pause : icon_t::play);
   buffer.append(icon).append(1, SEPARATOR);
 
   uint32_t supported_features = value_or_default(this->media_entity_->
@@ -468,9 +468,9 @@ std::string &MediaCard::render(std::string &buffer) {
   // shuffle button icon
   if (supported_features & 0b100000000000000) {
     if (this->media_entity_->get_attribute(ha_attr_type::shuffle) == generic_type::on)
-      buffer.append(icon_t::shuffle);
+      buffer.append(CHAR8_CAST(icon_t::shuffle));
     else
-      buffer.append(icon_t::shuffle_disable);
+      buffer.append(CHAR8_CAST(icon_t::shuffle_disable));
   } else {
     buffer.append(generic_type::disable);
   }

@@ -134,7 +134,7 @@ public:
 
 protected:
   std::shared_ptr<Entity> thermo_entity_;
-  const char* temperature_unit_icon_;
+  const icon_char_t* temperature_unit_icon_;
 };
 
 /*

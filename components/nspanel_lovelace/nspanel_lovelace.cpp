@@ -732,9 +732,9 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
 
   if (cover_icons != nullptr) {
     if (entity->is_state("closed")) {
-      cover_icon = cover_icons->at(1);
+      cover_icon = CHAR8_CAST(cover_icons->at(1));
     } else {
-      cover_icon = cover_icons->at(0);
+      cover_icon = CHAR8_CAST(cover_icons->at(0));
     }
   }
 
@@ -750,7 +750,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
         position_str.empty())) {
       icon_up_status = true;
     }
-    icon_up = cover_icons->at(2);
+    icon_up = CHAR8_CAST(cover_icons->at(2));
   }
   // CLOSE
   if (supported_features & 0b00000010) {
@@ -759,12 +759,12 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
         position_str.empty())) {
       icon_down_status = true;
     }
-    icon_down = cover_icons->at(3);
+    icon_down = CHAR8_CAST(cover_icons->at(3));
   }
   // STOP
   if (supported_features & 0b00001000) {
     icon_stop_status = !entity->is_state(generic_type::unknown);
-    icon_stop = icon_t::stop;
+    icon_stop = CHAR8_CAST(icon_t::stop);
   }
 
   // Tilt supported
@@ -773,17 +773,17 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   }
   // SUPPORT_OPEN_TILT
   if (supported_features & 0b00010000) {
-    icon_tilt_left = icon_t::arrow_top_right;
+    icon_tilt_left = CHAR8_CAST(icon_t::arrow_top_right);
     icon_tilt_left_status = true;
   }
   // SUPPORT_CLOSE_TILT
   if (supported_features & 0b00100000) {
-    icon_tilt_right = icon_t::arrow_bottom_left;
+    icon_tilt_right = CHAR8_CAST(icon_t::arrow_bottom_left);
     icon_tilt_right_status = true;
   }
   // SUPPORT_STOP_TILT
   if (supported_features & 0b01000000) {
-    icon_tilt_stop = icon_t::stop;
+    icon_tilt_stop = CHAR8_CAST(icon_t::stop);
     icon_tilt_stop_status = true;
   }
   // SUPPORT_SET_TILT_POSITION

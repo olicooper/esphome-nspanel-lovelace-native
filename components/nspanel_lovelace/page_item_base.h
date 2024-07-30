@@ -95,7 +95,7 @@ public:
     return std::to_string(this->icon_color_);
   }
 
-  virtual void set_icon_value(const std::string &value);
+  virtual void set_icon_value(const icon_char_t* value);
   virtual void reset_icon_value();
   virtual void set_icon_color(const uint16_t color);
   virtual void set_icon_color(const std::array<uint8_t, 3> rgb);

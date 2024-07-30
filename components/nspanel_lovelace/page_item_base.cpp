@@ -41,7 +41,7 @@ std::string &PageItem::render_(std::string &buffer) {
 
 PageItem_Icon::PageItem_Icon(IHaveRenderInvalid *const parent) :
     ISetRenderInvalid(parent), 
-    icon_default_value_(icon_t::help_circle_outline), icon_default_color_(17299u),
+    icon_default_value_(CHAR8_CAST(icon_t::help_circle_outline)), icon_default_color_(17299u),
     icon_value_(icon_default_value_), icon_color_(icon_default_color_),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
@@ -55,7 +55,7 @@ PageItem_Icon::PageItem_Icon(
 PageItem_Icon::PageItem_Icon(
     IHaveRenderInvalid *const parent, const uint16_t icon_default_color) :
     ISetRenderInvalid(parent),
-    icon_default_value_(icon_t::help_circle_outline), icon_default_color_(icon_default_color),
+    icon_default_value_(CHAR8_CAST(icon_t::help_circle_outline)), icon_default_color_(icon_default_color),
     icon_value_(icon_default_value_), icon_color_(icon_default_color),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
@@ -66,8 +66,8 @@ PageItem_Icon::PageItem_Icon(
     icon_value_(icon_default_value), icon_color_(icon_default_color),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
-void PageItem_Icon::set_icon_value(const std::string &value) {
-  this->icon_value_ = value;
+void PageItem_Icon::set_icon_value(const icon_char_t* value) {
+  this->icon_value_ = CHAR8_CAST(value);
   this->icon_value_overridden_ = true;
   set_render_invalid_();
 }
@@ -240,7 +240,7 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
   if (attr == ha_attr_type::device_class) {
     if (!this->icon_value_overridden_) {
       if (this->entity_->is_type(entity_type::sensor)) {
-        this->icon_default_value_ = icon_t::alert_circle_outline;
+        this->icon_default_value_ = CHAR8_CAST(icon_t::alert_circle_outline);
         auto icon = get_icon_by_name(SENSOR_ICON_MAP, value);
         this->icon_value_ = (icon == nullptr ? this->icon_default_value_ : icon);
       }
@@ -325,14 +325,13 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
 }
 
 void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
-  const char *icon = nullptr;
   if (me->entity_->is_state(generic_type::on)) {
     if (!me->icon_color_overridden_)
       me->icon_color_ = 64909u; // yellow
     if (!me->icon_value_overridden_) {
-      icon = get_icon_by_name(SENSOR_ON_ICON_MAP,
-        me->entity_->get_attribute(ha_attr_type::device_class));
-      me->icon_value_ = icon == nullptr ? icon_t::checkbox_marked_circle : icon;
+      me->icon_value_ = get_icon_by_name(SENSOR_ON_ICON_MAP,
+        me->entity_->get_attribute(
+          ha_attr_type::device_class), "", icon_t::checkbox_marked_circle);
     }
   } else {
     if (!me->icon_color_overridden_) {
@@ -342,9 +341,9 @@ void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
         me->icon_color_ = 38066u; // grey
     }
     if (!me->icon_value_overridden_) {
-      icon = get_icon_by_name(SENSOR_OFF_ICON_MAP,
-        me->entity_->get_attribute(ha_attr_type::device_class));
-      me->icon_value_ = icon == nullptr ? icon_t::radiobox_blank : icon;
+      me->icon_value_ = get_icon_by_name(SENSOR_OFF_ICON_MAP,
+        me->entity_->get_attribute(
+          ha_attr_type::device_class), "", icon_t::radiobox_blank);
     }
   }
 }
@@ -364,9 +363,9 @@ void StatefulPageItem::state_cover_fn(StatefulPageItem *me) {
       me->entity_->get_attribute(ha_attr_type::device_class));
     if (icons != nullptr) {
       if (me->entity_->is_state("closed"))
-        me->icon_value_ = icons->at(1);
+        me->icon_value_ = CHAR8_CAST(icons->at(1));
       else
-        me->icon_value_ = icons->at(0);
+        me->icon_value_ = CHAR8_CAST(icons->at(0));
     }
   }
 }
@@ -375,8 +374,8 @@ void StatefulPageItem::state_climate_fn(StatefulPageItem *me) {
   auto &state = me->get_state();
 
   if (!me->icon_value_overridden_) {
-    auto icon = get_icon_by_name(CLIMATE_ICON_MAP, state);
-    me->icon_value_ = icon == nullptr ? icon_t::checkbox_marked_circle : icon;
+    me->icon_value_ = get_icon_by_name(
+      CLIMATE_ICON_MAP, state, "", icon_t::checkbox_marked_circle);
   }
 
   if (!me->icon_color_overridden_) {

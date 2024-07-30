@@ -522,10 +522,10 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
 
 def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
     entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
-    default_icon_value = r'u8"\u{0}"'.format(get_icon_hex(default_icon_value))
+    default_icon_value = r'CHAR8_CAST(u8"\u{0}")'.format(get_icon_hex(default_icon_value))
     attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
     # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
-    # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
+    # todo: esphome is escaping the icon value (e.g. CHAR8_CAST(u8"\uE598")) due to cpp_string_escape, so having to build a raw statement instead.
     basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
     if isinstance(attrs["value"], str) and isinstance(attrs["color"], int):
         return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
@@ -686,9 +686,9 @@ async def to_code(config):
     visible_index = 0
 
     prev_card_uuid = next_card_uuid = None
-    navleft_icon_value = r'u8"\u{0}"'.format(get_icon_hex("arrow-left-bold"))
-    navhome_icon_value = r'u8"\u{0}"'.format(get_icon_hex("home"))
-    navright_icon_value = r'u8"\u{0}"'.format(get_icon_hex("arrow-right-bold"))
+    navleft_icon_value = r'CHAR8_CAST(u8"\u{0}")'.format(get_icon_hex("arrow-left-bold"))
+    navhome_icon_value = r'CHAR8_CAST(u8"\u{0}")'.format(get_icon_hex("home"))
+    navright_icon_value = r'CHAR8_CAST(u8"\u{0}")'.format(get_icon_hex("arrow-right-bold"))
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         cg.add(cg.RawStatement("{"))
         prev_card_uuid = visible_card_uuids[visible_index - 1]

@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "defines.h"
 #include "helpers.h"
 
 namespace esphome {
@@ -172,134 +173,134 @@ private:
 };
 
 struct icon_t {
-  static constexpr const char* account = u8"\uE003";
-  static constexpr const char* air_humidifier = u8"\uF098";
-  static constexpr const char* alert_circle = u8"\uE027";
-  static constexpr const char* alert_circle_outline = u8"\uE5D5";
-  static constexpr const char* arrow_bottom_left = u8"\uE041";
-  static constexpr const char* arrow_collapse_horizontal = u8"\uE84B";
-  static constexpr const char* arrow_down = u8"\uE044";
-  static constexpr const char* arrow_expand_horizontal = u8"\uE84D";
-  static constexpr const char* arrow_left_bold = u8"\uE730";
-  static constexpr const char* arrow_right_bold = u8"\uE733";
-  static constexpr const char* arrow_top_right = u8"\uE05B";
-  static constexpr const char* arrow_up = u8"\uE05C";
-  static constexpr const char* arrow_up_bold = u8"\uE736";
-  static constexpr const char* battery = u8"\uE078";
-  static constexpr const char* battery_charging = u8"\uE083";
-  static constexpr const char* battery_outline = u8"\uE08D";
-  static constexpr const char* bell_ring = u8"\uE09D";
-  static constexpr const char* blinds = u8"\uE0AB";
-  static constexpr const char* blinds_open = u8"\uF010";
-  static constexpr const char* brightness_5 = u8"\uE0DD";
-  static constexpr const char* brightness_7 = u8"\uE0DF";
-  static constexpr const char* calendar = u8"\uE0EC";
-  static constexpr const char* calendar_clock = u8"\uE0EF";
-  static constexpr const char* calendar_sync = u8"\uEE8D";
-  static constexpr const char* cash = u8"\uE113";
-  static constexpr const char* chart_bell_curve = u8"\uEC4F";
-  static constexpr const char* check_circle = u8"\uE5DF";
-  static constexpr const char* check_network_outline = u8"\uEC53";
-  static constexpr const char* checkbox_blank_circle = u8"\uE12E";
-  static constexpr const char* checkbox_marked_circle = u8"\uE132";
-  static constexpr const char* circle_slice_8 = u8"\uEAA4";
-  static constexpr const char* close_network_outline = u8"\uEC5E";
-  static constexpr const char* crop_portrait = u8"\uE1A0";
-  static constexpr const char* cursor_text = u8"\uE5E6";
-  static constexpr const char* curtains = u8"\uF845";
-  static constexpr const char* curtains_closed = u8"\uF846";
-  static constexpr const char* door_closed = u8"\uE81A";
-  static constexpr const char* door_open = u8"\uE81B";
-  static constexpr const char* fan = u8"\uE20F";
-  static constexpr const char* fire = u8"\uE237";
-  static constexpr const char* flash = u8"\uE240";
-  static constexpr const char* format_color_text = u8"\uE69D";
-  static constexpr const char* garage = u8"\uE6D8";
-  static constexpr const char* garage_open = u8"\uE6D9";
-  static constexpr const char* gas_cylinder = u8"\uE646";
-  static constexpr const char* gate = u8"\uE298";
-  static constexpr const char* gate_open = u8"\uF169";
-  static constexpr const char* gauge = u8"\uE299";
-  static constexpr const char* gesture_tap_button = u8"\uF2A7";
-  static constexpr const char* help_circle_outline = u8"\uE624";
-  static constexpr const char* home = u8"\uE2DB";
-  static constexpr const char* home_outline = u8"\uE6A0";
-  static constexpr const char* light_switch = u8"\uE97D";
-  static constexpr const char* lightbulb = u8"\uE334";
-  static constexpr const char* link_box_outline = u8"\uED1A";
-  static constexpr const char* lock = u8"\uE33D";
-  static constexpr const char* lock_open = u8"\uE33E";
-  static constexpr const char* motion_sensor = u8"\uED90";
-  static constexpr const char* motion_sensor_off = u8"\uF434";
-  static constexpr const char* movie = u8"\uE380";
-  static constexpr const char* music = u8"\uE759";
-  static constexpr const char* music_note = u8"\uE386";
-  static constexpr const char* music_note_off = u8"\uE389";
-  static constexpr const char* open_in_app = u8"\uE3CA";
-  static constexpr const char* package = u8"\uE3D2";
-  static constexpr const char* package_up = u8"\uE3D4";
-  static constexpr const char* palette = u8"\uE3D7";
-  static constexpr const char* pause = u8"\uE3E3";
-  static constexpr const char* play = u8"\uE409";
-  static constexpr const char* playlist_music = u8"\uECB7";
-  static constexpr const char* playlist_play = u8"\uE410";
-  static constexpr const char* playlist_star = u8"\uEDF1";
-  static constexpr const char* power = u8"\uE424";
-  static constexpr const char* power_plug = u8"\uE6A4";
-  static constexpr const char* power_plug_off = u8"\uE6A5";
-  static constexpr const char* progress_alert = u8"\uECBB";
-  static constexpr const char* radiobox_blank = u8"\uE43C";
-  static constexpr const char* ray_vertex = u8"\uE444";
-  static constexpr const char* robot = u8"\uE6A8";
-  static constexpr const char* robot_vacuum = u8"\uE70C";
-  static constexpr const char* script_text = u8"\uEBC1";
-  static constexpr const char* shield = u8"\uE497";
-  static constexpr const char* shield_airplane = u8"\uE6BA";
-  static constexpr const char* shield_home = u8"\uE689";
-  static constexpr const char* shield_lock = u8"\uE99C";
-  static constexpr const char* shield_moon = u8"\uF827";
-  static constexpr const char* shield_off = u8"\uE99D";
-  static constexpr const char* shuffle = u8"\uE49C";
-  static constexpr const char* shuffle_disable = u8"\uE49D";
-  static constexpr const char* signal = u8"\uE4A1";
-  static constexpr const char* smog = u8"\uEA70";
-  static constexpr const char* smoke_detector = u8"\uE391";
-  static constexpr const char* smoke_detector_alert = u8"\uF92D";
-  static constexpr const char* smoke_detector_variant = u8"\uF80A";
-  static constexpr const char* smoke_detector_variant_alert = u8"\uF92F";
-  static constexpr const char* snowflake = u8"\uE716";
-  static constexpr const char* speaker_off = u8"\uE4C3";
-  static constexpr const char* square = u8"\uE763";
-  static constexpr const char* square_outline = u8"\uE762";
-  static constexpr const char* stop = u8"\uE4DA";
-  static constexpr const char* temperature_celsius = u8"\uE503";
-  static constexpr const char* temperature_fahrenheit = u8"\uE504";
-  static constexpr const char* thermometer = u8"\uE50E";
-  static constexpr const char* timer = u8"\uF3AA";
-  static constexpr const char* timer_outline = u8"\uE51A";
-  static constexpr const char* vibrate = u8"\uE565";
-  static constexpr const char* video = u8"\uE566";
-  static constexpr const char* water = u8"\uE58B";
-  static constexpr const char* water_off = u8"\uE58C";
-  static constexpr const char* water_percent = u8"\uE58D";
-  static constexpr const char* weather_cloudy = u8"\uE58F";
-  static constexpr const char* weather_fog = u8"\uE590";
-  static constexpr const char* weather_hail = u8"\uE591";
-  static constexpr const char* weather_lightning = u8"\uE592";
-  static constexpr const char* weather_lightning_rainy = u8"\uE67D";
-  static constexpr const char* weather_night = u8"\uE593";
-  static constexpr const char* weather_partly_cloudy = u8"\uE594";
-  static constexpr const char* weather_partly_snowy_rainy = u8"\uEF34";
-  static constexpr const char* weather_pouring = u8"\uE595";
-  static constexpr const char* weather_rainy = u8"\uE596";
-  static constexpr const char* weather_snowy = u8"\uE597";
-  static constexpr const char* weather_sunny = u8"\uE598";
-  static constexpr const char* weather_windy = u8"\uE59C";
-  static constexpr const char* weather_windy_variant = u8"\uE59D";
-  static constexpr const char* window_closed = u8"\uE5AD";
-  static constexpr const char* window_open = u8"\uE5B0";
-  static constexpr const char* window_shutter = u8"\uF11B";
-  static constexpr const char* window_shutter_open = u8"\uF11D";
+  static constexpr const icon_char_t* account = u8"\uE003";
+  static constexpr const icon_char_t* air_humidifier = u8"\uF098";
+  static constexpr const icon_char_t* alert_circle = u8"\uE027";
+  static constexpr const icon_char_t* alert_circle_outline = u8"\uE5D5";
+  static constexpr const icon_char_t* arrow_bottom_left = u8"\uE041";
+  static constexpr const icon_char_t* arrow_collapse_horizontal = u8"\uE84B";
+  static constexpr const icon_char_t* arrow_down = u8"\uE044";
+  static constexpr const icon_char_t* arrow_expand_horizontal = u8"\uE84D";
+  static constexpr const icon_char_t* arrow_left_bold = u8"\uE730";
+  static constexpr const icon_char_t* arrow_right_bold = u8"\uE733";
+  static constexpr const icon_char_t* arrow_top_right = u8"\uE05B";
+  static constexpr const icon_char_t* arrow_up = u8"\uE05C";
+  static constexpr const icon_char_t* arrow_up_bold = u8"\uE736";
+  static constexpr const icon_char_t* battery = u8"\uE078";
+  static constexpr const icon_char_t* battery_charging = u8"\uE083";
+  static constexpr const icon_char_t* battery_outline = u8"\uE08D";
+  static constexpr const icon_char_t* bell_ring = u8"\uE09D";
+  static constexpr const icon_char_t* blinds = u8"\uE0AB";
+  static constexpr const icon_char_t* blinds_open = u8"\uF010";
+  static constexpr const icon_char_t* brightness_5 = u8"\uE0DD";
+  static constexpr const icon_char_t* brightness_7 = u8"\uE0DF";
+  static constexpr const icon_char_t* calendar = u8"\uE0EC";
+  static constexpr const icon_char_t* calendar_clock = u8"\uE0EF";
+  static constexpr const icon_char_t* calendar_sync = u8"\uEE8D";
+  static constexpr const icon_char_t* cash = u8"\uE113";
+  static constexpr const icon_char_t* chart_bell_curve = u8"\uEC4F";
+  static constexpr const icon_char_t* check_circle = u8"\uE5DF";
+  static constexpr const icon_char_t* check_network_outline = u8"\uEC53";
+  static constexpr const icon_char_t* checkbox_blank_circle = u8"\uE12E";
+  static constexpr const icon_char_t* checkbox_marked_circle = u8"\uE132";
+  static constexpr const icon_char_t* circle_slice_8 = u8"\uEAA4";
+  static constexpr const icon_char_t* close_network_outline = u8"\uEC5E";
+  static constexpr const icon_char_t* crop_portrait = u8"\uE1A0";
+  static constexpr const icon_char_t* cursor_text = u8"\uE5E6";
+  static constexpr const icon_char_t* curtains = u8"\uF845";
+  static constexpr const icon_char_t* curtains_closed = u8"\uF846";
+  static constexpr const icon_char_t* door_closed = u8"\uE81A";
+  static constexpr const icon_char_t* door_open = u8"\uE81B";
+  static constexpr const icon_char_t* fan = u8"\uE20F";
+  static constexpr const icon_char_t* fire = u8"\uE237";
+  static constexpr const icon_char_t* flash = u8"\uE240";
+  static constexpr const icon_char_t* format_color_text = u8"\uE69D";
+  static constexpr const icon_char_t* garage = u8"\uE6D8";
+  static constexpr const icon_char_t* garage_open = u8"\uE6D9";
+  static constexpr const icon_char_t* gas_cylinder = u8"\uE646";
+  static constexpr const icon_char_t* gate = u8"\uE298";
+  static constexpr const icon_char_t* gate_open = u8"\uF169";
+  static constexpr const icon_char_t* gauge = u8"\uE299";
+  static constexpr const icon_char_t* gesture_tap_button = u8"\uF2A7";
+  static constexpr const icon_char_t* help_circle_outline = u8"\uE624";
+  static constexpr const icon_char_t* home = u8"\uE2DB";
+  static constexpr const icon_char_t* home_outline = u8"\uE6A0";
+  static constexpr const icon_char_t* light_switch = u8"\uE97D";
+  static constexpr const icon_char_t* lightbulb = u8"\uE334";
+  static constexpr const icon_char_t* link_box_outline = u8"\uED1A";
+  static constexpr const icon_char_t* lock = u8"\uE33D";
+  static constexpr const icon_char_t* lock_open = u8"\uE33E";
+  static constexpr const icon_char_t* motion_sensor = u8"\uED90";
+  static constexpr const icon_char_t* motion_sensor_off = u8"\uF434";
+  static constexpr const icon_char_t* movie = u8"\uE380";
+  static constexpr const icon_char_t* music = u8"\uE759";
+  static constexpr const icon_char_t* music_note = u8"\uE386";
+  static constexpr const icon_char_t* music_note_off = u8"\uE389";
+  static constexpr const icon_char_t* open_in_app = u8"\uE3CA";
+  static constexpr const icon_char_t* package = u8"\uE3D2";
+  static constexpr const icon_char_t* package_up = u8"\uE3D4";
+  static constexpr const icon_char_t* palette = u8"\uE3D7";
+  static constexpr const icon_char_t* pause = u8"\uE3E3";
+  static constexpr const icon_char_t* play = u8"\uE409";
+  static constexpr const icon_char_t* playlist_music = u8"\uECB7";
+  static constexpr const icon_char_t* playlist_play = u8"\uE410";
+  static constexpr const icon_char_t* playlist_star = u8"\uEDF1";
+  static constexpr const icon_char_t* power = u8"\uE424";
+  static constexpr const icon_char_t* power_plug = u8"\uE6A4";
+  static constexpr const icon_char_t* power_plug_off = u8"\uE6A5";
+  static constexpr const icon_char_t* progress_alert = u8"\uECBB";
+  static constexpr const icon_char_t* radiobox_blank = u8"\uE43C";
+  static constexpr const icon_char_t* ray_vertex = u8"\uE444";
+  static constexpr const icon_char_t* robot = u8"\uE6A8";
+  static constexpr const icon_char_t* robot_vacuum = u8"\uE70C";
+  static constexpr const icon_char_t* script_text = u8"\uEBC1";
+  static constexpr const icon_char_t* shield = u8"\uE497";
+  static constexpr const icon_char_t* shield_airplane = u8"\uE6BA";
+  static constexpr const icon_char_t* shield_home = u8"\uE689";
+  static constexpr const icon_char_t* shield_lock = u8"\uE99C";
+  static constexpr const icon_char_t* shield_moon = u8"\uF827";
+  static constexpr const icon_char_t* shield_off = u8"\uE99D";
+  static constexpr const icon_char_t* shuffle = u8"\uE49C";
+  static constexpr const icon_char_t* shuffle_disable = u8"\uE49D";
+  static constexpr const icon_char_t* signal = u8"\uE4A1";
+  static constexpr const icon_char_t* smog = u8"\uEA70";
+  static constexpr const icon_char_t* smoke_detector = u8"\uE391";
+  static constexpr const icon_char_t* smoke_detector_alert = u8"\uF92D";
+  static constexpr const icon_char_t* smoke_detector_variant = u8"\uF80A";
+  static constexpr const icon_char_t* smoke_detector_variant_alert = u8"\uF92F";
+  static constexpr const icon_char_t* snowflake = u8"\uE716";
+  static constexpr const icon_char_t* speaker_off = u8"\uE4C3";
+  static constexpr const icon_char_t* square = u8"\uE763";
+  static constexpr const icon_char_t* square_outline = u8"\uE762";
+  static constexpr const icon_char_t* stop = u8"\uE4DA";
+  static constexpr const icon_char_t* temperature_celsius = u8"\uE503";
+  static constexpr const icon_char_t* temperature_fahrenheit = u8"\uE504";
+  static constexpr const icon_char_t* thermometer = u8"\uE50E";
+  static constexpr const icon_char_t* timer = u8"\uF3AA";
+  static constexpr const icon_char_t* timer_outline = u8"\uE51A";
+  static constexpr const icon_char_t* vibrate = u8"\uE565";
+  static constexpr const icon_char_t* video = u8"\uE566";
+  static constexpr const icon_char_t* water = u8"\uE58B";
+  static constexpr const icon_char_t* water_off = u8"\uE58C";
+  static constexpr const icon_char_t* water_percent = u8"\uE58D";
+  static constexpr const icon_char_t* weather_cloudy = u8"\uE58F";
+  static constexpr const icon_char_t* weather_fog = u8"\uE590";
+  static constexpr const icon_char_t* weather_hail = u8"\uE591";
+  static constexpr const icon_char_t* weather_lightning = u8"\uE592";
+  static constexpr const icon_char_t* weather_lightning_rainy = u8"\uE67D";
+  static constexpr const icon_char_t* weather_night = u8"\uE593";
+  static constexpr const icon_char_t* weather_partly_cloudy = u8"\uE594";
+  static constexpr const icon_char_t* weather_partly_snowy_rainy = u8"\uEF34";
+  static constexpr const icon_char_t* weather_pouring = u8"\uE595";
+  static constexpr const icon_char_t* weather_rainy = u8"\uE596";
+  static constexpr const icon_char_t* weather_snowy = u8"\uE597";
+  static constexpr const icon_char_t* weather_sunny = u8"\uE598";
+  static constexpr const icon_char_t* weather_windy = u8"\uE59C";
+  static constexpr const icon_char_t* weather_windy_variant = u8"\uE59D";
+  static constexpr const icon_char_t* window_closed = u8"\uE5AD";
+  static constexpr const icon_char_t* window_open = u8"\uE5B0";
+  static constexpr const icon_char_t* window_shutter = u8"\uF11B";
+  static constexpr const icon_char_t* window_shutter_open = u8"\uF11D";
 };
 
 struct Icon {
@@ -313,7 +314,7 @@ struct Icon {
   const std::string color_str() const { return std::to_string(color); }
 
   Icon() : Icon(icon_t::alert_circle_outline, 63878u) { }
-  Icon(const std::string value, const uint16_t color) : value(value), color(color) { }
+  Icon(const icon_char_t* value, const uint16_t color) : value(CHAR8_CAST(value)), color(color) { }
 };
 
 struct generic_type {
@@ -327,8 +328,9 @@ struct generic_type {
 };
 
 typedef std::map<const char*, const char*, compare_char_str> char_map;
+typedef std::map<const char*, const icon_char_t*, compare_char_str> char8_map;
 typedef std::map<const char*, Icon, compare_char_str> char_icon_map;
-typedef std::map<const char*, std::vector<const char *>, compare_char_str> char_list_map;
+typedef std::map<const char*, std::vector<const icon_char_t*>, compare_char_str> char8_list_map;
 
 struct weather_type {
   static constexpr const char* sunny = "sunny";
@@ -789,32 +791,32 @@ inline datetime_mode operator&(datetime_mode a, datetime_mode b) {
   return static_cast<datetime_mode>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
-inline const char *get_icon_by_name(
-    const char_map &map,
+inline const char* get_icon_by_name(
+    const char8_map &map,
     const std::string& icon_name,
     const std::string& fallback_icon_name = "",
-    const char *default_icon = nullptr) {
+    const icon_char_t* default_icon = nullptr) {
   if (map.size() > 0) {
     if (icon_name.empty()) {
       if (!fallback_icon_name.empty()) {
         auto icon_it = map.find(fallback_icon_name.c_str());
-        if (icon_it != map.end()) return icon_it->second;
+        if (icon_it != map.end()) return CHAR8_CAST(icon_it->second);
       }
     } else {
       auto icon_it = map.find(icon_name.c_str());
-      if (icon_it != map.end()) return icon_it->second;
+      if (icon_it != map.end()) return CHAR8_CAST(icon_it->second);
     }
   }
-  return default_icon == nullptr 
+  return CHAR8_CAST(default_icon == nullptr 
     ? icon_t::alert_circle_outline
-    : default_icon;
+    : default_icon);
 }
 
-inline const std::vector<const char*> *get_icon_by_name(
-    const char_list_map &map,
+inline const std::vector<const icon_char_t*>* get_icon_by_name(
+    const char8_list_map &map,
     const std::string &icon_name,
     const std::string& fallback_icon_name = "",
-    const std::vector<const char*> *default_icon_list = nullptr) {
+    const std::vector<const icon_char_t*>* default_icon_list = nullptr) {
   if (map.size() > 0) {
     if (icon_name.empty()) {
       if (!fallback_icon_name.empty()) {
@@ -829,11 +831,11 @@ inline const std::vector<const char*> *get_icon_by_name(
   return default_icon_list;
 }
 
-inline const Icon *get_icon_by_name(
+inline const Icon* get_icon_by_name(
     const char_icon_map &map,
     const std::string &icon_name,
     const std::string& fallback_icon_name = "",
-    const Icon *default_icon = nullptr) {
+    const Icon* default_icon = nullptr) {
   if (map.size() > 0) {
     if (icon_name.empty()) {
       if (!fallback_icon_name.empty()) {
@@ -852,7 +854,7 @@ inline const Icon *get_icon_by_name(
 }
 
 // simple_type_mapping
-const char_map ENTITY_ICON_MAP {
+const char8_map ENTITY_ICON_MAP {
   {entity_type::button, icon_t::gesture_tap_button},
   {entity_type::navigate, icon_t::gesture_tap_button},
   {entity_type::input_button, icon_t::gesture_tap_button},
@@ -877,7 +879,7 @@ const char_map ENTITY_ICON_MAP {
 };
 
 // sensor_mapping_on
-const char_map SENSOR_ON_ICON_MAP {
+const char8_map SENSOR_ON_ICON_MAP {
   {sensor_type::battery, icon_t::battery_outline},
   {sensor_type::battery_charging, icon_t::battery_charging},
   {sensor_type::carbon_monoxide, icon_t::smoke_detector_alert},
@@ -908,7 +910,7 @@ const char_map SENSOR_ON_ICON_MAP {
 };
 
 // sensor_mapping_off
-const char_map SENSOR_OFF_ICON_MAP {
+const char8_map SENSOR_OFF_ICON_MAP {
   {sensor_type::battery, icon_t::battery},
   {sensor_type::battery_charging, icon_t::battery},
   {sensor_type::carbon_monoxide, icon_t::smoke_detector},
@@ -939,7 +941,7 @@ const char_map SENSOR_OFF_ICON_MAP {
 };
 
 // sensor_mapping
-const char_map SENSOR_ICON_MAP {
+const char8_map SENSOR_ICON_MAP {
   {sensor_type::apparent_power, icon_t::flash},
   {sensor_type::aqi, icon_t::smog},
   {sensor_type::battery, icon_t::battery},
@@ -974,7 +976,7 @@ const char_map SENSOR_ICON_MAP {
 };
 
 // climate_mapping
-const char_map CLIMATE_ICON_MAP {
+const char8_map CLIMATE_ICON_MAP {
   {ha_attr_hvac_mode::auto_, icon_t::calendar_sync},
   {ha_attr_hvac_mode::heat_cool, icon_t::calendar_sync},
   {ha_attr_hvac_mode::heat, icon_t::fire},
@@ -984,7 +986,7 @@ const char_map CLIMATE_ICON_MAP {
   {ha_attr_hvac_mode::fan_only, icon_t::fan},
 };
 
-const char_map MEDIA_TYPE_MAP {
+const char8_map MEDIA_TYPE_MAP {
   {generic_type::off, icon_t::speaker_off},
   {ha_attr_media_content_type::music, icon_t::music},
   {ha_attr_media_content_type::tvshow, icon_t::movie},
@@ -997,7 +999,7 @@ const char_map MEDIA_TYPE_MAP {
 };
 
 // cover_mapping
-const char_list_map COVER_MAP {
+const char8_list_map COVER_MAP {
   // "device_class": ("icon-open", "icon-closed", "icon-cover-open", "icon-cover-close")
   {entity_cover_type::awning, {icon_t::window_open, icon_t::window_closed, icon_t::arrow_up, icon_t::arrow_down}},
   {entity_cover_type::blind, {icon_t::blinds_open, icon_t::blinds, icon_t::arrow_up, icon_t::arrow_down}},

@@ -167,7 +167,7 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
         position_str.empty())) {
       icon_up_status = true;
     }
-    icon_up = cover_icons->at(2);
+    icon_up = CHAR8_CAST(cover_icons->at(2));
   }
   // CLOSE
   if (supported_features & 0b10) {
@@ -176,12 +176,12 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
         position_str.empty())) {
       icon_down_status = true;
     }
-    icon_down = cover_icons->at(3);
+    icon_down = CHAR8_CAST(cover_icons->at(3));
   }
   // STOP
   if (supported_features & 0b1000) {
     icon_stop_status = !me_->entity_->is_state(generic_type::unknown);
-    icon_stop = icon_t::stop;
+    icon_stop = CHAR8_CAST(icon_t::stop);
   }
   me_->value_
     .assign(icon_up).append(1, '|')

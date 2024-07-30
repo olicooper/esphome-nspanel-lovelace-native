@@ -32,6 +32,8 @@ esp32:
   board: lolin32_lite
   framework:
     type: esp-idf
+    version: '5.3.0'
+    platform_version: '6.8.0'
     # sdkconfig_options:
     #   CONFIG_D0WD_PSRAM_CLK_IO: '5'
     #   CONFIG_D0WD_PSRAM_CS_IO: '18'

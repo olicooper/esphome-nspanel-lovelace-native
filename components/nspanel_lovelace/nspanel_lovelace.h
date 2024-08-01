@@ -19,6 +19,9 @@
 
 #ifdef USE_ESP_IDF
 #include "esphome/components/uart/uart_component_esp_idf.h"
+#ifdef USE_NSPANEL_TFT_UPLOAD
+#include <esp_http_client.h>
+#endif
 #else
 #ifdef USE_NSPANEL_TFT_UPLOAD
 #include <HTTPClient.h>
@@ -148,8 +151,7 @@ protected:
   void init_display_(int baud_rate);
 #ifdef USE_NSPANEL_TFT_UPLOAD
   uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
-  void start_reparse_mode_();
-  void exit_reparse_mode_();
+  void set_reparse_mode_(bool active);
 #endif
   void send_nextion_command_(const std::string &command);
 
@@ -230,7 +232,6 @@ protected:
 
   std::queue<std::string> command_queue_;
   unsigned long command_last_sent_ = 0;
-  unsigned int update_baud_rate_ = 921600;
 
   bool button_press_timeout_set_ = false;
   std::string button_press_uuid_;
@@ -254,17 +255,18 @@ protected:
   std::string command_buffer_;
 
 #ifdef USE_NSPANEL_TFT_UPLOAD
+  unsigned int update_baud_rate_ = 921600;
   bool is_updating_ = false;
   bool reparse_mode_ = false;
-  int content_length_ = 0;
-  int tft_size_ = 0;
+  uint32_t content_length_ = 0;
+  size_t tft_size_ = 0;
+  bool upload_first_chunk_sent_ = false;
 #ifdef USE_ESP_IDF
-  int upload_range_(const std::string &url, int range_start);
+  int upload_by_chunks_(esp_http_client_handle_t http_client, uint32_t &range_start);
 #else // USE_ARDUINO
   uint8_t *transfer_buffer_ = nullptr;
   size_t transfer_buffer_size_;
-  bool upload_first_chunk_sent_ = false;
-  int upload_by_chunks_(HTTPClient *http, const std::string &url, int range_start);
+  int upload_by_chunks_(HTTPClient *http, const std::string &url, uint32_t &range_start);
 #endif
   bool upload_end_(bool successful);
 #endif // USE_NSPANEL_TFT_UPLOAD

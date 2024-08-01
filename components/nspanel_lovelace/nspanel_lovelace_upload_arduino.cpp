@@ -19,7 +19,7 @@ static const char *const TAG = "nspanel_lovelace_upload";
 // Originally from: https://github.com/sairon/esphome-nspanel-lovelace-ui/blob/dev/components/nspanel_lovelace/nspanel_lovelace_upload.cpp
 // Followed guide: https://unofficialnextion.com/t/nextion-upload-protocol-v1-2-the-fast-one/1044/2
 
-int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url, int range_start) {
+int NSPanelLovelace::upload_by_chunks_(HTTPClient *http, const std::string &url, uint32_t &range_start) {
   int range_end;
 
   if (range_start == 0 && this->transfer_buffer_size_ > 16384) {  // Start small at the first run in case of a big skip
@@ -139,9 +139,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url) {
     return false;
   }
 
-  if (!this->reparse_mode_) {
-    this->start_reparse_mode_();
-  }
+  this->set_reparse_mode_(false);
 
   this->is_updating_ = true;
 
@@ -266,7 +264,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url) {
   ESP_LOGD(TAG, "Updating tft from \"%s\" with a file size of %d using %zu chunksize, Heap Size %d",
            url.c_str(), this->content_length_, this->transfer_buffer_size_, ESP.getFreeHeap());
 
-  int result = 0;
+  uint32_t result = 0;
   while (this->content_length_ > 0) {
     result = this->upload_by_chunks_(&http, url, result);
     if (result < 0) {

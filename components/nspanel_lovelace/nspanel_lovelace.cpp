@@ -1261,17 +1261,19 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
 #endif
 }
 
-void NSPanelLovelace::start_reparse_mode_() {
-  this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
-  this->send_nextion_command_("recmod=0");
-  this->send_nextion_command_("recmod=0");
-  this->send_nextion_command_("connect");
-  reparse_mode_ = true;
-}
+void NSPanelLovelace::set_reparse_mode_(bool active) {
+  if (this->reparse_mode_ == active) return;
 
-void NSPanelLovelace::exit_reparse_mode_() {
-  this->send_nextion_command_("recmod=1");
-  reparse_mode_ = false;
+  if (active) {
+    this->send_nextion_command_("recmod=1");
+  } else {
+    this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
+    this->send_nextion_command_("recmod=0");
+    this->send_nextion_command_("recmod=0");
+    this->send_nextion_command_("connect");
+  }
+
+  this->reparse_mode_ = active;
 }
 #endif // USE_NSPANEL_TFT_UPLOAD
 

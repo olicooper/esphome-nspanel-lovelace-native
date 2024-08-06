@@ -139,9 +139,10 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
 #ifdef USE_PSRAM
       ESP_LOGD(
           TAG,
-          "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " (DRAM) + %" PRIu32 " (PSRAM) bytes",
+          "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " (DRAM) + %" PRIu32 " (PSRAM) bytes, lblk %" PRIu32,
           upload_percentage, this->content_length_, static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
-          static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+          static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
+          static_cast<uint32_t>(heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)));
 #else
       ESP_LOGD(TAG, "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " bytes", upload_percentage,
                this->content_length_, static_cast<uint32_t>(esp_get_free_heap_size()));
@@ -278,9 +279,10 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 
   // The Nextion will ignore the upload command if it is sleeping
   ESP_LOGD(TAG, "Wake-up Nextion");
-  // todo: are these valid commands?
-  // this->send_nextion_command_("sleep=0");
-  // this->send_nextion_command_("dim=100");
+  // These commands target the stock firmware
+  this->send_nextion_command_("sleep=0");
+  this->send_nextion_command_("dim=100");
+  // This command targets nspanel firmware
   this->send_nextion_command_("dimmode~100~100");
   vTaskDelay(pdMS_TO_TICKS(250));  // NOLINT
   ESP_LOGD(TAG, "Free heap: %" PRIu32, esp_get_free_heap_size());

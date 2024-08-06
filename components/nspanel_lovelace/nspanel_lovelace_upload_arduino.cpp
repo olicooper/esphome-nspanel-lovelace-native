@@ -139,6 +139,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url) {
     return false;
   }
 
+  ESP_LOGD(TAG, "Exiting Nextion reparse mode");
   this->set_reparse_mode_(false);
 
   this->is_updating_ = true;
@@ -192,9 +193,16 @@ bool NSPanelLovelace::upload_tft(const std::string &url) {
     ESP_LOGE(TAG, "Failed to get file size");
     return this->upload_end_(false);
   }
+  // The Nextion will ignore the update command if it is sleeping
+  ESP_LOGD(TAG, "Wake-up Nextion");
+  // These commands target the stock firmware
+  this->send_nextion_command_("sleep=0");
+  this->send_nextion_command_("dim=100");
+  // This command targets nspanel firmware
+  this->send_nextion_command_("dimmode~100~100");
+  delay(250); // NOLINT
 
   ESP_LOGD(TAG, "Updating Nextion");
-  // The Nextion will ignore the update command if it is sleeping
 
   char command[128];
   // Tells the Nextion the content length of the tft file and baud rate it will be sent at

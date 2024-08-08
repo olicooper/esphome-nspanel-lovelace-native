@@ -65,8 +65,9 @@ ENTITY_ID_RE = re.compile(r"^(?:(delete)|([\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9])|(i
 ## The list of currently supported entities
 ENTITY_TYPES = [
     'sensor','binary_sensor','light','switch','scene','timer','weather','navigate',
-    'alarm_control_panel','input_boolean','input_button','cover','fan','automation',
-    'script', 'climate', 'media_player', 'select', 'input_select'
+    'alarm_control_panel','input_boolean','button','input_button','cover','fan',
+    'automation','script','climate','media_player','select','input_select',
+    'number','input_number','text','input_text','lock','sun','person','vacuum'
 ]
 
 CONF_INCOMING_MSG = "on_incoming_msg"

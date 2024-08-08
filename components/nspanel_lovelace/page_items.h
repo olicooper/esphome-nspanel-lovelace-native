@@ -95,19 +95,6 @@ public:
   void set_icon_by_weather_condition(const std::string &condition);
   bool set_value(const std::string &value) override;
 
-  // A map of icons and their respective color for each weather condition
-  // see:
-  //  - https://www.home-assistant.io/integrations/weather/
-  //  - 'get_entity_color' function in:
-  //  https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/pages.py
-  //  - icon lookup:
-  //      - codepoint values: https://docs.nspanel.pky.eu/icon-cheatsheet.html
-  //      - icon mapping:
-  //      https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/icon_mapping.py
-  //      - mdi icons: https://pictogrammers.com/library/mdi/
-  //  - color lookup:
-  //      - https://rgbcolorpicker.com/565
-  static char_icon_map icon_color_map;
   // The temperature unit all weather items will use
   static std::string temperature_unit;
 

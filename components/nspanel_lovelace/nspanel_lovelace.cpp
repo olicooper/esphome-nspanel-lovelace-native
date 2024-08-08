@@ -104,6 +104,7 @@ void NSPanelLovelace::setup() {
     this->render_page_(render_page_option::screensaver);
   }
 
+  // todo: create entity for weather instead, so others can subscribe
   if (!this->weather_entity_id_.empty()) {
     // state provides the information for the icon
     this->subscribe_homeassistant_state(
@@ -116,7 +117,7 @@ void NSPanelLovelace::setup() {
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
-        "forecast");
+        to_string(ha_attr_type::forecast));
   }
   
   for (auto &entity : this->entities_) {
@@ -150,8 +151,13 @@ void NSPanelLovelace::setup() {
     }
     else if (entity->is_type(entity_type::switch_) ||
         entity->is_type(entity_type::input_boolean) ||
+        entity->is_type(entity_type::input_text) ||
+        entity->is_type(entity_type::text) ||
         entity->is_type(entity_type::automation) ||
-        entity->is_type(entity_type::fan)) {
+        entity->is_type(entity_type::sun) ||
+        entity->is_type(entity_type::vacuum) ||
+        entity->is_type(entity_type::lock) ||
+        entity->is_type(entity_type::person)) {
       add_state_subscription = true;
     }
     // icons and unit_of_measurement based on state and device_class
@@ -275,6 +281,40 @@ void NSPanelLovelace::setup() {
       this->subscribe_homeassistant_state_attr(
           &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::options));
+    }
+    else if (entity->is_type(entity_type::number) ||
+        entity->is_type(entity_type::input_number)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::min));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::max));
+    }
+    else if (entity->is_type(entity_type::weather)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::temperature));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::temperature_unit));
+    }
+    else if (entity->is_type(entity_type::fan)) {
+      add_state_subscription = true;
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::percentage_step));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::percentage));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::preset_modes));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::preset_mode));
     }
 
     if (add_state_subscription) {
@@ -475,7 +515,7 @@ void NSPanelLovelace::process_command(const std::string &message) {
 #endif
 
 void NSPanelLovelace::process_command_(const std::string &message) {
-  ESP_LOGD(TAG, "Screen CMD: %s", message.c_str());
+  ESP_LOGD(TAG, "TFT CMD IN: %s", message.c_str());
 
   std::vector<std::string> tokens;
   tokens.reserve(5);
@@ -620,7 +660,10 @@ bool NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
   // handle this edge case. Only certain cards support this.
   if (!esphome::str_startswith(internal_id, entity_type::uuid)) {
     auto entity = this->get_entity_(internal_id);
-    if (entity == nullptr) return false;
+    if (entity == nullptr) {
+      ESP_LOGW(TAG, "[popup] entity not found '%s'", internal_id.c_str());
+      return false;
+    }
     bool rendered = false;
     if (this->current_page_->is_type(page_type::cardThermo)) {
       if (entity->is_type(entity_type::climate)) {
@@ -643,9 +686,15 @@ bool NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) 
         this->cached_page_item_ = page_item;
         break;
       } else {
+        ESP_LOGW(TAG, "[popup] item cast failed");
         return false;
       }
     }
+  }
+
+  if (this->cached_page_item_ == nullptr || this->cached_page_item_->get_uuid() != uuid) {
+    ESP_LOGW(TAG, "[popup] entity not found on page '%s'", internal_id.c_str());
+    return false;
   }
   
   this->popup_page_current_uuid_ = uuid;
@@ -676,6 +725,8 @@ bool NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
       item->is_type(entity_type::input_select) ||
       item->is_type(entity_type::media_player)) {
     this->render_input_select_detail_update_(item);
+  } else if (item->is_type(entity_type::fan)) {
+    this->render_fan_detail_update_(item);
   } else {
     return false;
   }
@@ -717,8 +768,8 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   const char* icon_tilt_stop = generic_type::empty;
   const char* icon_tilt_right = generic_type::empty;
 
-  const char* text_position = "";
-  const char* text_tilt = "";
+  std::string text_position = "";
+  std::string text_tilt = "";
 
   // Icon Status
   bool icon_up_status = false;
@@ -731,7 +782,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   bool tilt_position_status = false;
 
   if (cover_icons != nullptr) {
-    if (entity->is_state("closed")) {
+    if (entity->is_state(entity_state::closed)) {
       cover_icon = cover_icons->at(1);
     } else {
       cover_icon = cover_icons->at(0);
@@ -740,13 +791,13 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
 
   // Position
   if (supported_features & 0b00001111) {
-    text_position = "Position"; // todo: translate
+    text_position = get_translation(translation_item::position);
     position_status = true;
   }
   // OPEN
   if (supported_features & 0b00000001) {
-    if (position != 100 && !((entity->is_state("open") ||
-        entity->is_state(generic_type::unknown)) &&
+    if (position != 100 && !((entity->is_state(entity_state::open) ||
+        entity->is_state(entity_state::unknown)) &&
         position_str.empty())) {
       icon_up_status = true;
     }
@@ -754,8 +805,8 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   }
   // CLOSE
   if (supported_features & 0b00000010) {
-    if (position != 0 && !((entity->is_state("closed") ||
-        entity->is_state(generic_type::unknown)) &&
+    if (position != 0 && !((entity->is_state(entity_state::closed) ||
+        entity->is_state(entity_state::unknown)) &&
         position_str.empty())) {
       icon_down_status = true;
     }
@@ -763,13 +814,13 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   }
   // STOP
   if (supported_features & 0b00001000) {
-    icon_stop_status = !entity->is_state(generic_type::unknown);
+    icon_stop_status = !entity->is_state(entity_state::unknown);
     icon_stop = icon_t::stop;
   }
 
   // Tilt supported
   if (supported_features & 0b11110000) {
-    text_tilt = "Tilt position"; // todo: translate
+    text_tilt = get_translation(translation_item::tilt_position);
   }
   // SUPPORT_OPEN_TILT
   if (supported_features & 0b00010000) {
@@ -803,11 +854,11 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     // entity_id~
     .append("uuid.").append(item->get_uuid()).append(1, SEPARATOR)
     // slider_pos~
-    .append(std::to_string(position)).append(1, SEPARATOR)
+    .append(esphome::to_string(position)).append(1, SEPARATOR)
     // position text + state / value~
     .append(text_position).append(": ")
     .append(position_status
-      ? std::to_string(position).append("%")
+      ? esphome::to_string(position).append("%")
       : entity->get_state())
     .append(1, SEPARATOR)
     // position text~
@@ -824,9 +875,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     .append(icon_up_status ? generic_type::enable : generic_type::disable)
     .append(1, SEPARATOR)
     // icon_stop_status~
-    .append(icon_stop_status
-      ? generic_type::enable
-      : generic_type::disable)
+    .append(icon_stop_status ? generic_type::enable : generic_type::disable)
     .append(1, SEPARATOR)
     // icon_down_status~
     .append(icon_down_status ? generic_type::enable : generic_type::disable)
@@ -862,7 +911,7 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
 
   auto entity = item->get_entity();
   auto &supported_modes = entity->get_attribute(ha_attr_type::supported_color_modes);
-  bool enable_color_wheel = entity->get_state() == generic_type::on &&
+  bool enable_color_wheel = entity->is_state(entity_state::on) &&
       (contains_value(supported_modes, ha_attr_color_mode::xy) || 
       contains_value(supported_modes, ha_attr_color_mode::hs) ||
       contains_value(supported_modes, ha_attr_color_mode::rgb) ||
@@ -875,7 +924,7 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
     if (color_mode == ha_attr_color_mode::color_temp) {
       color_temp = entity->get_attribute(ha_attr_type::color_temp, generic_type::disable);
     } else {
-      color_temp = generic_type::unknown;
+      color_temp = entity_state::unknown;
     }
   } else {
     color_temp = generic_type::disable;
@@ -889,22 +938,22 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
     // icon_color~
     .append(item->get_icon_color_str()).append(1, SEPARATOR)
     // switch_val~
-    .append(std::to_string(entity->get_state() == generic_type::on ? 1 : 0)).append(1, SEPARATOR)
+    .append(std::to_string(entity->is_state(entity_state::on) ? 1 : 0)).append(1, SEPARATOR)
     // brightness~ (0-100)
     .append(entity->get_attribute(ha_attr_type::brightness, generic_type::disable)).append(1, SEPARATOR)
-    // todo: color_temp~ (color temperature value or 'disable')
+    // color_temp~ (color temperature value or 'disable')
     .append(color_temp).append(1, SEPARATOR)
-    // todo: color~ ('enable' or 'disable')
+    // color~ ('enable' or 'disable')
     .append(enable_color_wheel ? generic_type::enable : generic_type::disable).append(1, SEPARATOR)
     // color_translation~
-    .append("Colour").append(1, SEPARATOR)
+    .append(get_translation(translation_item::color)).append(1, SEPARATOR)
     // color_temp_translation~
-    .append("Colour temperature").append(1, SEPARATOR)
+    .append(get_translation(translation_item::color_temp)).append(1, SEPARATOR)
     // brightness_translation~
-    .append("Brightness").append(1, SEPARATOR)
+    .append(get_translation(translation_item::brightness)).append(1, SEPARATOR)
     // effect_supported ('enable' or 'disable')
-    // todo: requires parsing 'enabled_features' attribute
-    .append(generic_type::disable);
+    .append(entity->has_attribute(ha_attr_type::effect_list) ?
+      generic_type::enable : generic_type::disable);
 }
 
 // entityUpdateDetail~{entity_id}~~{icon_color}~{entity_id}~{min_remaining}~{sec_remaining}~{editable}~{action1}~{action2}~{action3}~{label1}~{label2}~{label3}
@@ -914,12 +963,12 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
   auto &state = item->get_state();
   bool render = false;
   uint16_t min_remaining = 0, sec_remaining = 0;
-  bool idle = state == "paused" || state == "idle";
+  bool idle = state == entity_state::paused || state == entity_state::idle;
 
   if (idle) {
     this->cancel_interval(entity_type::timer);
     std::string time_remaining_str;
-    if (state == "paused") {
+    if (state == entity_state::paused) {
       time_remaining_str = item->get_attribute(ha_attr_type::remaining);
     } else {
       time_remaining_str = item->get_attribute(ha_attr_type::duration);
@@ -976,21 +1025,26 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     .append(std::to_string(sec_remaining)).append(1, SEPARATOR)
     // editable~
     .append((idle && 
-      item->get_attribute(ha_attr_type::editable) == generic_type::on)
+      item->get_attribute(ha_attr_type::editable) == entity_state::on)
         ? "1" : "0")
     .append(1, SEPARATOR)
     // action1~
-    .append(idle ? "" : "pause").append(1, SEPARATOR)
+    .append(idle ? "" : ha_action_type::pause).append(1, SEPARATOR)
     // action2~
-    .append(idle ? "start" : "cancel").append(1, SEPARATOR)
+    .append(idle ? ha_action_type::start : ha_action_type::cancel)
+    .append(1, SEPARATOR)
     // action3~
-    .append(idle ? "" : "finish").append(1, SEPARATOR)
+    .append(idle ? "" : ha_action_type::finish)
+    .append(1, SEPARATOR)
     // label1~
-    .append(idle ? "" : "Pause").append(1, SEPARATOR)
+    .append(idle ? "" : get_translation(translation_item::pause))
+    .append(1, SEPARATOR)
     // label2~
-    .append(idle ? "Start" : "Cancel").append(1, SEPARATOR)
+    .append(get_translation(idle ? 
+      translation_item::start : translation_item::cancel))
+    .append(1, SEPARATOR)
     // label3
-    .append(idle ? "" : "Finish");
+    .append(idle ? "" : get_translation(translation_item::finish));
 }
 
 void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
@@ -1006,15 +1060,15 @@ void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::s
     CLIMATE_ICON_MAP, entity->get_state());
   uint16_t icon_colour = 64512U;
   auto &state = entity->get_state();
-  if (state == ha_attr_hvac_mode::auto_ ||
-      state == ha_attr_hvac_mode::heat_cool) {
+  if (state == entity_state::auto_ ||
+      state == entity_state::heat_cool) {
     icon_colour = 1024U;
-  } else if (state == ha_attr_hvac_mode::off ||
-      state == ha_attr_hvac_mode::fan_only) {
+  } else if (state == entity_state::off ||
+      state == entity_state::fan_only) {
     icon_colour = 35921U;
-  } else if (state == ha_attr_hvac_mode::cool) {
+  } else if (state == entity_state::cool) {
     icon_colour = 11487U;
-  } else if (state == ha_attr_hvac_mode::dry) {
+  } else if (state == entity_state::dry) {
     icon_colour = 60897U;
   }
 
@@ -1052,8 +1106,7 @@ void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::s
         pos_end = supported_modes.find(',', pos_start + 1);
         mode_res.append(
           get_translation(
-            supported_modes.substr(pos_start + 1, pos_end - pos_start - 1)
-            .c_str()));
+            supported_modes.substr(pos_start + 1, pos_end - pos_start - 1)));
         if (pos_end != std::string::npos) mode_res.append(1, '?');
         pos_start = pos_end;
       } while (pos_start != std::string::npos);
@@ -1066,7 +1119,7 @@ void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::s
 
     this->command_buffer_
       // heading~
-      .append(get_translation(mode_type.c_str())).append(1, SEPARATOR)
+      .append(get_translation(mode_type)).append(1, SEPARATOR)
       // mode~
       .append(to_string(mt)).append(1, SEPARATOR)
       // curr_mode~
@@ -1087,10 +1140,7 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
     options = item->get_attribute(ha_attr_type::options);
   }
   else if (item->is_type(entity_type::light)) {
-    auto split_pos = find_nth_of(',', 15, options);
-    if (split_pos != std::string::npos) {
-      options = options.substr(0, split_pos);
-    }
+    options = item->get_attribute(ha_attr_type::effect_list);
   }
   else if (item->is_type(entity_type::media_player)) {
     options = item->get_attribute(ha_attr_type::source_list);
@@ -1113,13 +1163,61 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
     .append(options).append(1, SEPARATOR);
 }
 
+// entityUpdateDetail~{entity_id}~~{icon_color}~{switch_val}~{speed}~{speed_max}~{speed_translation}~{preset_mode}~{preset_modes}
+void NSPanelLovelace::render_fan_detail_update_(StatefulPageItem *item) {
+  if(item == nullptr) return;
+
+  auto speed = item->get_attribute(ha_attr_type::percentage);
+  auto percentage_step = item->get_attribute(ha_attr_type::percentage_step);
+  auto preset_mode = item->get_attribute(ha_attr_type::preset_mode);
+  auto preset_modes = item->get_attribute(ha_attr_type::preset_modes);
+  if (!preset_modes.empty()) replace_all(preset_modes, ',', '?');
+
+  uint8_t speed_max = 100;
+  if (!percentage_step.empty()) {
+    float speed_val = 0.0f;
+    if (speed.empty()) {
+      speed = "0";
+    } else {
+      speed_val = std::stof(speed);
+    }
+    auto step_val = std::stof(percentage_step);
+    if (step_val < 1.0f) step_val = 1.0f; // avoid divide-by-zero
+    speed = esphome::to_string(
+      static_cast<uint16_t>(round(speed_val / step_val)));
+    speed_max = static_cast<uint16_t>(round(100.0f / step_val));
+  }
+
+  this->command_buffer_
+    // entityUpdateDetail~
+    .assign("entityUpdateDetail").append(1, SEPARATOR)
+    // entity_id~~
+    .append("uuid.").append(item->get_uuid()).append(2, SEPARATOR)
+    // icon_color~
+    .append(item->get_icon_color_str()).append(1, SEPARATOR)
+    // switch_val~
+    .append(esphome::to_string(item->is_state(entity_state::on) ? 1 : 0))
+    .append(1, SEPARATOR)
+    // speed~
+    .append(percentage_step.empty() ? generic_type::disable : speed)
+    .append(1, SEPARATOR)
+    // speed_max~
+    .append(esphome::to_string(speed_max)).append(1, SEPARATOR)
+    // speed_translation~
+    .append(get_translation(translation_item::speed)).append(1, SEPARATOR)
+    // preset_mode~
+    .append(preset_mode).append(1, SEPARATOR)
+    // preset_modes
+    .append(preset_modes);
+}
+
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  // ESP_LOGCONFIG(TAG, "\tRAM: %u %u %u",
-  //   psram_used(),
-  //   heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-  //   heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+  ESP_LOGCONFIG(TAG, "\tRAM: %u %u %u",
+    psram_used(),
+    heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+    heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
   ESP_LOGCONFIG(TAG, "\tState: pages:%u,stateful_items:%u,entities:%u",
       this->pages_.size(),
       this->stateful_page_items_.size(),
@@ -1154,7 +1252,7 @@ void NSPanelLovelace::process_display_command_queue_() {
     ESP_LOGVV(TAG, "Command un-queued (size: %u)", this->command_queue_.size());
   }
 
-  ESP_LOGD(TAG, "Sending: %s", this->command_buffer_.c_str());
+  ESP_LOGD(TAG, "TFT CMD OUT: %s", this->command_buffer_.c_str());
   // todo: break this in to chunks and use write_array() in loop() instead (similar to command_queue)
   std::vector<uint8_t> data;
   data.reserve(this->command_buffer_.length() + 6);
@@ -1478,8 +1576,35 @@ void NSPanelLovelace::process_button_press_(
         value == "1" ? ha_action_type::turn_on : ha_action_type::turn_off, 
         entity_id);
     }
-  } else if (button_type == button_type::numberSet) {
-    // todo
+  } 
+  // fan, number, input_number
+  else if (button_type == button_type::numberSet) {
+    if (entity_type == entity_type::fan) {
+      auto entity = this->get_entity_(entity_id);
+      if (entity == nullptr) return;
+      auto step = std::stof(
+        entity->get_attribute(ha_attr_type::percentage_step, "0"));
+      if (step > 100.0f) step = 100.0f;
+      auto val = std::stof(value) * step;
+      if (val > 100.0f) val = 100.0f;
+      auto pct = esphome::str_snprintf("%.6f", 11, val);
+      
+      this->call_ha_service_(
+        entity_type, 
+        ha_action_type::set_percentage, 
+        {{
+          {to_string(ha_attr_type::entity_id), entity_id},
+          {to_string(ha_attr_type::percentage), pct}
+        }});
+    } else {
+      this->call_ha_service_(
+        entity_type, 
+        ha_action_type::set_value, 
+        {{
+          {to_string(ha_attr_type::entity_id), entity_id},
+          {to_string(ha_attr_type::value), value}
+        }});
+    }
   }
   // cover and shutter cards
   else if (button_type == button_type::up) {
@@ -1546,7 +1671,7 @@ void NSPanelLovelace::process_button_press_(
       auto entity = this->get_entity_(entity_id);
       if (entity == nullptr) return;
       this->call_ha_service_(entity_type,
-        entity->is_state("docked") 
+        entity->is_state(entity_state::docked) 
           ? ha_action_type::start 
           : ha_action_type::return_to_base,
         entity_id);
@@ -1554,7 +1679,7 @@ void NSPanelLovelace::process_button_press_(
       auto entity = this->get_entity_(entity_id);
       if (entity == nullptr) return;
       this->call_ha_service_(entity_type,
-        entity->is_state("locked") 
+        entity->is_state(entity_state::locked) 
           ? ha_action_type::unlock 
           : ha_action_type::lock,
         entity_id);
@@ -1575,7 +1700,7 @@ void NSPanelLovelace::process_button_press_(
     if (entity == nullptr) return;
     this->call_ha_service_(
       entity_type,
-      entity->is_state(generic_type::on) 
+      entity->is_state(entity_state::on) 
         ? ha_action_type::turn_off 
         : ha_action_type::turn_on,
       entity_id);
@@ -1584,8 +1709,8 @@ void NSPanelLovelace::process_button_press_(
     if (entity == nullptr) return;
     auto shuffle = entity->get_attribute(ha_attr_type::shuffle);
     if (shuffle.empty()) return;
-    shuffle = shuffle == generic_type::off 
-      ? generic_type::on : generic_type::off;
+    shuffle = shuffle == entity_state::off 
+      ? entity_state::on : entity_state::off;
     this->call_ha_service_(
       entity_type,
       ha_action_type::shuffle_set,
@@ -1594,7 +1719,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::shuffle), shuffle}
       }});
   } else if (button_type == button_type::volumeSlider) {
-    auto volume = esphome::str_snprintf("%.2f", 6, std::stoi(value) * 0.01f);
+    auto volume = esphome::str_snprintf("%.2f", 7, std::stoi(value) * 0.01f);
     this->call_ha_service_(
       entity_type,
       ha_action_type::volume_set,
@@ -1828,6 +1953,24 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::option), options.at(index)}
       }});
   }
+  // light
+  else if (button_type == button_type::modeLight) {
+    auto entity = this->get_entity_(entity_id);
+    if (entity == nullptr) return;
+    auto effects_str = entity->get_attribute(ha_attr_type::effect_list);
+    if (effects_str.empty()) return;
+    std::vector<std::string> effects;
+    split_str(',', effects_str, effects);
+    uint8_t index = stoi(value);
+    if (effects.size() <= index) return;
+    this->call_ha_service_(
+      entity_type,
+      ha_action_type::turn_on,
+      {{
+        {to_string(ha_attr_type::entity_id), entity_id},
+        {to_string(ha_attr_type::effect), effects.at(index)}
+      }});
+  }
   // timer card
   else if (esphome::str_startswith(button_type, entity_type::timer)) {
     std::string service(button_type);
@@ -1927,14 +2070,17 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
   auto ha_attr = to_ha_attr(attr);
   if (ha_attr == ha_attr_type::unknown) return;
 
-  if (attr == to_string(ha_attr_type::state)) {
+  if (ha_attr == ha_attr_type::state) {
     entity->set_state(attr_value);
   } else {
     entity->set_attribute(ha_attr, attr_value);
   }
 
   ESP_LOGD(TAG, "HA update: %s %s='%s'",
-    entity_id.c_str(), attr.c_str(), attr_value.c_str());
+    entity_id.c_str(), attr.c_str(), 
+    ha_attr == ha_attr_type::state
+      ? entity->get_state().c_str()
+      : entity->get_attribute(ha_attr).c_str());
 
   // if (this->force_current_page_update_) return;
 
@@ -1974,6 +2120,11 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
     }
     else if (entity_type == entity_type::media_player &&
         this->current_page_->is_type(page_type::cardMedia)) {
+      force_current_page_update_ = true;
+      return;
+    }
+    else if (entity_type == entity_type::alarm_control_panel &&
+        this->current_page_->is_type(page_type::cardAlarm)) {
       force_current_page_update_ = true;
       return;
     }
@@ -2017,7 +2168,6 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
   this->send_weather_update_command_();
 }
 
-// todo: apply this technique https://arduinojson.org/v6/how-to/deserialize-a-very-large-document/#deserialization-in-chunks
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
   if (this->screensaver_ == nullptr) return;
   // todo: check if we are on the screensaver otherwise don't update

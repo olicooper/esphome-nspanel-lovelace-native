@@ -17,12 +17,6 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-struct compare_char_str {
-  bool operator()(const char *a, const char *b) const {
-    return a != nullptr && b != nullptr && std::strcmp(a, b) < 0;
-  }
-};
-
 // see: https://stackoverflow.com/a/13890501/2634818
 inline void replace_first(
     std::string &s, std::string const &toReplace,
@@ -89,6 +83,8 @@ inline double value_or_default(const std::string &str, double default_value) {
 }
 
 inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
+  if (iso8601_string == nullptr) return false;
+  
 	// note: don't need to know the timezone
 	static constexpr const char* format = "%d-%d-%dT%d:%d:%d";// "%d-%d-%dT%d:%d:%d+%d:%d";
 
@@ -218,6 +214,7 @@ inline size_t find_nth_of(char delimiter, uint16_t count, const std::string &str
 
 // Takes the string representation of a Python array (enums, strings etc) and extracts the 
 // values to a new string separated by delimiter.
+// todo: remove this when esphome starts sending properly formatted array strings
 inline std::string convert_python_arr_str(const std::string &str, const char delimiter = ',') {
   if (str.empty()) return str;
   size_t pos_start = std::string::npos, pos_end = pos_start;

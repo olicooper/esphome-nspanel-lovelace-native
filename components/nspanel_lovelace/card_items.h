@@ -54,6 +54,11 @@ protected:
   static void state_timer_fn(StatefulPageItem *me);
   static void state_cover_fn(StatefulPageItem *me);
   static void state_climate_fn(StatefulPageItem *me);
+  static void state_number_fn(StatefulPageItem *me);
+  static void state_lock_fn(StatefulPageItem *me);
+  static void state_weather_fn(StatefulPageItem *me);
+  static void state_sun_fn(StatefulPageItem *me);
+  static void state_translate_fn(StatefulPageItem *me);
 
   void set_on_state_callback_(const char *type) override;
 

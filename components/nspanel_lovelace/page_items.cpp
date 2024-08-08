@@ -131,7 +131,7 @@ void WeatherItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 // valid conditions are found in weather_type
 void WeatherItem::set_icon_by_weather_condition(const std::string &condition) {
-  auto icon = get_icon_by_name(WeatherItem::icon_color_map, condition);
+  auto icon = get_icon_by_name(WEATHER_ICON_MAP, condition);
   if (icon == nullptr)
     return;
   this->icon_color_ = icon->color;
@@ -156,26 +156,6 @@ std::string &WeatherItem::render_(std::string &buffer) {
   return buffer.append(esphome::str_snprintf("%.1f", 6, this->float_value_))
       .append(WeatherItem::temperature_unit);
 }
-
-// clang-format off
-char_icon_map WeatherItem::icon_color_map = {
-  {weather_type::sunny,           {icon_t::weather_sunny, 65504u}}, // mdi:0599,#ffff00
-  {weather_type::windy,           {icon_t::weather_windy, 38066u}}, // mdi:059D,#949694
-  {weather_type::windy_variant,   {icon_t::weather_windy_variant, 64495u}}, // mdi:059E,#ff7d7b
-  {weather_type::cloudy,          {icon_t::weather_cloudy, 31728u}}, // mdi:0590,#7b7d84
-  {weather_type::partlycloudy,    {icon_t::weather_partly_cloudy, 38066u}}, // mdi:0595,#949694
-  {weather_type::clear_night,     {icon_t::weather_night, 38060u}}, // mdi:0594,#949663
-  {weather_type::exceptional,     {icon_t::alert_circle_outline, 63878u}}, // mdi:05D6,#ff3131
-  {weather_type::rainy,           {icon_t::weather_rainy, 25375u}}, // mdi:0597,#6361ff
-  {weather_type::pouring,         {icon_t::weather_pouring, 12703u}}, // mdi:0596,#3131ff
-  {weather_type::snowy,           {icon_t::weather_snowy, 65535u}}, // mdi:E598,#ffffff
-  {weather_type::snowy_rainy,     {icon_t::weather_partly_snowy_rainy, 38079u}}, // mdi:067F,#9496ff
-  {weather_type::fog,             {icon_t::weather_fog, 38066u}}, // mdi:0591,#949694
-  {weather_type::hail,            {icon_t::weather_hail, 65535u}}, // mdi:0592,#ffffff
-  {weather_type::lightning,       {icon_t::weather_lightning, 65120u}}, // mdi:0593,#ffce00
-  {weather_type::lightning_rainy, {icon_t::weather_lightning_rainy, 50400u}} // mdi:067E,#c59e00
-};
-// clang-format on
 
 std::string WeatherItem::temperature_unit = "°C";
 

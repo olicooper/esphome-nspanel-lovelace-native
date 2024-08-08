@@ -14,6 +14,7 @@
 #    - Timer: `event,pageOpenDetail,popupTimer,uuid.15`
 #       - Start timer with time 0:35:40: `event,buttonPress2,uuid.15,timer-start,0:35:40`
 #    - RGBW Light: `event,pageOpenDetail,popupLight,uuid.12`
+#    - Input Select: `event,pageOpenDetail,popupInSel,climate.ecobee`
 
 substitutions:
   node_name: nspanel-test
@@ -49,23 +50,26 @@ nspanel_lovelace:
     time_id: homeassistant_time
     weather:
       entity_id: weather.forecast_home
+  
+  ## WARNING: There is not enough RAM on a basic ESP32 to support lots of cards
+  ##          Only enable a few at a time unless the device has PSRAM enabled
   cards:
-    - type: cardGrid
-      id: lights_card
-      title: Lights
-      sleep_timeout: 10
-      # hidden: true
-      entities:
-        - entity_id: switch.decorative_lights
-          name: switch
-        - entity_id: light.ceiling_lights
-          name: color_temp,hs
-        - entity_id: light.entrance_color_white_lights
-          name: hs,white
-        - entity_id: light.office_rgbw_lights
-          name: rgbw
-        - entity_id: light.living_room_rgbww_lights
-          name: rgbww
+    # - type: cardGrid
+    #   id: lights_card
+    #   title: Lights
+    #   sleep_timeout: 10
+    #   # hidden: true
+    #   entities:
+    #     - entity_id: switch.decorative_lights
+    #       name: switch
+    #     - entity_id: light.ceiling_lights
+    #       name: color_temp,hs
+    #     - entity_id: light.entrance_color_white_lights
+    #       name: hs,white
+    #     - entity_id: light.office_rgbw_lights
+    #       name: rgbw
+    #     - entity_id: light.living_room_rgbww_lights
+    #       name: rgbww
 
     - type: cardEntities
       id: extras_1_card
@@ -91,8 +95,8 @@ nspanel_lovelace:
           name: Temp Sensor
         - entity_id: weather.demo_weather_south
           name: Weather
-        - entity_id: navigate.qr_card
-          name: QR Card
+        # - entity_id: navigate.qr_card
+        #   name: QR Card
 
     - type: cardGrid2
       id: extras_3_card
@@ -107,19 +111,45 @@ nspanel_lovelace:
         - entity_id: select.speed
           name: Select Speed
 
-    - type: cardQR
-      id: qr_card
-      title: WiFi
+    - type: cardEntities
+      id: extras_4_card
+      title: Extras 4
       sleep_timeout: 30
-      hidden: true
-      qr_text: WIFI:S:SSID;T:WPA;P:PASSWORD;;
       entities:
-        - entity_id: iText.ssid
-          name: SSID
-          icon: wifi
-        - entity_id: iText.password
-          name: Password
-          icon: key
+        - entity_id: number.pwm_1
+          name: Number Decimal
+        - entity_id: lock.openable_lock
+          name: Openable Lock
+        - entity_id: fan.percentage_limited_fan
+          name: Fan
+        - entity_id: vacuum.5_fifth_floor
+          name: Vacuum 5
+
+    - type: cardEntities
+      id: extras_5_card
+      title: Extras 5
+      sleep_timeout: 30
+      entities:
+        - entity_id: sun.sun
+          name: Sun
+        - entity_id: person.oliver
+          name: Person
+        - entity_id: text.text
+          name: Text
+
+    # - type: cardQR
+    #   id: qr_card
+    #   title: WiFi
+    #   sleep_timeout: 30
+    #   hidden: true
+    #   qr_text: WIFI:S:SSID;T:WPA;P:PASSWORD;;
+    #   entities:
+    #     - entity_id: iText.ssid
+    #       name: SSID
+    #       icon: wifi
+    #     - entity_id: iText.password
+    #       name: Password
+    #       icon: key
 
     - type: cardAlarm
       id: alarm_card
@@ -128,26 +158,30 @@ nspanel_lovelace:
       alarm_entity_id: alarm_control_panel.security
 
     - type: cardThermo
+      id: thermo_card_1
       sleep_timeout: 60
       title: Thermo Ecobee
       thermo_entity_id: climate.ecobee
 
-    - type: cardThermo
-      sleep_timeout: 60
-      title: Thermo HVAC
-      thermo_entity_id: climate.hvac
+    # - type: cardThermo
+    #   id: thermo_card_2
+    #   sleep_timeout: 60
+    #   title: Thermo HVAC
+    #   thermo_entity_id: climate.hvac
 
-    - type: cardThermo
-      sleep_timeout: 60
-      title: Thermo heatpump
-      thermo_entity_id: climate.heatpump
+    # - type: cardThermo
+    #   id: thermo_card_3
+    #   sleep_timeout: 60
+    #   title: Thermo heatpump
+    #   thermo_entity_id: climate.heatpump
 
     - type: cardMedia
+      id: media_card
       sleep_timeout: 60
       title: Media Lounge
       media_entity_id: media_player.lounge_room
-      entities:
-        - entity_id: sensor.carbon_dioxide
+      # entities:
+      #   - entity_id: sensor.carbon_dioxide
 
 logger:
   baud_rate: 115200

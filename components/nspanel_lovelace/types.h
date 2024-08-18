@@ -2,11 +2,9 @@
 
 #include <array>
 #include <cassert>
-#include <map>
 #include <stdint.h>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "helpers.h"
 
@@ -305,15 +303,15 @@ struct icon_t {
 struct Icon {
   // The codepoint value
   // default: mdi:05D6 (alert-circle-outline)
-  std::string value;
+  const char *value;
   // The rgb565 color
   // default: #ff3131 (red)
   uint16_t color;
   // The string representation of the rgb565 color
   const std::string color_str() const { return std::to_string(color); }
 
-  Icon() : Icon(icon_t::alert_circle_outline, 63878u) { }
-  Icon(const std::string value, const uint16_t color) : value(value), color(color) { }
+  constexpr Icon() : Icon(icon_t::alert_circle_outline, 63878u) { }
+  constexpr Icon(const char *value, const uint16_t color) : value(value), color(color) { }
 };
 
 struct generic_type {
@@ -325,10 +323,6 @@ struct generic_type {
   static constexpr const char* off = "off";
   static constexpr const char* empty = "";
 };
-
-typedef std::map<const char*, const char*, compare_char_str> char_map;
-typedef std::map<const char*, Icon, compare_char_str> char_icon_map;
-typedef std::map<const char*, std::vector<const char *>, compare_char_str> char_list_map;
 
 struct weather_type {
   static constexpr const char* sunny = "sunny";
@@ -789,70 +783,89 @@ inline datetime_mode operator&(datetime_mode a, datetime_mode b) {
   return static_cast<datetime_mode>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
 
-inline const char *get_icon_by_name(
-    const char_map &map,
-    const std::string& icon_name,
-    const std::string& fallback_icon_name = "",
-    const char *default_icon = nullptr) {
-  if (map.size() > 0) {
-    if (icon_name.empty()) {
-      if (!fallback_icon_name.empty()) {
-        auto icon_it = map.find(fallback_icon_name.c_str());
-        if (icon_it != map.end()) return icon_it->second;
+// note: The FrozenCharMap is designed to avoid dynamic memory allocation by
+//       making use of std::array instead of std::map
+template <typename Value, size_t Size>
+using FrozenCharMap = const std::array<std::pair<const char *, Value>, Size>;
+
+template<typename Value, size_t Size>
+inline bool try_get_value(
+    const FrozenCharMap<Value, Size> &map,
+    Value &return_value,
+    const char *key,
+    const char *fallback_key = nullptr) {
+  if (map.size() == 0)
+    return false;
+
+  const char *key_cstr = key;
+  do {
+    if ((key_cstr != nullptr && strlen(key_cstr) > 0)) {
+      auto it = map.begin();
+      for (; it != map.end(); ++it) {
+        if (!str_equal(it->first, key_cstr)) continue;
+        return_value = it->second;
+        return true;
       }
-    } else {
-      auto icon_it = map.find(icon_name.c_str());
-      if (icon_it != map.end()) return icon_it->second;
     }
-  }
-  return default_icon == nullptr 
-    ? icon_t::alert_circle_outline
-    : default_icon;
+    if (key_cstr == fallback_key || 
+        fallback_key == nullptr || strlen(fallback_key) == 0)
+      return false;
+    key_cstr = fallback_key;
+  } while (true);
+
+  return false;
 }
 
-inline const std::vector<const char*> *get_icon_by_name(
-    const char_list_map &map,
-    const std::string &icon_name,
-    const std::string& fallback_icon_name = "",
-    const std::vector<const char*> *default_icon_list = nullptr) {
-  if (map.size() > 0) {
-    if (icon_name.empty()) {
-      if (!fallback_icon_name.empty()) {
-        auto icon_it = map.find(fallback_icon_name.c_str());
-        if (icon_it != map.end()) return &icon_it->second;
-      }
-    } else {
-      auto icon_it = map.find(icon_name.c_str());
-      if (icon_it != map.end()) return &icon_it->second;
-    }
-  }
-  return default_icon_list;
+template<typename Value, size_t Size>
+inline bool try_get_value(
+    const FrozenCharMap<Value, Size> &map,
+    Value &return_value,
+    const std::string &key,
+    const char *fallback_key = nullptr) {
+  return try_get_value(map, return_value, key.c_str(), fallback_key);
 }
 
-inline const Icon *get_icon_by_name(
-    const char_icon_map &map,
-    const std::string &icon_name,
-    const std::string& fallback_icon_name = "",
-    const Icon *default_icon = nullptr) {
-  if (map.size() > 0) {
-    if (icon_name.empty()) {
-      if (!fallback_icon_name.empty()) {
-        auto icon_it = map.find(fallback_icon_name.c_str());
-        if (icon_it != map.end()) return &icon_it->second;
-      }
-    } else {
-      auto icon_it = map.find(icon_name.c_str());
-      if (icon_it != map.end()) return &icon_it->second;
-    }
-  }
-  static const Icon default_icon_obj;
-  return default_icon == nullptr 
-    ? &default_icon_obj
-    : default_icon;
+template<typename Value, size_t Size>
+inline const Value &get_value_or_default(
+    const FrozenCharMap<Value, Size> &map,
+    const char *key,
+    const Value &default_value,
+    const char *fallback_key = nullptr) {
+  // todo: fix this bad implementation
+  //       use pointers and unwrap Value?
+  static Value ret{};
+  if (try_get_value(map, ret, key, fallback_key))
+    return ret;
+  return default_value;
+}
+
+template<typename Value, size_t Size>
+inline const Value &get_value_or_default(
+    const FrozenCharMap<Value, Size> &map,
+    const std::string &key,
+    const Value &default_value,
+    const char *fallback_key = nullptr) {
+ return get_value_or_default(map, key.c_str(), default_value, fallback_key);
+}
+
+template<size_t Size>
+inline const char *get_icon(
+    const FrozenCharMap<const char *, Size> &map,
+    const char *key,
+    const char *fallback_key = nullptr) {
+  return get_value_or_default(map, key, icon_t::alert_circle_outline, fallback_key);
+}
+
+template<size_t Size>
+inline const char *get_icon(
+    const FrozenCharMap<const char *, Size> &map,
+    const std::string &key,
+    const char *fallback_key = nullptr) {
+  return get_icon(map, key.c_str(), fallback_key);
 }
 
 // simple_type_mapping
-const char_map ENTITY_ICON_MAP {
+static constexpr FrozenCharMap<const char *, 20> ENTITY_ICON_MAP {{
   {entity_type::button, icon_t::gesture_tap_button},
   {entity_type::navigate, icon_t::gesture_tap_button},
   {entity_type::input_button, icon_t::gesture_tap_button},
@@ -874,10 +887,10 @@ const char_map ENTITY_ICON_MAP {
   {entity_type::nav_next, icon_t::arrow_right_bold},
   {entity_type::itext, icon_t::format_color_text},
   {entity_type::input_text, icon_t::cursor_text},
-};
+}};
 
 // sensor_mapping_on
-const char_map SENSOR_ON_ICON_MAP {
+static constexpr FrozenCharMap<const char *, 27> SENSOR_ON_ICON_MAP {{
   {sensor_type::battery, icon_t::battery_outline},
   {sensor_type::battery_charging, icon_t::battery_charging},
   {sensor_type::carbon_monoxide, icon_t::smoke_detector_alert},
@@ -905,10 +918,10 @@ const char_map SENSOR_ON_ICON_MAP {
   {sensor_type::update, icon_t::package_up},
   {sensor_type::vibration, icon_t::vibrate},
   {sensor_type::window, icon_t::window_open}
-};
+}};
 
 // sensor_mapping_off
-const char_map SENSOR_OFF_ICON_MAP {
+static constexpr FrozenCharMap<const char *, 27> SENSOR_OFF_ICON_MAP {{
   {sensor_type::battery, icon_t::battery},
   {sensor_type::battery_charging, icon_t::battery},
   {sensor_type::carbon_monoxide, icon_t::smoke_detector},
@@ -936,10 +949,10 @@ const char_map SENSOR_OFF_ICON_MAP {
   {sensor_type::update, icon_t::package},
   {sensor_type::vibration, icon_t::crop_portrait},
   {sensor_type::window, icon_t::window_closed},
-};
+}};
 
 // sensor_mapping
-const char_map SENSOR_ICON_MAP {
+static constexpr FrozenCharMap<const char *, 31> SENSOR_ICON_MAP {{
   {sensor_type::apparent_power, icon_t::flash},
   {sensor_type::aqi, icon_t::smog},
   {sensor_type::battery, icon_t::battery},
@@ -971,10 +984,40 @@ const char_map SENSOR_ICON_MAP {
   {sensor_type::timestamp, icon_t::calendar_clock},
   {sensor_type::volatile_organic_compounds, icon_t::smog},
   {sensor_type::voltage, icon_t::flash}
-};
+}};
+
+// A map of icons and their respective color for each weather condition
+// see:
+//  - https://www.home-assistant.io/integrations/weather/
+//  - 'get_entity_color' function in:
+//  https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/pages.py
+//  - icon lookup:
+//      - codepoint values: https://docs.nspanel.pky.eu/icon-cheatsheet.html
+//      - icon mapping:
+//      https://github.com/joBr99/nspanel-lovelace-ui/blob/main/apps/nspanel-lovelace-ui/luibackend/icon_mapping.py
+//      - mdi icons: https://pictogrammers.com/library/mdi/
+//  - color lookup:
+//      - https://rgbcolorpicker.com/565
+static constexpr FrozenCharMap<Icon, 15> WEATHER_ICON_MAP {{
+  {weather_type::sunny,           {icon_t::weather_sunny, 65504u}}, // mdi:0599,#ffff00
+  {weather_type::windy,           {icon_t::weather_windy, 38066u}}, // mdi:059D,#949694
+  {weather_type::windy_variant,   {icon_t::weather_windy_variant, 64495u}}, // mdi:059E,#ff7d7b
+  {weather_type::cloudy,          {icon_t::weather_cloudy, 31728u}}, // mdi:0590,#7b7d84
+  {weather_type::partlycloudy,    {icon_t::weather_partly_cloudy, 38066u}}, // mdi:0595,#949694
+  {weather_type::clear_night,     {icon_t::weather_night, 38060u}}, // mdi:0594,#949663
+  {weather_type::exceptional,     {icon_t::alert_circle_outline, 63878u}}, // mdi:05D6,#ff3131
+  {weather_type::rainy,           {icon_t::weather_rainy, 25375u}}, // mdi:0597,#6361ff
+  {weather_type::pouring,         {icon_t::weather_pouring, 12703u}}, // mdi:0596,#3131ff
+  {weather_type::snowy,           {icon_t::weather_snowy, 65535u}}, // mdi:E598,#ffffff
+  {weather_type::snowy_rainy,     {icon_t::weather_partly_snowy_rainy, 38079u}}, // mdi:067F,#9496ff
+  {weather_type::fog,             {icon_t::weather_fog, 38066u}}, // mdi:0591,#949694
+  {weather_type::hail,            {icon_t::weather_hail, 65535u}}, // mdi:0592,#ffffff
+  {weather_type::lightning,       {icon_t::weather_lightning, 65120u}}, // mdi:0593,#ffce00
+  {weather_type::lightning_rainy, {icon_t::weather_lightning_rainy, 50400u}} // mdi:067E,#c59e00
+}};
 
 // climate_mapping
-const char_map CLIMATE_ICON_MAP {
+static constexpr FrozenCharMap<const char *, 7> CLIMATE_ICON_MAP {{
   {ha_attr_hvac_mode::auto_, icon_t::calendar_sync},
   {ha_attr_hvac_mode::heat_cool, icon_t::calendar_sync},
   {ha_attr_hvac_mode::heat, icon_t::fire},
@@ -982,9 +1025,9 @@ const char_map CLIMATE_ICON_MAP {
   {ha_attr_hvac_mode::cool, icon_t::snowflake},
   {ha_attr_hvac_mode::dry, icon_t::water_percent},
   {ha_attr_hvac_mode::fan_only, icon_t::fan},
-};
+}};
 
-const char_map MEDIA_TYPE_MAP {
+static constexpr FrozenCharMap<const char *, 9> MEDIA_TYPE_MAP {{
   {generic_type::off, icon_t::speaker_off},
   {ha_attr_media_content_type::music, icon_t::music},
   {ha_attr_media_content_type::tvshow, icon_t::movie},
@@ -994,10 +1037,10 @@ const char_map MEDIA_TYPE_MAP {
   {ha_attr_media_content_type::playlist, icon_t::playlist_music}, // (originally: icon_t::alert_circle_outline)
   {ha_attr_media_content_type::app, icon_t::open_in_app}, // newly added!
   {ha_attr_media_content_type::url, icon_t::link_box_outline}, // newly added! (OR cast E117?)
-};
+}};
 
 // cover_mapping
-const char_list_map COVER_MAP {
+static constexpr FrozenCharMap<std::array<const char *, 4>, 10> COVER_MAP {{
   // "device_class": ("icon-open", "icon-closed", "icon-cover-open", "icon-cover-close")
   {entity_cover_type::awning, {icon_t::window_open, icon_t::window_closed, icon_t::arrow_up, icon_t::arrow_down}},
   {entity_cover_type::blind, {icon_t::blinds_open, icon_t::blinds, icon_t::arrow_up, icon_t::arrow_down}},
@@ -1009,9 +1052,9 @@ const char_list_map COVER_MAP {
   {entity_cover_type::shade, {icon_t::blinds_open, icon_t::blinds, icon_t::arrow_up, icon_t::arrow_down}},
   {entity_cover_type::shutter, {icon_t::window_shutter_open, icon_t::window_shutter, icon_t::arrow_up, icon_t::arrow_down}},
   {entity_cover_type::window, {icon_t::window_open, icon_t::window_closed, icon_t::arrow_up, icon_t::arrow_down}},
-};
+}};
 
-const char_map ENTITY_RENDER_TYPE_MAP {
+static constexpr FrozenCharMap<const char *, 29> ENTITY_RENDER_TYPE_MAP {{
   {entity_type::cover, entity_render_type::shutter},
   {entity_type::light, entity_type::light},
 
@@ -1048,7 +1091,7 @@ const char_map ENTITY_RENDER_TYPE_MAP {
 
   {entity_type::timer, entity_type::timer},
   {entity_type::media_player, entity_render_type::media_pl},
-};
+}};
 
 inline const char *get_entity_type(const std::string &entity_id) {
   auto pos = entity_id.find('.');

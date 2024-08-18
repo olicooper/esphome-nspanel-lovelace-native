@@ -17,12 +17,6 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-struct compare_char_str {
-  bool operator()(const char *a, const char *b) const {
-    return a != nullptr && b != nullptr && std::strcmp(a, b) < 0;
-  }
-};
-
 // see: https://stackoverflow.com/a/13890501/2634818
 inline void replace_first(
     std::string &s, std::string const &toReplace,
@@ -187,6 +181,10 @@ inline bool contains_value(const std::string &str, const char *value) {
 
 inline bool char_printable(const char value) {
   return value >= 0x20 && value <= 0x7e;
+}
+
+inline static constexpr bool str_equal(const char *a, const char *b) {
+  return a == b || (a != nullptr && b != nullptr && std::strcmp(a, b) == 0);
 }
 
 inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {

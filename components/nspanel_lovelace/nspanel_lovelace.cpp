@@ -690,8 +690,9 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
 
   auto entity = item->get_entity();
 
-  auto cover_icons = get_icon_by_name(
-    COVER_MAP,
+  std::array<const char *, 4> cover_icons{};
+  bool cover_icons_found = try_get_value(COVER_MAP,
+    cover_icons,
     entity->get_attribute(ha_attr_type::device_class),
     entity_cover_type::window);
 
@@ -730,11 +731,11 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   bool icon_tilt_right_status = false;
   bool tilt_position_status = false;
 
-  if (cover_icons != nullptr) {
+  if (cover_icons_found) {
     if (entity->is_state("closed")) {
-      cover_icon = cover_icons->at(1);
+      cover_icon = cover_icons.at(1);
     } else {
-      cover_icon = cover_icons->at(0);
+      cover_icon = cover_icons.at(0);
     }
   }
 
@@ -750,7 +751,8 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
         position_str.empty())) {
       icon_up_status = true;
     }
-    icon_up = cover_icons->at(2);
+    if (cover_icons_found)
+      icon_up = cover_icons.at(2);
   }
   // CLOSE
   if (supported_features & 0b00000010) {
@@ -759,7 +761,8 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
         position_str.empty())) {
       icon_down_status = true;
     }
-    icon_down = cover_icons->at(3);
+    if (cover_icons_found)
+      icon_down = cover_icons.at(3);
   }
   // STOP
   if (supported_features & 0b00001000) {
@@ -1002,8 +1005,6 @@ void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
 void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::string &uuid) {
   if(entity == nullptr) return;
 
-  auto icon = get_icon_by_name(
-    CLIMATE_ICON_MAP, entity->get_state());
   uint16_t icon_colour = 64512U;
   auto &state = entity->get_state();
   if (state == ha_attr_hvac_mode::auto_ ||
@@ -1030,7 +1031,8 @@ void NSPanelLovelace::render_climate_detail_update_(Entity *entity, const std::s
 
   this->command_buffer_.append(1, SEPARATOR)
     // icon_id~
-    .append(icon).append(1, SEPARATOR)
+    .append(get_icon(CLIMATE_ICON_MAP, entity->get_state()))
+    .append(1, SEPARATOR)
     // icon_color~
     .append(std::to_string(icon_colour)).append(1, SEPARATOR);
 

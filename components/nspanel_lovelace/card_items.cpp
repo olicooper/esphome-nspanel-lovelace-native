@@ -134,10 +134,12 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
   StatefulPageItem::state_cover_fn(me);
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
 
-  auto cover_icons = get_icon_by_name(
-    COVER_MAP,
+  std::array<const char *, 4> cover_icons{};
+  bool cover_icons_found = try_get_value(COVER_MAP,
+    cover_icons,
     me_->entity_->get_attribute(ha_attr_type::device_class),
     entity_cover_type::window);
+
   auto &position_str = me_->entity_->
     get_attribute(ha_attr_type::current_position);
   auto &supported_features_str = me_->entity_->
@@ -167,7 +169,8 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
         position_str.empty())) {
       icon_up_status = true;
     }
-    icon_up = cover_icons->at(2);
+    if (cover_icons_found)
+      icon_up = cover_icons.at(2);
   }
   // CLOSE
   if (supported_features & 0b10) {
@@ -176,7 +179,8 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
         position_str.empty())) {
       icon_down_status = true;
     }
-    icon_down = cover_icons->at(3);
+    if (cover_icons_found)
+      icon_down = cover_icons.at(3);
   }
   // STOP
   if (supported_features & 0b1000) {

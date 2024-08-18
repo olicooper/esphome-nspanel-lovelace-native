@@ -358,7 +358,7 @@ std::string &ThermoCard::render(std::string &buffer) {
         active_colour = 60897U; //light orange
       }
       buffer.append(1, SEPARATOR);
-      buffer.append(get_icon_by_name(CLIMATE_ICON_MAP, mode)).append(1, SEPARATOR);
+      buffer.append(get_icon(CLIMATE_ICON_MAP, mode)).append(1, SEPARATOR);
       buffer.append(std::to_string(active_colour)).append(1, SEPARATOR);
       buffer.append(1, this->thermo_entity_->is_state(mode) ? '1' : '0');
       buffer.append(1, SEPARATOR);
@@ -481,9 +481,9 @@ std::string &MediaCard::render(std::string &buffer) {
   //      on btn press: event,buttonPress2,{entity_id},button
   buffer.append(entity_render_type::media_pl).append(1, SEPARATOR);
   buffer.append(this->media_entity_->get_entity_id()).append(1, SEPARATOR);
-  auto media_icon = get_icon_by_name(MEDIA_TYPE_MAP, 
+  auto media_icon = get_value_or_default(MEDIA_TYPE_MAP, 
     this->media_entity_->get_attribute(ha_attr_type::media_content_type),
-    "", icon_t::speaker_off);
+    icon_t::speaker_off);
   buffer.append(media_icon).append(1, SEPARATOR);
   buffer.append(std::to_string(17299U)).append(2, SEPARATOR);
   

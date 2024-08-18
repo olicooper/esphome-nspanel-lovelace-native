@@ -1,13 +1,11 @@
 #pragma once
 
-#include <map>
-#include <string>
-#include "helpers.h"
+#include "types.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
 
-const std::map<const char*, std::string, compare_char_str> TRANSLATION_MAP {
+static constexpr FrozenCharMap<const char *, 26> TRANSLATION_MAP {{
   {"none", "None"},
   {"preset_mode", "Preset mode"},
   {"swing_mode", "Swing mode"},
@@ -34,20 +32,17 @@ const std::map<const char*, std::string, compare_char_str> TRANSLATION_MAP {
   {"currently", "Currently"},
   {"state", "State"},
   {"action", "Action"},
-};
+}};
 
 // inline const std::string &get_translation(const std::string &key) {
 //   auto key_cstr = key.c_str();
 //   return get_translation(key_cstr);
 // }
 
-inline std::string get_translation(const char *key) {
-  if (key == nullptr) return "";
-  auto it = TRANSLATION_MAP.find(key);
-  if (it != TRANSLATION_MAP.end()) {
-    return it->second;
-  }
-  return std::string(key);
+static inline const char *get_translation(const char *key) {
+  auto ret = key;
+  try_get_value(TRANSLATION_MAP, ret, key);
+  return ret;
 }
 
 } // namespace nspanel_lovelace

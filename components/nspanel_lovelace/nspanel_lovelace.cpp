@@ -1157,21 +1157,22 @@ void NSPanelLovelace::process_display_command_queue_() {
   }
 
   ESP_LOGD(TAG, "Sending: %s", this->command_buffer_.c_str());
-  // todo: break this in to chunks and use write_array() in loop() instead (similar to command_queue)
-  std::vector<uint8_t> data;
-  data.reserve(this->command_buffer_.length() + 6);
-  data.assign({
+  std::array<uint8_t, 4> crc_data = {
     0x55, 0xBB, 
     static_cast<uint8_t>(command_buffer_.length() & 0xFF),
     static_cast<uint8_t>((command_buffer_.length() >> 8) & 0xFF)
-  });
-  data.insert(data.end(), this->command_buffer_.begin(), this->command_buffer_.end());
-  auto crc = esphome::crc16(data.data(), data.size());
-  data.push_back(static_cast<uint8_t>(crc & 0xFF));
-  data.push_back(static_cast<uint8_t>((crc >> 8) & 0xFF));
+  };
+  auto crc = esphome::crc16(crc_data.data(), 4);
+  crc = esphome::crc16(
+    reinterpret_cast<const uint8_t *>(command_buffer_.c_str()),
+    command_buffer_.length(), crc);
 
+  this->write_array(crc_data);
   App.feed_wdt();
-  this->write_array(data);
+  this->write_str(this->command_buffer_.c_str());
+  crc_data[0] = static_cast<uint8_t>(crc & 0xFF);
+  crc_data[1] = static_cast<uint8_t>((crc >> 8) & 0xFF);
+  this->write_array(crc_data.data(), 2);
   
   this->command_buffer_.clear();
   this->command_last_sent_ = millis();

@@ -215,9 +215,10 @@ protected:
   static void state_cover_fn(StatefulPageItem *me);
   static void state_climate_fn(StatefulPageItem *me);
   static void state_media_fn(StatefulPageItem *me);
-  // static void state_button_fn(StatefulPageItem *me);
-  // static void state_scene_fn(StatefulPageItem *me);
-  // static void state_script_fn(StatefulPageItem *me);
+  static void state_sun_fn(StatefulPageItem *me);
+  static void state_alarm_fn(StatefulPageItem *me);
+  static void state_lock_fn(StatefulPageItem *me);
+  static void state_weather_fn(StatefulPageItem *me);
 
   // output: type~internalName~icon~iconColor~
   std::string &render_(std::string &buffer) override;

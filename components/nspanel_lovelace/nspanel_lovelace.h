@@ -191,6 +191,7 @@ protected:
   void render_climate_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(Entity *entity, const std::string &uuid = "");
   void render_input_select_detail_update_(StatefulPageItem *item);
+  void render_fan_detail_update_(StatefulPageItem *item);
 
 #ifdef USE_TIME
   void setup_time_();

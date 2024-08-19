@@ -14,17 +14,6 @@ namespace nspanel_lovelace {
 enum class render_page_option : uint8_t { prev, next, screensaver, default_page };
 
 enum class alarm_arm_action : uint8_t { arm_home, arm_away, arm_night, arm_vacation };
-struct alarm_entity_state {
-  static constexpr const char* disarmed = "disarmed";
-  static constexpr const char* arming = "arming";
-  static constexpr const char* pending = "pending";
-  static constexpr const char* triggered = "triggered";
-  static constexpr const char* armed_home = "armed_home";
-  static constexpr const char* armed_away = "armed_away";
-  static constexpr const char* armed_night = "armed_night";
-  static constexpr const char* armed_vacation = "armed_vacation";
-  static constexpr const char* armed_custom_bypass = "armed_custom_bypass";
-};
 
 static const std::array<std::array<const char *, 2>, 7> dow_names = {
     {{"Sun", "Sunday"},
@@ -292,6 +281,8 @@ struct icon_t {
   static constexpr const char* weather_rainy = u8"\uE596";
   static constexpr const char* weather_snowy = u8"\uE597";
   static constexpr const char* weather_sunny = u8"\uE598";
+  static constexpr const char* weather_sunset_down = u8"\uE59A";
+  static constexpr const char* weather_sunset_up = u8"\uE59B";
   static constexpr const char* weather_windy = u8"\uE59C";
   static constexpr const char* weather_windy_variant = u8"\uE59D";
   static constexpr const char* window_closed = u8"\uE5AD";
@@ -314,13 +305,53 @@ struct Icon {
   constexpr Icon(const char *value, const uint16_t color) : value(value), color(color) { }
 };
 
-struct generic_type {
-  static constexpr const char* enable = "enable";
-  static constexpr const char* disable = "disable";
+struct entity_state {
   static constexpr const char* unknown = "unknown";
   static constexpr const char* unavailable = "unavailable";
   static constexpr const char* on = "on";
   static constexpr const char* off = "off";
+  // cover
+  static constexpr const char* open = "open";
+  static constexpr const char* closed = "closed";
+  // media_player
+  static constexpr const char* playing = "playing";
+  static constexpr const char* paused = "paused";
+  // lock
+  static constexpr const char* locked = "locked";
+  static constexpr const char* unlocked = "unlocked";
+  // alarm_control_panel
+  static constexpr const char* disarmed = "disarmed";
+  static constexpr const char* arming = "arming";
+  static constexpr const char* pending = "pending";
+  static constexpr const char* triggered = "triggered";
+  static constexpr const char* armed_home = "armed_home";
+  static constexpr const char* armed_away = "armed_away";
+  static constexpr const char* armed_night = "armed_night";
+  static constexpr const char* armed_vacation = "armed_vacation";
+  static constexpr const char* armed_custom_bypass = "armed_custom_bypass";
+  // sun
+  static constexpr const char* above_horizon = "above_horizon";
+  static constexpr const char* below_horizon = "below_horizon";
+  // vacuum
+  static constexpr const char* docked = "docked";
+  // person
+  static constexpr const char* home = "home";
+  static constexpr const char* not_home = "not_home";
+  // timer
+  static constexpr const char* idle = "idle";
+  // climate
+  static constexpr const char* cool = "cool";
+  static constexpr const char* dry = "dry";
+  static constexpr const char* heat = "heat";
+  static constexpr const char* heat_cool = "heat_cool";
+  static constexpr const char* fan_only = "fan_only";
+  static constexpr const char* auto_ = "auto";
+
+};
+
+struct generic_type {
+  static constexpr const char* enable = "enable";
+  static constexpr const char* disable = "disable";
   static constexpr const char* empty = "";
 };
 
@@ -427,6 +458,7 @@ struct entity_type {
   static constexpr const char* sensor = "sensor";
   static constexpr const char* binary_sensor = "binary_sensor";
   static constexpr const char* input_text = "input_text";
+  static constexpr const char* text = "text"; //added
   static constexpr const char* select = "select";
   static constexpr const char* alarm_control_panel = "alarm_control_panel";
   static constexpr const char* media_player = "media_player";
@@ -565,7 +597,7 @@ inline const char *to_string(page_type type) {
 struct action_type {
   static constexpr const char* buttonPress2 = "buttonPress2";
   static constexpr const char* pageOpenDetail = "pageOpenDetail";
-  static constexpr const char* sleepReached = "sleepReached";
+  static constexpr const char* sleepReached = button_type::sleepReached;
   static constexpr const char* startup = "startup";
 };
 
@@ -599,6 +631,17 @@ struct ha_action_type {
   static constexpr const char* lock = "lock";
   static constexpr const char* unlock = "unlock";
   static constexpr const char* select_option = "select_option";
+  static constexpr const char* set_percentage = "set_percentage";
+  static constexpr const char* set_value = "set_value";
+
+  // others not in HA
+  static constexpr const char* pause = "pause";
+  static constexpr const char* cancel = "cancel";
+  static constexpr const char* finish = "finish";
+  // static constexpr const char* disarm = "disarm";
+  // static constexpr const char* start_cleaning = "start_cleaning";
+  // static constexpr const char* resume_cleaning = "resume_cleaning";
+  // static constexpr const char* run = "run";
 };
 
 enum class ha_attr_type : uint8_t {
@@ -618,6 +661,7 @@ enum class ha_attr_type : uint8_t {
   color_temp,
   rgb_color,
   effect_list,
+  effect,
   // alarm_control_panel
   code,
   code_arm_required,
@@ -630,12 +674,13 @@ enum class ha_attr_type : uint8_t {
   // weather & climate
   temperature,
   temperature_unit,
+  forecast,
   // timer
   duration,
   remaining,
   editable,
   finishes_at,
-  // climate
+  // climate & fan (only preset_mode,preset_modes)
   current_temperature,
   target_temp_high,
   target_temp_low,
@@ -662,6 +707,13 @@ enum class ha_attr_type : uint8_t {
   // input & input_select
   options,
   option,
+  // number & input_number
+  min,
+  max,
+  value,
+  // fan
+  percentage,
+  percentage_step,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -681,6 +733,7 @@ static constexpr const char* ha_attr_names [] = {
   "color_temp",
   "rgb_color",
   "effect_list",
+  "effect",
   // alarm_control_panel
   "code",
   "code_arm_required",
@@ -693,12 +746,13 @@ static constexpr const char* ha_attr_names [] = {
   // weather & climate
   "temperature",
   "temperature_unit",
+  "forecast",
   // timer
   "duration",
   "remaining",
   "editable",
   "finishes_at",
-  // climate
+  // climate & fan (only preset_mode,preset_modes)
   "current_temperature",
   "target_temp_high",
   "target_temp_low",
@@ -725,6 +779,13 @@ static constexpr const char* ha_attr_names [] = {
   // input & input_select
   "options",
   "option",
+  // number & input_number
+  "min",
+  "max",
+  "value",
+  // fan
+  "percentage",
+  "percentage_step",
 };
 
 inline const char *to_string(ha_attr_type attr) {
@@ -748,16 +809,6 @@ struct ha_attr_color_mode {
   static constexpr const char* rgb = "rgb";
   static constexpr const char* rgbw = "rgbw";
   static constexpr const char* rgbww = "rgbww";
-};
-
-struct ha_attr_hvac_mode {
-  static constexpr const char* auto_ = "auto";
-  static constexpr const char* heat_cool = "heat_cool";
-  static constexpr const char* heat = "heat";
-  static constexpr const char* off = "off";
-  static constexpr const char* cool = "cool";
-  static constexpr const char* dry = "dry";
-  static constexpr const char* fan_only = "fan_only";
 };
 
 struct ha_attr_media_content_type {
@@ -865,7 +916,7 @@ inline const char *get_icon(
 }
 
 // simple_type_mapping
-static constexpr FrozenCharMap<const char *, 20> ENTITY_ICON_MAP {{
+static constexpr FrozenCharMap<const char *, 22> ENTITY_ICON_MAP {{
   {entity_type::button, icon_t::gesture_tap_button},
   {entity_type::navigate, icon_t::gesture_tap_button},
   {entity_type::input_button, icon_t::gesture_tap_button},
@@ -886,7 +937,9 @@ static constexpr FrozenCharMap<const char *, 20> ENTITY_ICON_MAP {{
   {entity_type::nav_prev, icon_t::arrow_left_bold},
   {entity_type::nav_next, icon_t::arrow_right_bold},
   {entity_type::itext, icon_t::format_color_text},
-  {entity_type::input_text, icon_t::cursor_text},
+  {entity_type::input_text, icon_t::cursor_text}, //added
+  {entity_type::text, icon_t::cursor_text}, //added
+  {entity_type::select, icon_t::gesture_tap_button}, //added
 }};
 
 // sensor_mapping_on
@@ -1018,17 +1071,17 @@ static constexpr FrozenCharMap<Icon, 15> WEATHER_ICON_MAP {{
 
 // climate_mapping
 static constexpr FrozenCharMap<const char *, 7> CLIMATE_ICON_MAP {{
-  {ha_attr_hvac_mode::auto_, icon_t::calendar_sync},
-  {ha_attr_hvac_mode::heat_cool, icon_t::calendar_sync},
-  {ha_attr_hvac_mode::heat, icon_t::fire},
-  {ha_attr_hvac_mode::off, icon_t::power},
-  {ha_attr_hvac_mode::cool, icon_t::snowflake},
-  {ha_attr_hvac_mode::dry, icon_t::water_percent},
-  {ha_attr_hvac_mode::fan_only, icon_t::fan},
+  {entity_state::auto_, icon_t::calendar_sync},
+  {entity_state::heat_cool, icon_t::calendar_sync},
+  {entity_state::heat, icon_t::fire},
+  {entity_state::off, icon_t::power},
+  {entity_state::cool, icon_t::snowflake},
+  {entity_state::dry, icon_t::water_percent},
+  {entity_state::fan_only, icon_t::fan},
 }};
 
-static constexpr FrozenCharMap<const char *, 9> MEDIA_TYPE_MAP {{
-  {generic_type::off, icon_t::speaker_off},
+static constexpr FrozenCharMap<const char *, 9> MEDIA_TYPE_ICON_MAP {{
+  {entity_state::off, icon_t::speaker_off},
   {ha_attr_media_content_type::music, icon_t::music},
   {ha_attr_media_content_type::tvshow, icon_t::movie},
   {ha_attr_media_content_type::video, icon_t::video},
@@ -1037,6 +1090,19 @@ static constexpr FrozenCharMap<const char *, 9> MEDIA_TYPE_MAP {{
   {ha_attr_media_content_type::playlist, icon_t::playlist_music}, // (originally: icon_t::alert_circle_outline)
   {ha_attr_media_content_type::app, icon_t::open_in_app}, // newly added!
   {ha_attr_media_content_type::url, icon_t::link_box_outline}, // newly added! (OR cast E117?)
+}};
+
+const FrozenCharMap<Icon, 10> ALARM_ICON_MAP {{
+  {entity_state::unknown, {icon_t::shield_off, 0x0CE6u}}, //green
+  {entity_state::disarmed, {icon_t::shield_off, 0x0CE6u}}, //green
+  {entity_state::armed_home, {icon_t::shield_home, 0xE243u}}, //red
+  {entity_state::armed_away, {icon_t::shield_lock, 0xE243u}}, //red
+  {entity_state::armed_night, {icon_t::shield_moon, 0xE243u}}, //red. icon was E593:weather-night
+  {entity_state::armed_vacation, {icon_t::shield_airplane, 0xE243u}}, //red
+  {entity_state::armed_custom_bypass, {icon_t::shield, 0xE243u}}, //red
+  {entity_state::arming, {icon_t::shield, 0xED80u}}, //orange
+  {entity_state::pending, {icon_t::shield, 0xED80u}}, //orange
+  {entity_state::triggered, {icon_t::bell_ring, 0xE243u}}, //red
 }};
 
 // cover_mapping
@@ -1124,6 +1190,7 @@ inline const char *get_entity_type(const std::string &entity_id) {
   else if (type == entity_type::cover) return entity_type::cover;
   else if (type == entity_type::sensor) return entity_type::sensor;
   else if (type == entity_type::binary_sensor) return entity_type::binary_sensor;
+  else if (type == entity_type::text) return entity_type::text;
   else if (type == entity_type::input_text) return entity_type::input_text;
   else if (type == entity_type::select) return entity_type::select;
   else if (type == entity_type::alarm_control_panel) return entity_type::alarm_control_panel;

@@ -242,9 +242,9 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
     }
   } else if (attr == ha_attr_type::media_content_type) {
     if (this->icon_value_overridden_) return;
-    this->icon_value_ = get_icon(MEDIA_TYPE_MAP,
+    this->icon_value_ = get_icon(MEDIA_TYPE_ICON_MAP,
       this->entity_->get_attribute(ha_attr_type::media_content_type),
-      generic_type::off);
+      entity_state::off);
   } else {
     return;
   }
@@ -271,15 +271,15 @@ void StatefulPageItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = StatefulPageItem::state_climate_fn;
   } else if (type == entity_type::media_player) {
     this->on_state_callback_ = StatefulPageItem::state_media_fn;
-  } /* else if (
-      type == entity_type::button ||
-      type == entity_type::input_button) {
-    this->on_state_callback_ = StatefulPageItem::state_button_fn;
-  } else if (type == entity_type::scene) {
-    this->on_state_callback_ = StatefulPageItem::state_scene_fn;
-  } else if (type == entity_type::script) {
-    this->on_state_callback_ = StatefulPageItem::state_script_fn;
-  }*/
+  } else if (type == entity_type::sun) {
+    this->on_state_callback_ = StatefulPageItem::state_sun_fn;
+  } else if (type == entity_type::alarm_control_panel) {
+    this->on_state_callback_ = StatefulPageItem::state_alarm_fn;
+  } else if (type == entity_type::lock) {
+    this->on_state_callback_ = StatefulPageItem::state_lock_fn;
+  } else if (type == entity_type::weather) {
+    this->on_state_callback_ = StatefulPageItem::state_weather_fn;
+  }
 }
 
 std::string &StatefulPageItem::render_(std::string &buffer) {
@@ -309,9 +309,9 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
     return;
   }
 
-  if (me->entity_->is_state(generic_type::on)) {
+  if (me->is_state(entity_state::on)) {
     me->icon_color_ = 64909u; // yellow
-  } else if (me->entity_->is_state(generic_type::off)) {
+  } else if (me->is_state(entity_state::off)) {
     me->icon_color_ = 17299u; // blue
   } else {
     me->icon_color_ = 38066u; // grey
@@ -319,24 +319,24 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
 }
 
 void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
-  if (me->entity_->is_state(generic_type::on)) {
+  if (me->is_state(entity_state::on)) {
     if (!me->icon_color_overridden_)
       me->icon_color_ = 64909u; // yellow
     if (!me->icon_value_overridden_) {
       me->icon_value_ = get_value_or_default(SENSOR_ON_ICON_MAP,
-        me->entity_->get_attribute(ha_attr_type::device_class),
+        me->get_attribute(ha_attr_type::device_class),
         static_cast<const char *>(icon_t::checkbox_marked_circle));
     }
   } else {
     if (!me->icon_color_overridden_) {
-      if (me->entity_->is_state(generic_type::off))
+      if (me->is_state(entity_state::off))
         me->icon_color_ = 17299u; // blue
       else
         me->icon_color_ = 38066u; // grey
     }
     if (!me->icon_value_overridden_) {
       me->icon_value_ = get_value_or_default(SENSOR_OFF_ICON_MAP,
-        me->entity_->get_attribute(ha_attr_type::device_class),
+        me->get_attribute(ha_attr_type::device_class),
         static_cast<const char *>(icon_t::radiobox_blank));
     }
   }
@@ -344,9 +344,9 @@ void StatefulPageItem::state_binary_sensor_fn(StatefulPageItem *me) {
 
 void StatefulPageItem::state_cover_fn(StatefulPageItem *me) {
   if (!me->icon_color_overridden_) {
-    if (me->entity_->is_state("closed"))
+    if (me->is_state(entity_state::closed))
       me->icon_color_ = 17299u; // blue
-    else if (me->entity_->is_state("open"))
+    else if (me->is_state(entity_state::open))
       me->icon_color_ = 64909u; // yellow
     else 
       me->icon_color_ = 38066u; // grey
@@ -355,8 +355,8 @@ void StatefulPageItem::state_cover_fn(StatefulPageItem *me) {
   if (!me->icon_value_overridden_) {
     std::array<const char *, 4> icons{};
     if (try_get_value(COVER_MAP, icons,
-        me->entity_->get_attribute(ha_attr_type::device_class))) {
-      if (me->entity_->is_state("closed"))
+        me->get_attribute(ha_attr_type::device_class))) {
+      if (me->is_state(entity_state::closed))
         me->icon_value_ = icons.at(1);
       else
         me->icon_value_ = icons.at(0);
@@ -374,15 +374,15 @@ void StatefulPageItem::state_climate_fn(StatefulPageItem *me) {
 
   if (!me->icon_color_overridden_) {
     me->icon_color_ = 64512U;
-    if (state == ha_attr_hvac_mode::auto_ ||
-        state == ha_attr_hvac_mode::heat_cool) {
+    if (state == entity_state::auto_ ||
+        state == entity_state::heat_cool) {
       me->icon_color_ = 1024U;
-    } else if (state == ha_attr_hvac_mode::off ||
-        state == ha_attr_hvac_mode::fan_only) {
+    } else if (state == entity_state::off ||
+        state == entity_state::fan_only) {
       me->icon_color_ = 35921U;
-    } else if (state == ha_attr_hvac_mode::cool) {
+    } else if (state == entity_state::cool) {
       me->icon_color_ = 11487U;
-    } else if (state == ha_attr_hvac_mode::dry) {
+    } else if (state == entity_state::dry) {
       me->icon_color_ = 60897U;
     }
   }
@@ -393,20 +393,56 @@ void StatefulPageItem::state_media_fn(StatefulPageItem *me) {
     return;
   }
 
-  if (me->entity_->is_state(generic_type::off)) {
+  if (me->is_state(entity_state::off)) {
     me->icon_color_ = 17299u; // blue
-  } else if (!me->entity_->is_state(generic_type::unavailable)) {
+  } else if (!me->is_state(entity_state::unavailable)) {
     me->icon_color_ = 64909u; // yellow
   } else {
     me->icon_color_ = 38066u; // grey
   }
 }
 
-// clang-format off
-// void StatefulPageItem::state_button_fn(StatefulPageItem *me) {}
-// void StatefulPageItem::state_scene_fn(StatefulPageItem *me) {}
-// void StatefulPageItem::state_script_fn(StatefulPageItem *me) {}
-// clang-format on
+void StatefulPageItem::state_alarm_fn(StatefulPageItem *me) {
+  if (me->icon_value_overridden_ && 
+      me->icon_color_overridden_) return;
+  
+  Icon icon(icon_t::help_circle_outline, 38066u);
+  try_get_value(ALARM_ICON_MAP, icon, me->get_state());
+
+  if (!me->icon_value_overridden_)
+    me->icon_value_ = icon.value;
+  if (!me->icon_color_overridden_)
+    me->icon_color_ = icon.color;
+}
+
+void StatefulPageItem::state_sun_fn(StatefulPageItem *me) {
+  if (me->icon_value_overridden_) return;
+  if (me->is_state(entity_state::above_horizon))
+    me->icon_value_ = icon_t::weather_sunset_up;
+  else
+    me->icon_value_ = icon_t::weather_sunset_down;
+}
+
+void StatefulPageItem::state_lock_fn(StatefulPageItem *me) {
+  if (me->icon_value_overridden_) return;
+  if (me->is_state(entity_state::unlocked))
+    me->icon_value_ = icon_t::lock_open;
+  else
+    me->icon_value_ = icon_t::lock;
+}
+
+void StatefulPageItem::state_weather_fn(StatefulPageItem *me) {
+  if (me->icon_value_overridden_ && 
+      me->icon_color_overridden_) return;
+
+  Icon icon{};
+  try_get_value(WEATHER_ICON_MAP, icon, me->get_state());
+
+  if (!me->icon_value_overridden_)
+    me->icon_value_ = icon.value;
+  if (!me->icon_color_overridden_)
+    me->icon_color_ = icon.color;
+}
 
 } // namespace nspanel_lovelace
 } // namespace esphome

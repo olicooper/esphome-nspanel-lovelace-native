@@ -94,7 +94,7 @@ public:
 
   void set_icon_by_weather_condition(const std::string &condition);
   bool set_value(const std::string &value) override;
-  
+
   // The temperature unit all weather items will use
   static std::string temperature_unit;
 

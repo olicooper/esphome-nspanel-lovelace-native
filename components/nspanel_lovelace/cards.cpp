@@ -64,7 +64,7 @@ AlarmCard::AlarmCard(
     new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
-      button_type::disarm, "Disarm"));
+      button_type::disarm, get_translation(translation_item::disarm)));
 }
 AlarmCard::AlarmCard(
   const std::string &uuid, const std::shared_ptr<Entity> &alarm_entity,
@@ -79,7 +79,7 @@ AlarmCard::AlarmCard(
     new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"),
-      button_type::disarm, "Disarm"));
+      button_type::disarm, get_translation(translation_item::disarm)));
 }
 AlarmCard::AlarmCard(
     const std::string &uuid, const std::shared_ptr<Entity> &alarm_entity,
@@ -94,7 +94,7 @@ AlarmCard::AlarmCard(
     new AlarmIconItem(std::string(uuid).append("_i"), icon_t::progress_alert, 0xED80)); //orange
   this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
     new AlarmButtonItem(std::string(uuid).append("_d"), 
-      button_type::disarm, "Disarm"));
+      button_type::disarm, get_translation(translation_item::disarm)));
 }
 
 AlarmCard::~AlarmCard() {
@@ -143,43 +143,22 @@ void AlarmCard::set_disarm_button(const std::string &display_name) {
 void AlarmCard::on_entity_state_change(const std::string &state) {
   this->status_icon_flashing_ = false;
 
-  if (state == alarm_entity_state::disarmed || 
-      state == generic_type::unknown) {
-    this->status_icon_->reset_icon_color(); //green
-    this->status_icon_->reset_icon_value(); //shield-off
-  } else if (state == alarm_entity_state::triggered) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::bell_ring);
+  if (state == entity_state::triggered || 
+      state == entity_state::arming || 
+      state == entity_state::pending) {
     this->status_icon_flashing_ = true;
-  } else if (state == alarm_entity_state::armed_home) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::shield_home);
-  } else if (state == alarm_entity_state::armed_away) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::shield_lock);
-  } else if (state == alarm_entity_state::armed_night) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::shield_moon); // was E593:weather-night
-  } else if (state == alarm_entity_state::armed_vacation) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::shield_airplane);
-  } else if (state == alarm_entity_state::armed_custom_bypass) {
-    this->status_icon_->set_icon_color(0xE243); //red
-    this->status_icon_->set_icon_value(icon_t::shield);
-  } else if (state == alarm_entity_state::arming || 
-      state == alarm_entity_state::pending) {
-    this->status_icon_->set_icon_color(0xED80); //orange
-    this->status_icon_->set_icon_value(icon_t::shield);
-    this->status_icon_flashing_ = true;
-  } else {
-    this->status_icon_->set_icon_color(38066u); //grey
-    this->status_icon_->set_icon_value(icon_t::help_circle_outline);
   }
+
+  Icon icon{};
+  icon.color = 38066u; //grey
+  try_get_value(ALARM_ICON_MAP, icon, state);
+  this->status_icon_->set_icon_color(icon.color);
+  this->status_icon_->set_icon_value(icon.value);
 }
 
 void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
   if (attr == ha_attr_type::code_arm_required) {
-    this->set_show_keypad(value != generic_type::off);
+    this->set_show_keypad(value != entity_state::off);
   }
 }
 
@@ -193,8 +172,8 @@ std::string &AlarmCard::render(std::string &buffer) {
 
   buffer.append(this->alarm_entity_->get_entity_id());
 
-  if (this->alarm_entity_->is_state(generic_type::unknown) ||
-      this->alarm_entity_->is_state(alarm_entity_state::disarmed)) {
+  if (this->alarm_entity_->is_state(entity_state::unknown) ||
+      this->alarm_entity_->is_state(entity_state::disarmed)) {
     for (auto& item : this->items_) {
       buffer.append(1, SEPARATOR).append(item->render());
     }
@@ -311,10 +290,12 @@ std::string &ThermoCard::render(std::string &buffer) {
     ha_attr_type::hvac_action);
   if (!hvac_action.empty()) {
     buffer
-      .append(get_translation(hvac_action.c_str()))
+      // frontend.state_attributes.climate.hvac_action
+      .append(get_translation(hvac_action))
       .append("\r\n(");
   }
-  buffer.append(get_translation(this->thermo_entity_->get_state().c_str()));
+  // backend.component.climate.state
+  buffer.append(get_translation(this->thermo_entity_->get_state()));
   if (!hvac_action.empty()) {
     buffer.append(1, ')');
   }
@@ -346,15 +327,15 @@ std::string &ThermoCard::render(std::string &buffer) {
 
     for (auto& mode : hvac_modes) {
       uint16_t active_colour = 64512U; //dark orange
-      if (mode == ha_attr_hvac_mode::auto_ ||
-          mode == ha_attr_hvac_mode::heat_cool) {
+      if (mode == entity_state::auto_ ||
+          mode == entity_state::heat_cool) {
         active_colour = 1024U; //dark green
-      } else if (mode == ha_attr_hvac_mode::off ||
-          mode == ha_attr_hvac_mode::fan_only) {
+      } else if (mode == entity_state::off ||
+          mode == entity_state::fan_only) {
         active_colour = 52857U; // light grey (was: muddy grey|35921)
-      } else if (mode == ha_attr_hvac_mode::cool) {
+      } else if (mode == entity_state::cool) {
         active_colour = 11487U; //light blue
-      } else if (mode == ha_attr_hvac_mode::dry) {
+      } else if (mode == entity_state::dry) {
         active_colour = 60897U; //light orange
       }
       buffer.append(1, SEPARATOR);
@@ -371,9 +352,9 @@ std::string &ThermoCard::render(std::string &buffer) {
 
   buffer.append(1, SEPARATOR);
 
-  buffer.append(get_translation("currently")).append(1, SEPARATOR);
-  buffer.append(get_translation("state")).append(1, SEPARATOR);
-  // buffer.append(get_translation("action")).append(1, SEPARATOR); // depreciated
+  buffer.append(get_translation(translation_item::currently)).append(1, SEPARATOR);
+  buffer.append(get_translation(translation_item::state)).append(1, SEPARATOR);
+  // buffer.append(get_translation(translation_item::action)).append(1, SEPARATOR); // depreciated
   buffer.append(1, SEPARATOR);
   buffer.append(this->temperature_unit_icon_).append(1, SEPARATOR);
   buffer.append(dest_temp2_str).append(1, SEPARATOR);
@@ -447,7 +428,7 @@ std::string &MediaCard::render(std::string &buffer) {
       ha_attr_type::volume_level, "0")) * 100));
   buffer.append(1, SEPARATOR);
 
-  auto icon = this->media_entity_->is_state("playing")
+  auto icon = this->media_entity_->is_state(entity_state::playing)
     ? icon_t::pause : icon_t::play;
   buffer.append(icon).append(1, SEPARATOR);
 
@@ -456,7 +437,7 @@ std::string &MediaCard::render(std::string &buffer) {
 
   // on/off button colour
   if (supported_features & 0b10000000) {
-    if (this->media_entity_->is_state(generic_type::off))
+    if (this->media_entity_->is_state(entity_state::off))
       buffer.append(std::to_string(1374)); // light blue
     else
       buffer.append(std::to_string(64704)); // orange
@@ -467,7 +448,8 @@ std::string &MediaCard::render(std::string &buffer) {
   
   // shuffle button icon
   if (supported_features & 0b100000000000000) {
-    if (this->media_entity_->get_attribute(ha_attr_type::shuffle) == generic_type::on)
+    if (this->media_entity_->
+        get_attribute(ha_attr_type::shuffle) == entity_state::on)
       buffer.append(icon_t::shuffle);
     else
       buffer.append(icon_t::shuffle_disable);
@@ -481,7 +463,7 @@ std::string &MediaCard::render(std::string &buffer) {
   //      on btn press: event,buttonPress2,{entity_id},button
   buffer.append(entity_render_type::media_pl).append(1, SEPARATOR);
   buffer.append(this->media_entity_->get_entity_id()).append(1, SEPARATOR);
-  auto media_icon = get_value_or_default(MEDIA_TYPE_MAP, 
+  auto media_icon = get_value_or_default(MEDIA_TYPE_ICON_MAP, 
     this->media_entity_->get_attribute(ha_attr_type::media_content_type),
     icon_t::speaker_off);
   buffer.append(media_icon).append(1, SEPARATOR);

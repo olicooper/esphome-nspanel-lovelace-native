@@ -24,7 +24,8 @@ std::string &Screensaver::render(std::string &buffer) {
   buffer.assign(this->get_render_instruction());
 
   for (auto &item : this->items_) {
-    buffer.append(1, SEPARATOR).append(item->render());
+    buffer.append(1, SEPARATOR);
+    item->render(buffer);
   }
   
   return buffer;
@@ -41,7 +42,7 @@ std::string &Screensaver::render_status_update(std::string &buffer) {
   buffer.assign("statusUpdate").append(1, SEPARATOR);
   
   if (this->left_icon) {
-    buffer.append(this->left_icon->render()).append(1, SEPARATOR);
+    this->left_icon->render(buffer).append(1, SEPARATOR);
     if (this->left_icon->get_alt_font()) {
       alt_font.append(1, '1');
     }
@@ -51,7 +52,7 @@ std::string &Screensaver::render_status_update(std::string &buffer) {
   alt_font.append(1, SEPARATOR);
 
   if (this->right_icon) {
-    buffer.append(this->right_icon->render()).append(1, SEPARATOR);
+    this->right_icon->render(buffer).append(1, SEPARATOR);
     if (this->right_icon->get_alt_font()) {
       alt_font.append(1, '1');
     }

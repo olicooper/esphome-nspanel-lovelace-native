@@ -42,7 +42,8 @@ std::string &QRCard::render(std::string &buffer) {
   buffer.append(this->qr_text_);
 
   for (auto& item : this->items_) {
-    buffer.append(1, SEPARATOR).append(item->render());
+    buffer.append(1, SEPARATOR);
+    item->render(buffer);
   }
 
   return buffer;
@@ -126,10 +127,9 @@ bool AlarmCard::set_arm_button(
   }
 
   this->items_.push_back(
-    std::unique_ptr<AlarmButtonItem>(
-      new AlarmButtonItem(
-        std::string(this->uuid_).append(1, '_').append(action_type), 
-        action_type, display_name)));
+    std::make_shared<AlarmButtonItem>(
+      std::string(this->uuid_).append(1, '_').append(action_type), 
+      action_type, display_name));
   return true;
 }
 
@@ -196,17 +196,19 @@ std::string &AlarmCard::render(std::string &buffer) {
   if (this->alarm_entity_->is_state(generic_type::unknown) ||
       this->alarm_entity_->is_state(alarm_entity_state::disarmed)) {
     for (auto& item : this->items_) {
-      buffer.append(1, SEPARATOR).append(item->render());
+      buffer.append(1, SEPARATOR);
+      item->render(buffer);
     }
     if (this->items_.size() < 4) {
       buffer.append(2 * (4 - this->items_.size()), SEPARATOR);
     }
   } else {
-    buffer.append(1, SEPARATOR).append(this->disarm_button_->render());
-    buffer.append(2 * 3, SEPARATOR);
+    buffer.append(1, SEPARATOR);
+    this->disarm_button_->render(buffer);
   }
 
-  buffer.append(1, SEPARATOR).append(this->status_icon_->render());
+  buffer.append(1, SEPARATOR);
+  this->status_icon_->render(buffer);
 
   buffer.append(1, SEPARATOR)
     .append(this->show_keypad_ ? 
@@ -219,7 +221,8 @@ std::string &AlarmCard::render(std::string &buffer) {
   // todo: not finished/tested
   auto &open_sensors = this->alarm_entity_->get_attribute(ha_attr_type::open_sensors);
   if (!open_sensors.empty()) {
-    buffer.append(1, SEPARATOR).append(this->info_icon_->render());
+    buffer.append(1, SEPARATOR);
+    this->info_icon_->render(buffer);
   }
 
   return buffer;
@@ -488,7 +491,8 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(std::to_string(17299U)).append(2, SEPARATOR);
   
   for (auto& item : this->items_) {
-    buffer.append(1, SEPARATOR).append(item->render());
+    buffer.append(1, SEPARATOR);
+    item->render(buffer);
   }
   if (this->items_.size() > 0) buffer.append(1, SEPARATOR);
 

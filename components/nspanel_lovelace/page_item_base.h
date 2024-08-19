@@ -22,35 +22,11 @@ protected:
   virtual std::string &render_(std::string &buffer) = 0;
 };
 
-struct IHaveRenderInvalid {
-public:
-  virtual bool get_render_invalid() = 0;
-  // Invalidates the render buffer and forces a re-build of the string.
-  // Note: Call this manually if static members are modified
-  //       as the instance won't know about those changes.
-  virtual void set_render_invalid() = 0;
-};
-
-struct ISetRenderInvalid {
-public:
-  ISetRenderInvalid(IHaveRenderInvalid *const parent) : parent_(parent) {}
-  virtual ~ISetRenderInvalid() {}
-
-  virtual void set_render_invalid_() {
-    if (parent_ == nullptr)
-      return;
-    parent_->set_render_invalid();
-  }
-
-private:
-  IHaveRenderInvalid *const parent_{nullptr};
-};
-
 /*
  * =============== PageItem ===============
  */
 
-class PageItem : public IRender, public IHaveRenderInvalid {
+class PageItem : public IRender {
 public:
   PageItem(const std::string &uuid);
   PageItem(const PageItem &other);
@@ -61,17 +37,11 @@ public:
   const std::string &get_uuid() const { return this->uuid_; }
   virtual void set_uuid(const std::string &uuid) { this->uuid_ = uuid; }
   
-  bool get_render_invalid() { return this->render_invalid_; }
-  virtual void set_render_invalid() { this->render_invalid_ = true; }
-  virtual const std::string &render();
+  virtual std::string &render(std::string &buffer);
 
 protected:
   std::string uuid_;
-  std::string render_buffer_;
-  bool render_invalid_ = true;
 
-  virtual uint16_t get_render_buffer_reserve_() const { return 5; }
-  
   // output: internalName (uuid)
   std::string &render_(std::string &buffer) override;
 };
@@ -80,12 +50,12 @@ protected:
  * =============== PageItem_Icon ===============
  */
 
-class PageItem_Icon : public IRender, public ISetRenderInvalid {
+class PageItem_Icon : public IRender {
 public:
-  PageItem_Icon(IHaveRenderInvalid *const parent);
-  PageItem_Icon(IHaveRenderInvalid *const parent, const std::string &icon_default_value);
-  PageItem_Icon(IHaveRenderInvalid *const parent, const uint16_t icon_default_color);
-  PageItem_Icon(IHaveRenderInvalid *const parent, const std::string &icon_default_value, const uint16_t icon_default_color);
+  PageItem_Icon();
+  PageItem_Icon(const std::string &icon_default_value);
+  PageItem_Icon(const uint16_t icon_default_color);
+  PageItem_Icon(const std::string &icon_default_value, const uint16_t icon_default_color);
   virtual ~PageItem_Icon() {}
 
   const std::string &get_icon_value() const { return this->icon_value_; }
@@ -119,10 +89,10 @@ protected:
  * =============== PageItem_DisplayName ===============
  */
 
-class PageItem_DisplayName : public IRender, public ISetRenderInvalid {
+class PageItem_DisplayName : public IRender {
 public:
-  PageItem_DisplayName(IHaveRenderInvalid *const parent) : ISetRenderInvalid(parent) {}
-  PageItem_DisplayName(IHaveRenderInvalid *const parent, const std::string &display_name);
+  PageItem_DisplayName() {}
+  PageItem_DisplayName(const std::string &display_name);
   virtual ~PageItem_DisplayName() {}
 
   const std::string &get_display_name() const {
@@ -142,10 +112,10 @@ protected:
  * =============== PageItem_Value ===============
  */
 
-class PageItem_Value : public IRender, public ISetRenderInvalid {
+class PageItem_Value : public IRender {
 public:
-  PageItem_Value(IHaveRenderInvalid *const parent) : ISetRenderInvalid(parent) {}
-  PageItem_Value(IHaveRenderInvalid *const parent, const std::string &value);
+  PageItem_Value() {}
+  PageItem_Value(const std::string &value);
   virtual ~PageItem_Value() {}
 
   const std::string &get_value() const { return this->value_; }
@@ -221,7 +191,6 @@ protected:
 
   // output: type~internalName~icon~iconColor~
   std::string &render_(std::string &buffer) override;
-  uint16_t get_render_buffer_reserve_() const override;
 };
 
 } // namespace nspanel_lovelace

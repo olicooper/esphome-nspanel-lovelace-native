@@ -17,14 +17,12 @@ namespace nspanel_lovelace {
 GridCardEntityItem::GridCardEntityItem(
     const std::string &uuid, std::shared_ptr<Entity> entity) : 
     CardItem(uuid, std::move(entity)) {
-  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 GridCardEntityItem::GridCardEntityItem(
     const std::string &uuid, std::shared_ptr<Entity> entity, 
     const std::string &display_name) : 
     CardItem(uuid, std::move(entity), display_name) {
-  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
@@ -35,20 +33,18 @@ void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this)
 
 EntitiesCardEntityItem::EntitiesCardEntityItem(
     const std::string &uuid, std::shared_ptr<Entity> entity) :
-    CardItem(uuid, std::move(entity)), PageItem_Value(this) {
+    CardItem(uuid, std::move(entity)), PageItem_Value() {
   // todo: fix this - needs to be called to ensure overloaded set_on_state_callback_ is called
   this->on_entity_type_change(this->entity_->get_type());
-  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 EntitiesCardEntityItem::EntitiesCardEntityItem(
     const std::string &uuid, std::shared_ptr<Entity> entity,
     const std::string &display_name) :
     CardItem(uuid, std::move(entity), display_name),
-    PageItem_Value(this) {
+    PageItem_Value() {
   // todo: fix this - needs to be called to ensure overloaded set_on_state_callback_ is called
   this->on_entity_type_change(this->entity_->get_type());
-  this->render_buffer_.reserve(this->get_render_buffer_reserve_());
 }
 
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
@@ -86,7 +82,6 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
   }
 
   this->on_state_callback_(this);
-  this->set_render_invalid();
 }
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {
@@ -245,12 +240,6 @@ void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
 std::string &EntitiesCardEntityItem::render_(std::string &buffer) {
   CardItem::render_(buffer);
   return PageItem_Value::render_(buffer);
-}
-
-uint16_t EntitiesCardEntityItem::get_render_buffer_reserve_() const {
-  // try to guess the required size of the buffer to reduce heap fragmentation
-  return CardItem::get_render_buffer_reserve_() +
-         this->value_.length() + this->value_postfix_.length() + 2;
 }
 
 } // namespace nspanel_lovelace

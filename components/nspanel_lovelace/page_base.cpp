@@ -51,12 +51,6 @@ void Page::set_render_type(page_type type) {
   this->render_type_ = type;
 }
 
-void Page::set_items_render_invalid() { 
-  for (auto &i : this->items_) {
-    i.get()->set_render_invalid();
-  }
-}
-
 void Page::set_on_item_added_callback(
     std::function<void(const std::shared_ptr<PageItem>&)> &&callback) {
   this->on_item_added_callback_ = std::move(callback);

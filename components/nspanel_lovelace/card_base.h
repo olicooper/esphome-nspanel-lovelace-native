@@ -62,7 +62,6 @@ public:
 protected:
   // output: type~internalName~icon~iconColor~displayName~
   std::string &render_(std::string &buffer) override;
-  uint16_t get_render_buffer_reserve_() const override;
 };
 
 } // namespace nspanel_lovelace

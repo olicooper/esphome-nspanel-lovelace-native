@@ -43,8 +43,6 @@ public:
   virtual void set_sleep_timeout(const uint16_t timeout) {
     this->sleep_timeout_ = timeout;
   }
-  
-  virtual void set_items_render_invalid();
 
   virtual std::string &render(std::string &buffer) = 0;
 

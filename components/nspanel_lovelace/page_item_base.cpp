@@ -16,19 +16,12 @@ PageItem::PageItem(const std::string &uuid) :
     uuid_(uuid) {}
 
 // Copy constructor overridden so the uuid and render_buffer is cleared
-PageItem::PageItem(const PageItem &other) :
-    uuid_(""), render_buffer_(""), render_invalid_(true) {}
+PageItem::PageItem(const PageItem &other) : uuid_("") {}
 
 void PageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
-const std::string &PageItem::render() {
-  // only re-render if values have changed
-  if (this->render_invalid_) {
-    this->render_buffer_.clear();
-    this->render_(this->render_buffer_);
-    this->render_invalid_ = false;
-  }
-  return this->render_buffer_;
+std::string &PageItem::render(std::string &buffer) {
+  return this->render_(buffer);
 }
 
 std::string &PageItem::render_(std::string &buffer) {
@@ -39,29 +32,23 @@ std::string &PageItem::render_(std::string &buffer) {
  * =============== PageItem_Icon ===============
  */
 
-PageItem_Icon::PageItem_Icon(IHaveRenderInvalid *const parent) :
-    ISetRenderInvalid(parent), 
+PageItem_Icon::PageItem_Icon() :
     icon_default_value_(icon_t::help_circle_outline), icon_default_color_(17299u),
     icon_value_(icon_default_value_), icon_color_(icon_default_color_),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
-PageItem_Icon::PageItem_Icon(
-    IHaveRenderInvalid *const parent, const std::string &icon_default_value) :
-    ISetRenderInvalid(parent),
+PageItem_Icon::PageItem_Icon(const std::string &icon_default_value) :
     icon_default_value_(icon_default_value), icon_default_color_(17299u),
     icon_value_(icon_default_value), icon_color_(icon_default_color_),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
-PageItem_Icon::PageItem_Icon(
-    IHaveRenderInvalid *const parent, const uint16_t icon_default_color) :
-    ISetRenderInvalid(parent),
+PageItem_Icon::PageItem_Icon(const uint16_t icon_default_color) :
     icon_default_value_(icon_t::help_circle_outline), icon_default_color_(icon_default_color),
     icon_value_(icon_default_value_), icon_color_(icon_default_color),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
 
 PageItem_Icon::PageItem_Icon(
-    IHaveRenderInvalid *const parent, const std::string &icon_default_value, const uint16_t icon_default_color) :
-    ISetRenderInvalid(parent), 
+    const std::string &icon_default_value, const uint16_t icon_default_color) :
     icon_default_value_(icon_default_value), icon_default_color_(icon_default_color),
     icon_value_(icon_default_value), icon_color_(icon_default_color),
     icon_value_overridden_(false), icon_color_overridden_(false) {}
@@ -69,31 +56,26 @@ PageItem_Icon::PageItem_Icon(
 void PageItem_Icon::set_icon_value(const std::string &value) {
   this->icon_value_ = value;
   this->icon_value_overridden_ = true;
-  set_render_invalid_();
 }
 
 void PageItem_Icon::reset_icon_value() {
   this->icon_value_ = this->icon_default_value_;
   this->icon_value_overridden_ = false;
-  set_render_invalid_();
 }
 
 void PageItem_Icon::set_icon_color(const uint16_t color) {
   this->icon_color_ = color;
   this->icon_color_overridden_ = true;
-  set_render_invalid_();
 }
 
 void PageItem_Icon::set_icon_color(const std::array<uint8_t, 3> rgb) {
   this->icon_color_ = rgb_dec565(rgb[0], rgb[1], rgb[2]);
   this->icon_color_overridden_ = true;
-  set_render_invalid_();
 }
 
 void PageItem_Icon::reset_icon_color() {
   this->icon_color_ = this->icon_default_color_;
   this->icon_color_overridden_ = false;
-  set_render_invalid_();
 }
 
 std::string &PageItem_Icon::render_(std::string &buffer) {
@@ -110,14 +92,11 @@ std::string &PageItem_Icon::render_(std::string &buffer) {
  * =============== PageItem_DisplayName ===============
  */
 
-PageItem_DisplayName::PageItem_DisplayName(
-    IHaveRenderInvalid *const parent, const std::string &display_name) :
-    ISetRenderInvalid(parent),
+PageItem_DisplayName::PageItem_DisplayName(const std::string &display_name) :
     display_name_(display_name) {}
 
 void PageItem_DisplayName::set_display_name(const std::string &display_name) {
   this->display_name_ = display_name;
-  set_render_invalid_();
 }
 
 std::string &PageItem_DisplayName::render_(std::string &buffer) {
@@ -128,20 +107,16 @@ std::string &PageItem_DisplayName::render_(std::string &buffer) {
  * =============== PageItem_Value ===============
  */
 
-PageItem_Value::PageItem_Value(
-    IHaveRenderInvalid *const parent, const std::string &value) :
-    ISetRenderInvalid(parent),
+PageItem_Value::PageItem_Value(const std::string &value) :
     value_(value) {}
 
 bool PageItem_Value::set_value(const std::string &value) {
   this->value_ = value;
-  set_render_invalid_();
   return true;
 }
 
 void PageItem_Value::set_value_postfix(const std::string &value_postfix) {
   this->value_postfix_ = value_postfix;
-  set_render_invalid_();
 }
 
 std::string &PageItem_Value::render_(std::string &buffer) {
@@ -156,7 +131,7 @@ std::string &PageItem_Value::render_(std::string &buffer) {
 
 StatefulPageItem::StatefulPageItem(
     const std::string &uuid, std::shared_ptr<Entity> entity) :
-    PageItem(uuid), PageItem_Icon(this),
+    PageItem(uuid),
     entity_(std::move(entity)), render_type_(nullptr) {
   this->entity_->add_subscriber(this);
   this->on_entity_type_change(this->entity_->get_type());
@@ -165,7 +140,7 @@ StatefulPageItem::StatefulPageItem(
 StatefulPageItem::StatefulPageItem(
     const std::string &uuid, std::shared_ptr<Entity> entity,
     const std::string &icon_default_value) :
-    PageItem(uuid), PageItem_Icon(this, icon_default_value),
+    PageItem(uuid), PageItem_Icon(icon_default_value),
     entity_(std::move(entity)), render_type_(nullptr) {
   this->entity_->add_subscriber(this);
   this->on_entity_type_change(this->entity_->get_type());
@@ -174,7 +149,7 @@ StatefulPageItem::StatefulPageItem(
 StatefulPageItem::StatefulPageItem(
     const std::string &uuid, std::shared_ptr<Entity> entity,
     const uint16_t icon_default_color) :
-    PageItem(uuid), PageItem_Icon(this, icon_default_color),
+    PageItem(uuid), PageItem_Icon(icon_default_color),
     entity_(std::move(entity)), render_type_(nullptr) {
   this->entity_->add_subscriber(this);
   this->on_entity_type_change(this->entity_->get_type());
@@ -185,7 +160,7 @@ StatefulPageItem::StatefulPageItem(
     const std::string &icon_default_value, 
     const uint16_t icon_default_color) :
     PageItem(uuid),
-    PageItem_Icon(this, icon_default_value, icon_default_color),
+    PageItem_Icon(icon_default_value, icon_default_color),
     entity_(std::move(entity)), render_type_(nullptr) {
   this->entity_->add_subscriber(this);
   this->on_entity_type_change(this->entity_->get_type());
@@ -215,8 +190,6 @@ void StatefulPageItem::on_entity_type_change(const char *type) {
 
   this->set_on_state_callback_(type);
 
-  this->set_render_invalid();
-
   // also need to make sure the state is updated based on the new 'type'
   if (this->on_state_callback_) {
     this->on_state_callback_(this);
@@ -224,8 +197,6 @@ void StatefulPageItem::on_entity_type_change(const char *type) {
 }
 
 void StatefulPageItem::on_entity_state_change(const std::string &state) {
-  this->set_render_invalid();
-
   if (this->on_state_callback_) {
     this->on_state_callback_(this);
   }
@@ -252,8 +223,6 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
   if (this->on_state_callback_) {
     this->on_state_callback_(this);
   }
-
-  this->set_render_invalid();
 }
 
 void StatefulPageItem::set_on_state_callback_(const char *type) {
@@ -293,15 +262,6 @@ std::string &StatefulPageItem::render_(std::string &buffer) {
     PageItem::render_(buffer).append(1, SEPARATOR);
   // iconValue~iconColor~
   return PageItem_Icon::render_(buffer).append(1, SEPARATOR);
-}
-  
-uint16_t StatefulPageItem::get_render_buffer_reserve_() const {
-  // try to guess the required size of the buffer to reduce heap fragmentation
-  return strlen(this->render_type_) + 
-      this->uuid_.length() + 6 +
-      this->get_icon_color_str().length() + 
-      // icon is 4 char long + separator chars
-      9;
 }
 
 void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {

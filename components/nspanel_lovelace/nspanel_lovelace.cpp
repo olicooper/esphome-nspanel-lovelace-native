@@ -2016,7 +2016,6 @@ void NSPanelLovelace::on_weather_temperature_update_(std::string entity_id, std:
 void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit) {
   if (this->screensaver_ == nullptr) return;
   WeatherItem::temperature_unit = std::move(temperature_unit);
-  this->screensaver_->set_items_render_invalid();
   this->send_weather_update_command_();
 }
 

@@ -338,7 +338,7 @@ void NSPanelLovelace::loop() {
     this->read_byte(&d);
     this->buffer_.push_back(d);
     if (!this->process_data_()) {
-      ESP_LOGW(TAG, "Unparsed data: 0x%02x", d);
+      ESP_LOGW(TAG, "Unparsed data: %s", esphome::format_hex(this->buffer_).c_str());
       this->buffer_.clear();
     }
   }
@@ -467,6 +467,29 @@ bool NSPanelLovelace::process_data_() {
   uint32_t at = this->buffer_.size() - 1;
   auto *data = &this->buffer_[0];
   uint8_t new_byte = data[at];
+
+  // Nextion Startup event
+  // todo: store 'tft_connected' state?
+  if (data[0] == 0x0) {
+    if (at > 5) return false;
+    static constexpr uint8_t seq[] = {0x00,0x00,0x00,0xFF,0xFF,0xFF};
+    if (at == 5 && data[at] == seq[at]) {
+      ESP_LOGD(TAG, "Nextion started");
+      this->buffer_.clear();
+    }
+    return data[at] == seq[at];
+  }
+  // Nextion Ready event
+  // note: This event can be removed by custom firmware and may never occur
+  if (data[0] == 0x88) {
+    if (at > 3) return false;
+    static constexpr uint8_t seq[] = {0x88,0xFF,0xFF,0xFF};
+    if (at == 3 && data[at] == seq[at]) {
+      ESP_LOGD(TAG, "Nextion ready");
+      this->buffer_.clear();
+    }
+    return data[at] == seq[at];
+  }
 
   // Byte 0: HEADER1 (always 0x55)
   if (at == 0)

@@ -879,40 +879,23 @@ inline bool try_get_value(
 template<typename Value, size_t Size>
 inline const Value &get_value_or_default(
     const FrozenCharMap<Value, Size> &map,
-    const char *key,
+    const std::string &key,
     const Value &default_value,
     const char *fallback_key = nullptr) {
   // todo: fix this bad implementation
   //       use pointers and unwrap Value?
   static Value ret{};
-  if (try_get_value(map, ret, key, fallback_key))
+  if (try_get_value(map, ret, key.c_str(), fallback_key))
     return ret;
   return default_value;
 }
 
-template<typename Value, size_t Size>
-inline const Value &get_value_or_default(
-    const FrozenCharMap<Value, Size> &map,
-    const std::string &key,
-    const Value &default_value,
-    const char *fallback_key = nullptr) {
- return get_value_or_default(map, key.c_str(), default_value, fallback_key);
-}
-
 template<size_t Size>
 inline const char *get_icon(
     const FrozenCharMap<const char *, Size> &map,
-    const char *key,
+    const std::string &key,
     const char *fallback_key = nullptr) {
   return get_value_or_default(map, key, icon_t::alert_circle_outline, fallback_key);
-}
-
-template<size_t Size>
-inline const char *get_icon(
-    const FrozenCharMap<const char *, Size> &map,
-    const std::string &key,
-    const char *fallback_key = nullptr) {
-  return get_icon(map, key.c_str(), fallback_key);
 }
 
 // simple_type_mapping

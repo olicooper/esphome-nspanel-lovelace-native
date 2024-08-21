@@ -284,6 +284,18 @@ button:
     on_press:
       # Simulate TFT reboot
       - lambda: 'id(nspanel).process_command("event,startup,53,eu");'
+  - platform: template
+    name: $node_name PrintDebugInfo
+    on_press:
+      - logger.log:
+          format: "DebugInfo model:%s ver:%hu mem:{psram_used:%hu,free:%hu,free_blk:%hu}"
+          args: [
+            'Configuration::get_model_str().c_str()',
+            'Configuration::get_version()',
+            'psram_used()',
+            'heap_caps_get_free_size(MALLOC_CAP_INTERNAL)',
+            'heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)'
+          ]
 
 text_sensor:
   - platform: wifi_info

@@ -1216,11 +1216,11 @@ void NSPanelLovelace::render_fan_detail_update_(StatefulPageItem *item) {
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  ESP_LOGCONFIG(TAG, "\tRAM: %u %u %u",
+  ESP_LOGCONFIG(TAG, "\tRAM: psram_used:%zu int_free:%zu int_free_blk:%zu",
     psram_used(),
-    heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
-    heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
-  ESP_LOGCONFIG(TAG, "\tState: pages:%u,stateful_items:%u,entities:%u",
+    heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+    heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+  ESP_LOGCONFIG(TAG, "\tState: pages:%zu,stateful_items:%zu,entities:%zu",
       this->pages_.size(),
       this->stateful_page_items_.size(),
       this->entities_.size());

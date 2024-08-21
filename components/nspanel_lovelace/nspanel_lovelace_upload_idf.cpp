@@ -137,15 +137,18 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
       this->content_length_ -= read_len;
       const float upload_percentage = 100.0f * (this->tft_size_ - this->content_length_) / this->tft_size_;
 #ifdef USE_PSRAM
-      ESP_LOGD(
-          TAG,
-          "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " (DRAM) + %" PRIu32 " (PSRAM) bytes, lblk %" PRIu32,
-          upload_percentage, this->content_length_, static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
-          static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
-          static_cast<uint32_t>(heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT)));
+      ESP_LOGD(TAG,
+          "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %zu (DRAM) + %zu (PSRAM) bytes, lblk %zu",
+          upload_percentage, this->content_length_,
+          heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+          heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+          heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 #else
-      ESP_LOGD(TAG, "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " bytes", upload_percentage,
-               this->content_length_, static_cast<uint32_t>(esp_get_free_heap_size()));
+      ESP_LOGD(TAG,
+          "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " bytes, lblk %zu",
+          upload_percentage, this->content_length_,
+          esp_get_free_heap_size(MALLOC_CAP_DEFAULT),
+          heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 #endif
       this->upload_first_chunk_sent_ = true;
       if (recv_string[0] == 0x08 && recv_string.size() == 5) {  // handle partial upload request
@@ -192,7 +195,7 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
 }
 
 bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/) {
-  ESP_LOGD(TAG, "Nextion TFT upload requested");
+  ESP_LOGI(TAG, "Nextion TFT upload requested");
   ESP_LOGD(TAG, "URL: %s", url.c_str());
 
   if (this->is_updating_) {
@@ -206,6 +209,12 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   }
 
   this->is_updating_ = true;
+
+  // Edge case where user is trying to upload using old protocol for compatibility reasons
+  // see: https://unofficialnextion.com/t/nextion-upload-protocol-v1-2-the-fast-one/1044
+  //      https://github.com/sairon/esphome-nspanel-lovelace-ui/issues/26
+  bool use_old_proto = this->parent_->get_baud_rate() == 9600u;
+  ESP_LOGI(TAG, "Using protocol v1.%" PRIu8, use_old_proto ? 1u : 2u);
 
   ESP_LOGD(TAG, "Exiting Nextion reparse mode");
   this->set_reparse_mode_(false);
@@ -275,24 +284,27 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   }
   this->content_length_ = this->tft_size_;
 
-  ESP_LOGD(TAG, "Uploading Nextion");
-
   // The Nextion will ignore the upload command if it is sleeping
   ESP_LOGD(TAG, "Wake-up Nextion");
-  // These commands target the stock firmware
-  this->send_nextion_command_("sleep=0");
-  this->send_nextion_command_("dim=100");
-  // This command targets nspanel firmware
-  this->send_nextion_command_("dimmode~100~100");
+  if (Configuration::get_version() > 0) {
+    // This command targets nspanel firmware
+    this->send_nextion_command_("dimmode~100~100");
+  } else {
+    // These commands target the stock firmware
+    this->send_nextion_command_("sleep=0");
+    this->send_nextion_command_("dim=100");
+  }
   vTaskDelay(pdMS_TO_TICKS(250));  // NOLINT
-  ESP_LOGD(TAG, "Free heap: %" PRIu32, esp_get_free_heap_size());
 
   App.feed_wdt();
-  char command[128];
   // Tells the Nextion the content length of the tft file and baud rate it will be sent at
   // Once the Nextion accepts the command it will wait until the file is successfully uploaded
   // If it fails for any reason a power cycle of the display will be needed
-  sprintf(command, "whmi-wris %" PRIu32 ",%" PRIu32 ",1", this->content_length_, /*baud_rate*/ this->parent_->get_baud_rate());
+  char command[32] = "whmi-wris";
+  auto sz = snprintf(
+    &command[(use_old_proto ? 8 : 9)],
+    sizeof(command) - 10, " %" PRIu32 ",%" PRIu32 ",1",
+    this->content_length_, /*baud_rate*/ this->update_baud_rate_);
 
   // Clear serial receive buffer
   ESP_LOGD(TAG, "Clear serial receive buffer");
@@ -304,11 +316,11 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   vTaskDelay(pdMS_TO_TICKS(250));  // NOLINT
   ESP_LOGD(TAG, "Free heap: %" PRIu32, esp_get_free_heap_size());
 
-  ESP_LOGD(TAG, "Send upload instruction: %s", command);
   this->send_nextion_command_(command);
 
-  if (this->update_baud_rate_ != 115200) {
-    this->init_display_(this->update_baud_rate_);
+  if (this->parent_->get_baud_rate() != this->update_baud_rate_) {
+    this->parent_->set_baud_rate(this->update_baud_rate_);
+    this->parent_->load_settings();
   }
 
   // if (baud_rate != this->original_baud_rate_) {
@@ -345,10 +357,10 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
     return this->upload_end_(false);
   }
 
-  ESP_LOGD(TAG, "Uploading TFT to Nextion:");
-  ESP_LOGD(TAG, "  URL: %s", url.c_str());
-  ESP_LOGD(TAG, "  File size: %" PRIu32 " bytes", this->content_length_);
-  ESP_LOGD(TAG, "  Free heap: %" PRIu32, esp_get_free_heap_size());
+  ESP_LOGI(TAG, "Uploading TFT to Nextion:");
+  ESP_LOGI(TAG, "  URL: %s", url.c_str());
+  ESP_LOGI(TAG, "  File size: %" PRIu32 " bytes", this->content_length_);
+  ESP_LOGI(TAG, "  Free heap: %" PRIu32, esp_get_free_heap_size());
 
   // Proceed with the content download as before
 
@@ -380,7 +392,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 }
 
 bool NSPanelLovelace::upload_end_(bool successful) {
-  ESP_LOGD(TAG, "Nextion TFT upload finished: %s", YESNO(successful));
+  ESP_LOGI(TAG, "Nextion TFT upload finished: %s", YESNO(successful));
   this->is_updating_ = false;
 
   // uint32_t baud_rate = this->parent_->get_baud_rate();

@@ -121,7 +121,7 @@ public:
    * Softreset the Nextion
    */
   void soft_reset_display() {
-    this->send_nextion_command_("rest"); // doesnt exist/work!?
+    this->send_nextion_command_("rest"); // only for stock FW
   }
 
   float get_setup_priority() const override { return setup_priority::DATA; }
@@ -256,7 +256,7 @@ protected:
   std::string command_buffer_;
 
 #ifdef USE_NSPANEL_TFT_UPLOAD
-  unsigned int update_baud_rate_ = 921600;
+  uint32_t update_baud_rate_ = 921600;
   bool is_updating_ = false;
   bool reparse_mode_ = false;
   uint32_t content_length_ = 0;

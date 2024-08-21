@@ -9,7 +9,9 @@
 #include <time.h>
 #include <vector>
 #include <utility>
-// #include <driver/gpio.h>
+#ifdef USE_ESP_IDF
+#include <driver/gpio.h>
+#endif
 #include <esp_heap_caps.h>
 // #include <esp32/rom/rtc.h>
 #include <esp_system.h>
@@ -91,17 +93,17 @@ void NSPanelLovelace::setup() {
   if (reason == esp_reset_reason_t::ESP_RST_SW ||
       reason == esp_reset_reason_t::ESP_RST_DEEPSLEEP/* ||
       reason == esp_reset_reason_t::ESP_RST_USB*/) {
-// #ifdef USE_ESP_IDF
-//     gpio_set_level(GPIO_NUM_4, !gpio_get_level(GPIO_NUM_4));
-//     delay(200);
-//     gpio_set_level(GPIO_NUM_4, !gpio_get_level(GPIO_NUM_4));
-// #else
-//     digitalWrite(GPIO4, !digitalRead(GPIO4));
-//     delay(200);
-//     digitalWrite(GPIO4, !digitalRead(GPIO4));
-// #endif
-    this->set_display_dim();
-    this->render_page_(render_page_option::screensaver);
+#ifdef TEST_DEVICE_MODE
+    this->process_command("event,startup,53,eu");
+#elif defined(USE_ESP_IDF)
+    gpio_set_level(GPIO_NUM_4, 1);
+    delay(1000);
+    gpio_set_level(GPIO_NUM_4, 0);
+#else
+    digitalWrite(GPIO4, 1);
+    delay(1000);
+    digitalWrite(GPIO4, 0);
+#endif
   }
 
   // todo: create entity for weather instead, so others can subscribe

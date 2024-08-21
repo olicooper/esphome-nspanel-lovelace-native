@@ -86,26 +86,6 @@ void NSPanelLovelace::setup() {
 #ifdef USE_TIME
   this->setup_time_();
 #endif
-  // The display isn't reset when ESP is reset (on ota update etc.)
-  // so we need to simulate the display 'startup' instead
-  // see: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
-  auto reason = esp_reset_reason();
-  if (reason == esp_reset_reason_t::ESP_RST_SW ||
-      reason == esp_reset_reason_t::ESP_RST_DEEPSLEEP/* ||
-      reason == esp_reset_reason_t::ESP_RST_USB*/) {
-#ifdef TEST_DEVICE_MODE
-    this->process_command("event,startup,53,eu");
-#elif defined(USE_ESP_IDF)
-    gpio_set_level(GPIO_NUM_4, 1);
-    delay(1000);
-    gpio_set_level(GPIO_NUM_4, 0);
-#else
-    digitalWrite(GPIO4, 1);
-    delay(1000);
-    digitalWrite(GPIO4, 0);
-#endif
-  }
-
   // todo: create entity for weather instead, so others can subscribe
   if (!this->weather_entity_id_.empty()) {
     // state provides the information for the icon
@@ -325,6 +305,30 @@ void NSPanelLovelace::setup() {
         entity_id);
     }
   }
+
+  this->set_timeout(1000, [this]() {
+    // The display isn't reset when ESP is reset (on ota update etc.)
+    // so we need to simulate the display 'startup' instead
+    // see: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
+#ifdef TEST_DEVICE_MODE
+    this->process_command("event,startup,53,eu");
+#else
+    auto reason = esp_reset_reason();
+    if (reason == esp_reset_reason_t::ESP_RST_SW ||
+        reason == esp_reset_reason_t::ESP_RST_DEEPSLEEP/* ||
+        reason == esp_reset_reason_t::ESP_RST_USB*/) {
+#ifdef USE_ESP_IDF
+      gpio_set_level(GPIO_NUM_4, 1);
+      delay(1000);
+      gpio_set_level(GPIO_NUM_4, 0);
+#else
+      digitalWrite(GPIO4, 1);
+      delay(1000);
+      digitalWrite(GPIO4, 0);
+#endif
+    }
+#endif
+  });
 }
 
 void NSPanelLovelace::loop() {

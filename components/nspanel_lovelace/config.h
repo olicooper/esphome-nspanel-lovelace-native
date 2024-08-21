@@ -10,7 +10,7 @@ namespace esphome {
 namespace nspanel_lovelace {
 
 enum class temperature_unit_t : uint8_t { celcius, fahrenheit };
-enum class nspanel_model_t : uint8_t { eu, us_l, us_p };
+enum class nspanel_model_t : uint8_t { unknown, eu, us_l, us_p };
 
 constexpr char SEPARATOR = '~';
 // workaround for https://github.com/sairon/esphome-nspanel-lovelace-ui/issues/8
@@ -32,13 +32,16 @@ public:
   static void set_model(nspanel_model_t model);
   static void set_model(const std::string &model_str);
   static nspanel_model_t get_model();
-  std::string get_model_str();
+  static std::string get_model_str();
+  static uint16_t get_version();
+  static void set_version(uint16_t version);
 
 protected:
   Configuration();
 
   temperature_unit_t temperature_unit_;
   nspanel_model_t model_;
+  uint16_t version_;
 };
 
 } // nspanel_lovelace

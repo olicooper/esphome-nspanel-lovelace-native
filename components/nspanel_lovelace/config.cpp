@@ -5,7 +5,8 @@ namespace nspanel_lovelace {
 
 Configuration::Configuration() :
     temperature_unit_(temperature_unit_t::celcius),
-    model_(nspanel_model_t::eu) { }
+    model_(nspanel_model_t::unknown),
+    version_(0) { }
 
 Configuration *Configuration::instance() {
   static std::unique_ptr<Configuration> cfg;
@@ -33,11 +34,13 @@ void Configuration::set_model(nspanel_model_t model) {
 
 void Configuration::set_model(const std::string &model_str) {
   if (model_str == "us-p")
-    Configuration::instance()->model_ = nspanel_model_t::eu;
+    Configuration::instance()->model_ = nspanel_model_t::us_p;
   else if (model_str == "us-l")
     Configuration::instance()->model_ = nspanel_model_t::us_l;
-  else
+  else if (model_str == "eu")
     Configuration::instance()->model_ =  nspanel_model_t::eu;
+  else
+    Configuration::instance()->model_ =  nspanel_model_t::unknown;
 }
 
 nspanel_model_t Configuration::get_model() {
@@ -49,7 +52,17 @@ std::string Configuration::get_model_str() {
     return "us-p";
   if (Configuration::instance()->model_ == nspanel_model_t::us_l)
     return "us-l";
-  return "eu";
+  if (Configuration::instance()->model_ == nspanel_model_t::eu)
+    return "eu";
+  return "unknown";
+}
+
+uint16_t Configuration::get_version() {
+  return Configuration::instance()->version_;
+}
+
+void Configuration::set_version(uint16_t version) {
+  Configuration::instance()->version_ = version;
 }
 
 }

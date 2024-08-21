@@ -537,6 +537,19 @@ void NSPanelLovelace::process_command_(const std::string &message) {
     // todo: temporary, render default page instead
     this->render_page_(render_page_option::screensaver);
   } else if (tokens.at(1) == action_type::startup) {
+    if (tokens.size() == 4) {
+      uint16_t ver = 0;
+      if(std::sscanf(tokens.at(2).c_str(), "%" PRIu16, &ver) == 1) {
+        Configuration::set_version(ver);
+      }
+      Configuration::set_model(tokens.at(3));
+    }
+    if (Configuration::get_model() == nspanel_model_t::unknown) {
+      ESP_LOGW(TAG, "Unknown NSPanel model!");
+    }
+    if (Configuration::get_version() == 0) {
+      ESP_LOGW(TAG, "Unknown NSPanel version!");
+    }
     // restore dimmode state
     this->set_display_dim();
     this->render_page_(render_page_option::screensaver);

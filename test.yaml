@@ -137,6 +137,8 @@ nspanel_lovelace:
           name: Person
         - entity_id: text.text
           name: Text
+        - entity_id: alarm_control_panel.security
+          name: Alarm
 
     - type: cardQR
       id: qr_card

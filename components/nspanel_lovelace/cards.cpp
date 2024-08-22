@@ -103,8 +103,7 @@ AlarmCard::~AlarmCard() {
 
 void AlarmCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
 
-bool AlarmCard::set_arm_button(
-    alarm_arm_action action, const std::string &display_name) {
+bool AlarmCard::add_arm_button(alarm_arm_action action) {
   if (this->items_.size() >= 4) {
     return false;
   }
@@ -123,21 +122,17 @@ bool AlarmCard::set_arm_button(
     case alarm_arm_action::arm_vacation:
       action_type = button_type::armVacation;
       break;
+    case alarm_arm_action::arm_custom_bypass:
+      action_type = button_type::armCustomBypass;
+      break;
   }
 
   this->items_.push_back(
     std::unique_ptr<AlarmButtonItem>(
       new AlarmButtonItem(
         std::string(this->uuid_).append(1, '_').append(action_type), 
-        action_type, display_name)));
+        action_type, get_translation(action_type))));
   return true;
-}
-
-void AlarmCard::set_disarm_button(const std::string &display_name) {
-  this->disarm_button_.reset();
-  this->disarm_button_ = std::unique_ptr<AlarmButtonItem>(
-    new AlarmButtonItem(std::string(this->uuid_).append("_d"),
-      button_type::disarm, display_name));
 }
 
 void AlarmCard::on_entity_state_change(const std::string &state) {

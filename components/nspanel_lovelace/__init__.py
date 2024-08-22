@@ -43,13 +43,8 @@ DOW = nspanel_lovelace_ns.class_("DayOfWeekMap").enum("dow")
 TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 
 ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
-ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation']
-ALARM_ARM_OPTION_MAP = {
-    'arm_home': [ALARM_ARM_ACTION.arm_home, "Arm Home"],
-    'arm_away': [ALARM_ARM_ACTION.arm_away, "Arm Away"],
-    'arm_night': [ALARM_ARM_ACTION.arm_night, "Arm Night"],
-    'arm_vacation': [ALARM_ARM_ACTION.arm_vacation, "Arm Vacation"],
-}
+ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation','arm_custom_bypass']
+ALARM_ARM_DEFAULT_OPTIONS = ALARM_ARM_OPTIONS[:4]
 
 TEMPERATURE_UNIT = nspanel_lovelace_ns.enum("temperature_unit_t", True)
 TEMPERATURE_UNIT_OPTIONS = ['celcius','fahrenheit']
@@ -76,7 +71,9 @@ REQUIRED_TRANSLATION_KEYS = [
     "comfort","eco","home","sleep","cool","cooling","dry","drying","fan","heat","heating",
     "heat_cool","idle","auto","fan_only","on","off","currently","state","action","lock","unlock",
     "paused","active","activate","press","run","speed","brightness","color","color_temp",
-    "position","start","pause","cancel","finish","disarm","tilt_position",
+    "position","start","pause","cancel","finish","arm_home","arm_away","arm_night","arm_vacation",
+    "arm_custom_bypass","armed_home","armed_away","armed_night","armed_vacation","armed_custom_bypass",
+    "arming","disarmed","pending","triggered","disarm","tilt_position",
     "above_horizon","below_horizon","not_home","start_cleaning","return_to_base","docked",
     "turn_on","turn_off"
 ]
@@ -435,7 +432,7 @@ CONFIG_SCHEMA = cv.All(
                 }),
                 CARD_ALARM: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ALARM_ENTITY_ID): valid_entity_id(['alarm_control_panel']),
-                    cv.Optional(CONF_CARD_ALARM_SUPPORTED_MODES, default=ALARM_ARM_OPTIONS): 
+                    cv.Optional(CONF_CARD_ALARM_SUPPORTED_MODES, default=ALARM_ARM_DEFAULT_OPTIONS): 
                         cv.All(
                             cv.ensure_list(cv.one_of(*ALARM_ARM_OPTIONS)),
                             cv.Length(1, 4, f"Must be a list of up to 4 items from the following list: {ALARM_ARM_OPTIONS}"),
@@ -620,7 +617,6 @@ async def to_code(config):
 
         cgv = []
         for k,v in translationJson.items():
-            # _LOGGER.info(f"{k},{v}")
             if k in REQUIRED_TRANSLATION_KEYS:
                 if k in cv.RESERVED_IDS:
                     k += '_'
@@ -629,8 +625,7 @@ async def to_code(config):
         cg.add_define("TRANSLATION_MAP_SIZE", len(cgv))
         cg.add_global(cg.RawStatement(
             "constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> "
-            f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"
-            ))
+            f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"))
 
         if CONF_TEMPERATURE_UNIT in locale_config:
             cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
@@ -827,7 +822,7 @@ async def to_code(config):
                 cg.add(card_class.set_qr_text(card_config[CONF_CARD_QR_TEXT]))
         elif card_config[CONF_CARD_TYPE] == CARD_ALARM:
             for mode in card_config[CONF_CARD_ALARM_SUPPORTED_MODES]:
-                cg.add(card_class.set_arm_button(ALARM_ARM_OPTION_MAP[mode][0], ALARM_ARM_OPTION_MAP[mode][1]))
+                cg.add(card_class.add_arm_button(ALARM_ARM_ACTION.class_(mode)))
 
         gen_card_entities(
             card_config.get(CONF_CARD_ENTITIES, []), 

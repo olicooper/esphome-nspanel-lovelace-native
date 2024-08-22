@@ -62,7 +62,21 @@ struct translation_item {
   static constexpr const char* cancel = ha_action_type::cancel;
   static constexpr const char* finish = ha_action_type::finish;
   // alarm_control_panel
+  static constexpr const char* arm_home = button_type::armHome;
+  static constexpr const char* arm_away = button_type::armAway;
+  static constexpr const char* arm_night = button_type::armNight;
+  static constexpr const char* arm_vacation = button_type::armVacation;
+  static constexpr const char* arm_custom_bypass = button_type::armCustomBypass;
   static constexpr const char* disarm = button_type::disarm;
+  static constexpr const char* disarmed = entity_state::disarmed;
+  static constexpr const char* arming = entity_state::arming;
+  static constexpr const char* pending = entity_state::pending;
+  static constexpr const char* triggered = entity_state::triggered;
+  static constexpr const char* armed_home = entity_state::armed_home;
+  static constexpr const char* armed_away = entity_state::armed_away;
+  static constexpr const char* armed_night = entity_state::armed_night;
+  static constexpr const char* armed_vacation = entity_state::armed_vacation;
+  static constexpr const char* armed_custom_bypass = entity_state::armed_custom_bypass;
   // cover
   static constexpr const char* tilt_position = "tilt_pos";
   // sun (backend.component.sun.state)

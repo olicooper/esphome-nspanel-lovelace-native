@@ -1073,7 +1073,7 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     .append(idle ? "" : ha_action_type::finish)
     .append(1, SEPARATOR)
     // label1~
-    .append(idle ? "" : get_translation(translation_item::pause))
+    .append(idle ? "" : get_translation(translation_item::pause_))
     .append(1, SEPARATOR)
     // label2~
     .append(get_translation(idle ? 

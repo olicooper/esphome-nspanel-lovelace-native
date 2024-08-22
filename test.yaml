@@ -45,6 +45,7 @@ nspanel_lovelace:
   id: nspanel
   locale:
     temperature_unit: celcius
+    language: en
   sleep_timeout: 10
   screensaver:
     time_id: homeassistant_time

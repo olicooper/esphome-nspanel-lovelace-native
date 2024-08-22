@@ -34,11 +34,13 @@ entity_ids: dict[str] = {}
 entity_id_index = 0
 uuid_index = 0
 iconJson = None
+translationJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
 DOW = nspanel_lovelace_ns.class_("DayOfWeekMap").enum("dow")
+TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 
 ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
 ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation']
@@ -69,6 +71,15 @@ ENTITY_TYPES = [
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
 ]
+REQUIRED_TRANSLATION_KEYS = [
+    "none","unknown","preset_mode","swing_mode","fan_mode","activity","away","boost",
+    "comfort","eco","home","sleep","cool","cooling","dry","drying","fan","heat","heating",
+    "heat_cool","idle","auto","fan_only","on","off","currently","state","action","lock","unlock",
+    "paused","active","activate","press","run","speed","brightness","color","color_temp",
+    "position","start","pause","cancel","finish","disarm","tilt_position",
+    "above_horizon","below_horizon","not_home","start_cleaning","return_to_base","docked",
+    "turn_on","turn_off"
+]
 
 CONF_INCOMING_MSG = "on_incoming_msg"
 CONF_ICON = "icon"
@@ -80,6 +91,7 @@ CONF_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
 CONF_DAY_OF_WEEK_MAP = "day_of_week_map"
+CONF_LANGUAGE = "language"
 CONF_DOW_SUNDAY = "sunday"
 CONF_DOW_MONDAY = "monday"
 CONF_DOW_TUESDAY = "tuesday"
@@ -141,6 +153,26 @@ def load_icons():
     if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
         raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
+
+def load_translations(lang: str):
+    global translationJson
+    current_directory = os.path.dirname(__file__)
+    jsonPath = os.path.abspath(lang)
+    if not lang.endswith('.json'):
+        jsonPath = os.path.join(current_directory, "translations", f"{lang}.json")
+    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load translation from '{jsonPath}'")
+    try:
+        with open(jsonPath, encoding="utf-8") as read_file:
+            translationJson = json.load(read_file)
+    except (UnicodeDecodeError, OSError):
+        raise cv.Invalid(f"Failed to load translation file from '{jsonPath}', does it exist?")
+    missingKeys = []
+    for k in REQUIRED_TRANSLATION_KEYS:
+        if k not in translationJson:
+            missingKeys.append(k)
+    if len(missingKeys) > 0:
+        raise cv.Invalid(f"Translation file missing the following required keys: {missingKeys}")
+    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file")
 
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:
@@ -256,7 +288,8 @@ SCHEMA_DOW_MAP = cv.Schema({
 
 SCHEMA_LOCALE = cv.Schema({
     cv.Optional(CONF_TEMPERATURE_UNIT): cv.one_of(*TEMPERATURE_UNIT_OPTIONS),
-    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP
+    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP,
+    cv.Optional(CONF_LANGUAGE, default='en'): cv.string_strict,
 })
 
 SCHEMA_ICON = cv.Any(
@@ -320,6 +353,8 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
 
 def validate_config(config):
     model = config[CONF_MODEL]
+    if CONF_LANGUAGE not in config[CONF_LOCALE]:
+        raise cv.Invalid("A language must be specified in locale")
     # Build a list of custom card ids
     card_ids = []
     for card_config in config.get(CONF_CARDS, []):
@@ -580,6 +615,23 @@ async def to_code(config):
 
     if CONF_LOCALE in config:
         locale_config = config[CONF_LOCALE]
+        global translationJson
+        load_translations(locale_config[CONF_LANGUAGE])
+
+        cgv = []
+        for k,v in translationJson.items():
+            # _LOGGER.info(f"{k},{v}")
+            if k in REQUIRED_TRANSLATION_KEYS:
+                if k in cv.RESERVED_IDS:
+                    k += '_'
+                k = TRANSLATION_ITEM.class_(k)
+            cgv.append(cg.ArrayInitializer(k, v))
+        cg.add_define("TRANSLATION_MAP_SIZE", len(cgv))
+        cg.add_global(cg.RawStatement(
+            "constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> "
+            f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"
+            ))
+
         if CONF_TEMPERATURE_UNIT in locale_config:
             cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
         if CONF_DAY_OF_WEEK_MAP in locale_config:

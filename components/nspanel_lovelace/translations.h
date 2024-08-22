@@ -1,10 +1,20 @@
+// NOTE: Due to memory constraints a few design decisions have been made to preserve resources...
+//  - Keep the translation keys short with no nesting (besides using the 'key.subkey' format in select places).
+//  - Use constexpr to ensure strings are stored in flash and re-use matching keys from other places where possible.
+//  - No unnecessary translations.
+// **Translations (keys and values) may change in the future!** This is an imperfect solution which may be inadequate
+// for the task, but reducing memory consumption is also important.
+
 #pragma once
 
+#include "esphome/core/defines.h"
 #include "types.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
 
+// NOTE: If keys are added to this list, the REQUIRED_TRANSLATION_KEYS
+//       list in __init__.py will need updating
 struct translation_item {
   static constexpr const char* none = "none";
   static constexpr const char* unknown = entity_state::unknown;
@@ -17,7 +27,7 @@ struct translation_item {
   static constexpr const char* comfort = "comfort";
   static constexpr const char* eco = "eco";
   static constexpr const char* home = entity_state::home;
-  static constexpr const char* sleep = "sleep";
+  static constexpr const char* sleep_ = "sleep";
   static constexpr const char* cool = entity_state::cool;
   static constexpr const char* cooling = "cooling";
   static constexpr const char* dry = entity_state::dry;
@@ -29,6 +39,7 @@ struct translation_item {
   static constexpr const char* idle = entity_state::idle;
   static constexpr const char* auto_ = entity_state::auto_;
   static constexpr const char* fan_only = entity_state::fan_only;
+  static constexpr const char* on = entity_state::on;
   static constexpr const char* off = entity_state::off;
   static constexpr const char* currently = "currently";
   static constexpr const char* state = "state";
@@ -47,11 +58,11 @@ struct translation_item {
   static constexpr const char* position = "position";
   // timer (frontend.ui.card.timer.actions)
   static constexpr const char* start = ha_action_type::start;
-  static constexpr const char* pause = ha_action_type::pause;
+  static constexpr const char* pause_ = ha_action_type::pause;
   static constexpr const char* cancel = ha_action_type::cancel;
   static constexpr const char* finish = ha_action_type::finish;
   // alarm_control_panel
-  static constexpr const char* disarm = "disarm";
+  static constexpr const char* disarm = button_type::disarm;
   // cover
   static constexpr const char* tilt_position = "tilt_pos";
   // sun (backend.component.sun.state)
@@ -61,7 +72,6 @@ struct translation_item {
   static constexpr const char* not_home = entity_state::not_home;
   // vacuum (frontend.ui.card.vacuum.actions)
   static constexpr const char* start_cleaning = "start_cleaning";
-  static constexpr const char* resume_cleaning = "resume_cleaning";
   static constexpr const char* return_to_base = ha_action_type::return_to_base;
   static constexpr const char* docked = "docked";
   
@@ -69,63 +79,9 @@ struct translation_item {
   static constexpr const char* turn_off = ha_action_type::turn_off;
 };
 
-static constexpr FrozenCharMap<const char *, 55> TRANSLATION_MAP {{
-  {translation_item::none, "None"},
-  {translation_item::unknown, "Unknown"},
-  {translation_item::preset_mode, "Preset mode"},
-  {translation_item::swing_mode, "Swing mode"},
-  {translation_item::fan_mode, "Fan mode"},
-  {translation_item::activity, "Activity"},
-  {translation_item::away, "Away"},
-  {translation_item::boost, "Boost"},
-  {translation_item::comfort, "Comfort"},
-  {translation_item::eco, "Eco"},
-  {translation_item::home, "Home"},
-  {translation_item::sleep, "Sleep"},
-  {translation_item::cool, "Cool"},
-  {translation_item::cooling, "Cooling"},
-  {translation_item::dry, "Dry"},
-  {translation_item::drying, "Drying"},
-  {translation_item::fan, "Fan"},
-  {translation_item::heat, "Heat"},
-  {translation_item::heating, "Heating"},
-  {translation_item::heat_cool, "Heat/Cool"},
-  {translation_item::idle, "Idle"},
-  {translation_item::auto_, "Auto"},
-  {translation_item::fan_only, "Fan only"},
-  {translation_item::off, "Off"},
-  {translation_item::currently, "Currently"},
-  {translation_item::state, "State"},
-  {translation_item::action, "Action"},
-  {translation_item::lock, "Lock"},
-  {translation_item::unlock, "Unlock"},
-  {translation_item::idle, "Idle"},
-  {translation_item::paused, "Paused"},
-  {translation_item::active, "Active"},
-  {translation_item::activate, "Activate"},
-  {translation_item::press, "Press"},
-  {translation_item::run, "Run"},
-  {translation_item::speed, "Speed"},
-  {translation_item::brightness, "Brightness"},
-  {translation_item::color, "Colour"},
-  {translation_item::color_temp, "Colour temperature"},
-  {translation_item::above_horizon, "Above Horizon"},
-  {translation_item::below_horizon, "Below Horizon"},
-  {translation_item::position, "Position"},
-  {translation_item::tilt_position, "Tilt position"},
-  {translation_item::start, "Start"},
-  {translation_item::pause, "Pause"},
-  {translation_item::cancel, "Cancel"},
-  {translation_item::finish, "Finish"},
-  {translation_item::disarm, "Disarm"},
-  {translation_item::not_home, "Away"},
-  {translation_item::start_cleaning, "Start cleaning"},
-  {translation_item::return_to_base, "Return to dock"},
-  {translation_item::resume_cleaning, "Resume dock"},
-  {translation_item::docked, "Docked"},
-  {translation_item::turn_on, "Turn on"},
-  {translation_item::turn_off, "Turn off"},
-}};
+// NOTE: This map is dynamically generated by the esphome build script from a
+//       json file based on the users selected language (default 'en')
+extern FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> TRANSLATION_MAP;
 
 static inline const char *get_translation(const char *key) {
   auto ret = key;

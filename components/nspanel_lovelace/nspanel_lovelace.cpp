@@ -9,9 +9,6 @@
 #include <time.h>
 #include <vector>
 #include <utility>
-#ifdef USE_ESP_IDF
-#include <driver/gpio.h>
-#endif
 #include <esp_heap_caps.h>
 // #include <esp32/rom/rtc.h>
 #include <esp_system.h>
@@ -81,6 +78,8 @@ bool NSPanelLovelace::save_state_() {
 }
 
 void NSPanelLovelace::setup() {
+  this->default_baud_rate_ = this->parent_->get_baud_rate();
+
   this->restore_state_();
 
 #ifdef USE_TIME
@@ -317,15 +316,7 @@ void NSPanelLovelace::setup() {
     if (reason == esp_reset_reason_t::ESP_RST_SW ||
         reason == esp_reset_reason_t::ESP_RST_DEEPSLEEP/* ||
         reason == esp_reset_reason_t::ESP_RST_USB*/) {
-#ifdef USE_ESP_IDF
-      gpio_set_level(GPIO_NUM_4, 1);
-      delay(1000);
-      gpio_set_level(GPIO_NUM_4, 0);
-#else
-      digitalWrite(GPIO4, 1);
-      delay(1000);
-      digitalWrite(GPIO4, 0);
-#endif
+      this->soft_reset_display();
     }
 #endif
   });
@@ -1404,8 +1395,9 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
 #endif
 }
 
+#ifdef USE_ARDUINO
 void NSPanelLovelace::set_reparse_mode_(bool active) {
-  if (this->reparse_mode_ == active) return;
+  // if (this->reparse_mode_ == active) return;
 
   if (active) {
     this->send_nextion_command_("recmod=1");
@@ -1418,6 +1410,7 @@ void NSPanelLovelace::set_reparse_mode_(bool active) {
 
   this->reparse_mode_ = active;
 }
+#endif // USE_ARDUINO
 #endif // USE_NSPANEL_TFT_UPLOAD
 
 void NSPanelLovelace::init_display_(int baud_rate) {

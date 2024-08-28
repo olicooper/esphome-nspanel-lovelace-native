@@ -2,6 +2,12 @@
 #ifdef USE_ESP_IDF
 
 // Adapted from: https://github.com/esphome/esphome/blob/5b6b7c0d15098f7477bae68329fe76a1d8993cf5/esphome/components/nextion/nextion_upload_idf.cpp
+// See:
+//  - https://nextion.ca/documentation/nextion-upload-protocol-v1-1/
+//  - https://nextion.ca/documentation/nextion-upload-protocol-v1-0/
+//  - https://github.com/itead/ITEADLIB_Arduino_Nextion/blob/master/NexUpload.cpp
+//  - https://github.com/MMMZZZZ/Nexus/blob/master/Nexus.py
+//  - https://nextion.tech/instruction-set/
 
 #include "nspanel_lovelace.h"
 
@@ -63,12 +69,6 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     return -1;
   }
 
-  // todo: if this is included, only thr efirst 4096 bytes are fetched.
-  //       esp_http_client_read looks like it automatically handles the range request so this isn't required.
-  // char range_header[32];
-  // sprintf(range_header, "bytes=%" PRIu32 "-%" PRIu32, range_start, range_end);
-  // ESP_LOGD(TAG, "Requesting range: %s", range_header);
-  // esp_http_client_set_header(http_client, "Range", range_header);
   ESP_LOGD(TAG, "Opening HTTP connetion");
   esp_err_t err;
   if ((err = esp_http_client_open(http_client, 0)) != ESP_OK) {
@@ -130,7 +130,6 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     }
     ESP_LOGV(TAG, "%d bytes fetched, writing it to UART", read_len);
     if (read_len > 0) {
-      recv_string.clear();
       this->write_array(buffer, buffer_size);
       App.feed_wdt();
       this->recv_ret_string_(recv_string, this->upload_first_chunk_sent_ ? 500 : 5000, true);
@@ -162,6 +161,14 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
           ESP_LOGI(TAG, "Nextion reported new range %" PRIu32, result);
           this->content_length_ = this->tft_size_ - result;
           range_start = result;
+          
+          // Because the TFT requested a new upload start point, close the HTTP connection
+          // and start a new HTTP request with the updated Range header.
+          esp_http_client_close(http_client);
+          char range_header[32];
+          sprintf(range_header, "bytes=%" PRIu32 "-%" PRIu32, range_start, this->tft_size_);
+          ESP_LOGD(TAG, "Requesting range: %s", range_header);
+          esp_http_client_set_header(http_client, "Range", range_header);
         } else {
           range_start = range_end + 1;
         }
@@ -210,23 +217,58 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 
   this->is_updating_ = true;
 
-  // Edge case where user is trying to upload using old protocol for compatibility reasons
-  // see: https://unofficialnextion.com/t/nextion-upload-protocol-v1-2-the-fast-one/1044
-  //      https://github.com/sairon/esphome-nspanel-lovelace-ui/issues/26
-  bool use_old_proto = this->parent_->get_baud_rate() == 9600u;
-  ESP_LOGI(TAG, "Using protocol v1.%" PRIu8, use_old_proto ? 1u : 2u);
-
-  ESP_LOGD(TAG, "Exiting Nextion reparse mode");
-  this->set_reparse_mode_(false);
-
-  // Check if baud rate is supported
-  // this->original_baud_rate_ = this->parent_->get_baud_rate();
-  // static const std::vector<uint32_t> SUPPORTED_BAUD_RATES = {2400,   4800,   9600,   19200,  31250,  38400, 57600,
-  //                                                            115200, 230400, 250000, 256000, 512000, 921600};
-  // if (std::find(SUPPORTED_BAUD_RATES.begin(), SUPPORTED_BAUD_RATES.end(), baud_rate) == SUPPORTED_BAUD_RATES.end()) {
-  //   baud_rate = this->original_baud_rate_;
-  // }
-  // ESP_LOGD(TAG, "Baud rate: %" PRIu32, baud_rate);
+  std::string recv_res;
+  if (Configuration::get_model() != nspanel_model_t::unknown) {
+    this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
+    this->send_nextion_command_("recmod=0");
+    this->send_nextion_command_("recmod=0");
+    this->send_nextion_command_("connect");
+    ESP_LOGI(TAG, "TFT (v%" PRIu16 ") connected at %" PRIu32 " baud",
+      Configuration::get_version(), this->parent_->get_baud_rate());
+  }
+  // Figure out the current TFT baud rate if using the stock TFT firmware
+  else {
+    uint32_t baudrates[7] = {115200,19200,9600,57600,38400,4800,2400};
+    bool found = false;
+    for (uint8_t i = 0; i < (sizeof(baudrates) / sizeof(uint32_t)); i++) {
+      this->parent_->set_baud_rate(baudrates[i]);
+      this->parent_->load_settings();
+      uint8_t d;
+      while (this->available()) {
+        App.feed_wdt();
+        this->read_byte(&d);
+      };
+      this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
+      this->send_nextion_command_("connect");
+      this->send_nextion_command_("\u00ff\u00ffconnect");
+      this->recv_ret_string_(recv_res, 100, false);
+      if (recv_res.find("comok") != std::string::npos) {
+        found = true;
+        ESP_LOGI(TAG, "TFT connected at %" PRIu32 " baud: '%s'",
+          this->parent_->get_baud_rate(), recv_res.c_str());
+        this->send_nextion_command_(""); // initial empty command recommended by nextion
+        break;
+      }
+      ESP_LOGD(TAG, "TFT response: '%s'",
+        format_hex_pretty(
+          reinterpret_cast<const uint8_t *>(recv_res.data()),
+          recv_res.size()).c_str());
+      recv_res.clear();
+      vTaskDelay(pdMS_TO_TICKS((1000000 / baudrates[i]) + 30));  // NOLINT
+    }
+    if (!found) {
+      // Sometimes the model is not known even though the panel is running
+      // custom FW and there is no way to find this information out,
+      // so we proceed with the FW upload anyway to account for this.
+      ESP_LOGW(TAG,
+        "Failed to establish TFT connection, reverting to %" PRIu32
+        " baud and attempting update anyway",
+        this->default_baud_rate_);
+      this->parent_->set_baud_rate(this->default_baud_rate_);
+      this->parent_->load_settings();
+      // return this->upload_end_(false);
+    }
+  }
 
   // Define the configuration for the HTTP client
   ESP_LOGD(TAG, "Initializing HTTP client");
@@ -246,7 +288,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   // Initialize the HTTP client with the configuration
   esp_http_client_handle_t http_client = esp_http_client_init(&config);
   if (!http_client) {
-    ESP_LOGE(TAG, "Failed to initialize HTTP client.");
+    ESP_LOGE(TAG, "Failed to initialize HTTP client");
     return this->upload_end_(false);
   }
   
@@ -286,13 +328,13 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 
   // The Nextion will ignore the upload command if it is sleeping
   ESP_LOGD(TAG, "Wake-up Nextion");
-  if (Configuration::get_version() > 0) {
+  if (Configuration::get_model() != nspanel_model_t::unknown) {
     // This command targets nspanel firmware
     this->send_nextion_command_("dimmode~100~100");
   } else {
     // These commands target the stock firmware
+    this->send_nextion_command_("dims=100");
     this->send_nextion_command_("sleep=0");
-    this->send_nextion_command_("dim=100");
   }
   vTaskDelay(pdMS_TO_TICKS(250));  // NOLINT
 
@@ -302,7 +344,7 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   // If it fails for any reason a power cycle of the display will be needed
   char command[32] = "whmi-wris";
   auto sz = snprintf(
-    &command[(use_old_proto ? 8 : 9)],
+    &command[9],
     sizeof(command) - 10, " %" PRIu32 ",%" PRIu32 ",1",
     this->content_length_, /*baud_rate*/ this->update_baud_rate_);
 
@@ -323,26 +365,20 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
     this->parent_->load_settings();
   }
 
-  // if (baud_rate != this->original_baud_rate_) {
-  //   ESP_LOGD(TAG, "Changing baud rate from %" PRIu32 " to %" PRIu32 " bps", this->original_baud_rate_, baud_rate);
-  //   this->parent_->set_baud_rate(baud_rate);
-  //   this->parent_->load_settings();
-  // }
-
-  std::string response;
   ESP_LOGD(TAG, "Waiting for upgrade response");
-  this->recv_ret_string_(response, 5000, true);  // This can take some time to return
+  recv_res.clear();
+  this->recv_ret_string_(recv_res, 5000, true);  // This can take some time to return
 
   // The Nextion display will, if it's ready to accept data, send a 0x05 byte.
   ESP_LOGD(TAG, "Upgrade response is [%s] - %zu byte(s)",
-           format_hex_pretty(reinterpret_cast<const uint8_t *>(response.data()), response.size()).c_str(),
-           response.length());
+           format_hex_pretty(reinterpret_cast<const uint8_t *>(recv_res.data()), recv_res.size()).c_str(),
+           recv_res.length());
   ESP_LOGD(TAG, "Free heap: %" PRIu32, esp_get_free_heap_size());
 
-  if (response.find(0x05) != std::string::npos) {
+  if (recv_res.find(0x05) != std::string::npos) {
     ESP_LOGD(TAG, "Preparation for TFT upload done");
   } else {
-    ESP_LOGE(TAG, "Preparation for TFT upload failed %d \"%s\"", response[0], response.c_str());
+    ESP_LOGE(TAG, "Preparation for TFT upload failed %d \"%s\"", recv_res[0], recv_res.c_str());
     ESP_LOGD(TAG, "Close HTTP connection");
     esp_http_client_close(http_client);
     esp_http_client_cleanup(http_client);
@@ -392,24 +428,28 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 }
 
 bool NSPanelLovelace::upload_end_(bool successful) {
-  ESP_LOGI(TAG, "Nextion TFT upload finished: %s", YESNO(successful));
+  if (successful)
+    ESP_LOGI(TAG, "Nextion TFT upload finished");
+  else
+    ESP_LOGW(TAG, "Nextion TFT upload failed");
   this->is_updating_ = false;
 
-  // uint32_t baud_rate = this->parent_->get_baud_rate();
-  // if (baud_rate != this->original_baud_rate_) {
-  //   ESP_LOGD(TAG, "Changing baud rate back from %" PRIu32 " to %" PRIu32 " bps", baud_rate, this->original_baud_rate_);
-  //   this->parent_->set_baud_rate(this->original_baud_rate_);
-  //   this->parent_->load_settings();
-  // }
-
-  this->soft_reset_display();
-  if (successful) {
-    ESP_LOGD(TAG, "Restarting ESPHome");
-    delay(1500);  // NOLINT
-    App.safe_reboot();
-  } else {
-    ESP_LOGE(TAG, "Nextion TFT upload failed");
+  // Make sure we are running with the configured baud rate
+  // so we can communicate normally with the TFT again
+  if (this->parent_->get_baud_rate() != this->default_baud_rate_) {
+    this->parent_->set_baud_rate(this->default_baud_rate_);
+    this->parent_->load_settings();
   }
+  this->soft_reset_display();
+  // todo: Why do we need to reset the ESP after a TFT update?
+  //       The TFT should send us the startup command when reset
+  // if (successful) {
+  //   ESP_LOGD(TAG, "Restarting ESPHome");
+  //   delay(1500);  // NOLINT
+  //   App.safe_reboot();
+  // } else {
+  //   ESP_LOGE(TAG, "Nextion TFT upload failed");
+  // }
   return successful;
 }
 

@@ -18,6 +18,7 @@
 #include "esphome/components/api/custom_api_device.h"
 
 #ifdef USE_ESP_IDF
+#include <driver/gpio.h>
 #include "esphome/components/uart/uart_component_esp_idf.h"
 #ifdef USE_NSPANEL_TFT_UPLOAD
 #include <esp_http_client.h>
@@ -121,7 +122,16 @@ public:
    * Softreset the Nextion
    */
   void soft_reset_display() {
-    this->send_nextion_command_("rest"); // only for stock FW
+    // this->send_nextion_command_("rest"); // only for stock FW
+#ifdef USE_ESP_IDF
+    gpio_set_level(GPIO_NUM_4, 1);
+    delay(1000);
+    gpio_set_level(GPIO_NUM_4, 0);
+#else
+    digitalWrite(GPIO4, 1);
+    delay(1000);
+    digitalWrite(GPIO4, 0);
+#endif
   }
 
   float get_setup_priority() const override { return setup_priority::DATA; }
@@ -151,7 +161,9 @@ protected:
   void init_display_(int baud_rate);
 #ifdef USE_NSPANEL_TFT_UPLOAD
   uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
+#ifdef USE_ARDUINO
   void set_reparse_mode_(bool active);
+#endif
 #endif
   void send_nextion_command_(const std::string &command);
 
@@ -256,7 +268,8 @@ protected:
   std::string command_buffer_;
 
 #ifdef USE_NSPANEL_TFT_UPLOAD
-  uint32_t update_baud_rate_ = 921600;
+  uint32_t default_baud_rate_ = 0;
+  uint32_t update_baud_rate_ = 115200;
   bool is_updating_ = false;
   bool reparse_mode_ = false;
   uint32_t content_length_ = 0;

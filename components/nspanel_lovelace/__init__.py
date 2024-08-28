@@ -169,7 +169,7 @@ def load_translations(lang: str):
             missingKeys.append(k)
     if len(missingKeys) > 0:
         raise cv.Invalid(f"Translation file missing the following required keys: {missingKeys}")
-    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file")
+    _LOGGER.info(f"[nspanel_lovelace] Loaded '{lang}' translation file")
 
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:
@@ -407,7 +407,7 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
         cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200),
         cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
-        cv.Optional(CONF_LOCALE): SCHEMA_LOCALE,
+        cv.Optional(CONF_LOCALE, default={}): SCHEMA_LOCALE,
         cv.Optional(CONF_SCREENSAVER, default={}): SCHEMA_SCREENSAVER,
         cv.Optional(CONF_INCOMING_MSG): automation.validate_automation(
             cv.Schema({
@@ -610,48 +610,47 @@ async def to_code(config):
     if CONF_SLEEP_TIMEOUT in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
 
-    if CONF_LOCALE in config:
-        locale_config = config[CONF_LOCALE]
-        global translationJson
-        load_translations(locale_config[CONF_LANGUAGE])
+    locale_config = config[CONF_LOCALE]
+    global translationJson
+    load_translations(locale_config[CONF_LANGUAGE])
 
-        cgv = []
-        for k,v in translationJson.items():
-            if k in REQUIRED_TRANSLATION_KEYS:
-                if k in cv.RESERVED_IDS:
-                    k += '_'
-                k = TRANSLATION_ITEM.class_(k)
-            cgv.append(cg.ArrayInitializer(k, v))
-        cg.add_define("TRANSLATION_MAP_SIZE", len(cgv))
-        cg.add_global(cg.RawStatement(
-            "constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> "
-            f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"))
+    cgv = []
+    for k,v in translationJson.items():
+        if k in REQUIRED_TRANSLATION_KEYS:
+            if k in cv.RESERVED_IDS:
+                k += '_'
+            k = TRANSLATION_ITEM.class_(k)
+        cgv.append(cg.ArrayInitializer(k, v))
+    cg.add_define("TRANSLATION_MAP_SIZE", len(cgv))
+    cg.add_global(cg.RawStatement(
+        "constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> "
+        f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"))
 
-        if CONF_TEMPERATURE_UNIT in locale_config:
-            cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
-        if CONF_DAY_OF_WEEK_MAP in locale_config:
-            dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
-            if CONF_DOW_SUNDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.sunday, dow_config[CONF_DOW_SUNDAY]))
-            if CONF_DOW_MONDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.monday, dow_config[CONF_DOW_MONDAY]))
-            if CONF_DOW_TUESDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.tuesday, dow_config[CONF_DOW_TUESDAY]))
-            if CONF_DOW_WEDNESDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.wednesday, dow_config[CONF_DOW_WEDNESDAY]))
-            if CONF_DOW_THURSDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.thursday, dow_config[CONF_DOW_THURSDAY]))
-            if CONF_DOW_FRIDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.friday, dow_config[CONF_DOW_FRIDAY]))
-            if CONF_DOW_SATURDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.saturday, dow_config[CONF_DOW_SATURDAY]))
+    if CONF_TEMPERATURE_UNIT in locale_config:
+        cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
+    if CONF_DAY_OF_WEEK_MAP in locale_config:
+        dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
+        if CONF_DOW_SUNDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.sunday, dow_config[CONF_DOW_SUNDAY]))
+        if CONF_DOW_MONDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.monday, dow_config[CONF_DOW_MONDAY]))
+        if CONF_DOW_TUESDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.tuesday, dow_config[CONF_DOW_TUESDAY]))
+        if CONF_DOW_WEDNESDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.wednesday, dow_config[CONF_DOW_WEDNESDAY]))
+        if CONF_DOW_THURSDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.thursday, dow_config[CONF_DOW_THURSDAY]))
+        if CONF_DOW_FRIDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.friday, dow_config[CONF_DOW_FRIDAY]))
+        if CONF_DOW_SATURDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.saturday, dow_config[CONF_DOW_SATURDAY]))
 
     for conf in config.get(CONF_INCOMING_MSG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)

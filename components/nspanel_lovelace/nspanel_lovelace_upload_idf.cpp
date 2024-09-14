@@ -434,9 +434,10 @@ bool NSPanelLovelace::upload_end_(bool successful) {
     ESP_LOGW(TAG, "Nextion TFT upload failed");
   this->is_updating_ = false;
 
+  this->flush();
+  vTaskDelay(pdMS_TO_TICKS(2000));  // NOLINT
   // Make sure we are running with the configured baud rate
   // so we can communicate normally with the TFT again
-  vTaskDelay(pdMS_TO_TICKS(2000));  // NOLINT
   if (this->parent_->get_baud_rate() != this->default_baud_rate_) {
     this->parent_->set_baud_rate(this->default_baud_rate_);
     this->parent_->load_settings();

@@ -125,7 +125,7 @@ public:
     // this->send_nextion_command_("rest"); // only for stock FW
 #ifdef USE_ESP_IDF
     gpio_set_level(GPIO_NUM_4, 1);
-    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     gpio_set_level(GPIO_NUM_4, 0);
 #else
     digitalWrite(GPIO4, 1);

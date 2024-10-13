@@ -16,10 +16,9 @@ esp32:
     type: esp-idf
     sdkconfig_options:
       ## These are required to allow access to the PSRAM
-      ## NOTE: This is temporary and will be removed in a 
-      ##       future release when the build script is improved
       CONFIG_D0WD_PSRAM_CLK_IO: '5'
       CONFIG_D0WD_PSRAM_CS_IO: '18'
+      CONFIG_SPIRAM_USE_MALLOC: 'y'
 
 external_components:
   - source:

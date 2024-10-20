@@ -33,6 +33,11 @@ nspanel_lovelace:
   id: nspanel
   sleep_timeout: 10
   # locale:
+    ## This can be a language code or custom json file (i.e. custom.json). Only en,en_GB,de have been added so far.
+    ## NOTE: This feature is in beta so the translation keys and values could change at any time!
+    ##       Any custom translation files you create will need to be kept in sync with the the files on the repo
+    ##       https://github.com/olicooper/esphome-nspanel-lovelace-native/tree/dev/components/nspanel_lovelace/translations
+    # language: en
     # temperature_unit: celcius
     # day_of_week_map:
     #   sunday: ['Sun', 'Sunday']

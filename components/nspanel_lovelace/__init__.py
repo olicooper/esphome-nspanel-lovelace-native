@@ -34,20 +34,17 @@ entity_ids: dict[str] = {}
 entity_id_index = 0
 uuid_index = 0
 iconJson = None
+translationJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
 DOW = nspanel_lovelace_ns.class_("DayOfWeekMap").enum("dow")
+TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 
 ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
-ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation']
-ALARM_ARM_OPTION_MAP = {
-    'arm_home': [ALARM_ARM_ACTION.arm_home, "Arm Home"],
-    'arm_away': [ALARM_ARM_ACTION.arm_away, "Arm Away"],
-    'arm_night': [ALARM_ARM_ACTION.arm_night, "Arm Night"],
-    'arm_vacation': [ALARM_ARM_ACTION.arm_vacation, "Arm Vacation"],
-}
+ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation','arm_custom_bypass']
+ALARM_ARM_DEFAULT_OPTIONS = ALARM_ARM_OPTIONS[:4]
 
 TEMPERATURE_UNIT = nspanel_lovelace_ns.enum("temperature_unit_t", True)
 TEMPERATURE_UNIT_OPTIONS = ['celcius','fahrenheit']
@@ -69,6 +66,17 @@ ENTITY_TYPES = [
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
 ]
+REQUIRED_TRANSLATION_KEYS = [
+    "none","unknown","preset_mode","swing_mode","fan_mode","activity","away","boost",
+    "comfort","eco","home","sleep","cool","cooling","dry","drying","fan","heat","heating",
+    "heat_cool","idle","auto","fan_only","on","off","currently","state","action","lock","unlock",
+    "paused","active","activate","press","run","speed","brightness","color","color_temp",
+    "position","start","pause","cancel","finish","arm_home","arm_away","arm_night","arm_vacation",
+    "arm_custom_bypass","armed_home","armed_away","armed_night","armed_vacation","armed_custom_bypass",
+    "arming","disarmed","pending","triggered","disarm","tilt_position",
+    "above_horizon","below_horizon","not_home","start_cleaning","return_to_base","docked",
+    "turn_on","turn_off"
+]
 
 CONF_INCOMING_MSG = "on_incoming_msg"
 CONF_ICON = "icon"
@@ -80,6 +88,7 @@ CONF_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
 CONF_DAY_OF_WEEK_MAP = "day_of_week_map"
+CONF_LANGUAGE = "language"
 CONF_DOW_SUNDAY = "sunday"
 CONF_DOW_MONDAY = "monday"
 CONF_DOW_TUESDAY = "tuesday"
@@ -141,6 +150,26 @@ def load_icons():
     if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
         raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
+
+def load_translations(lang: str):
+    global translationJson
+    current_directory = os.path.dirname(__file__)
+    jsonPath = os.path.abspath(lang)
+    if not lang.endswith('.json'):
+        jsonPath = os.path.join(current_directory, "translations", f"{lang}.json")
+    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load translation from '{jsonPath}'")
+    try:
+        with open(jsonPath, encoding="utf-8") as read_file:
+            translationJson = json.load(read_file)
+    except (UnicodeDecodeError, OSError):
+        raise cv.Invalid(f"Failed to load translation file from '{jsonPath}', does it exist?")
+    missingKeys = []
+    for k in REQUIRED_TRANSLATION_KEYS:
+        if k not in translationJson:
+            missingKeys.append(k)
+    if len(missingKeys) > 0:
+        raise cv.Invalid(f"Translation file missing the following required keys: {missingKeys}")
+    _LOGGER.info(f"[nspanel_lovelace] Loaded '{lang}' translation file")
 
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:
@@ -256,7 +285,8 @@ SCHEMA_DOW_MAP = cv.Schema({
 
 SCHEMA_LOCALE = cv.Schema({
     cv.Optional(CONF_TEMPERATURE_UNIT): cv.one_of(*TEMPERATURE_UNIT_OPTIONS),
-    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP
+    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP,
+    cv.Optional(CONF_LANGUAGE, default='en'): cv.string_strict,
 })
 
 SCHEMA_ICON = cv.Any(
@@ -320,6 +350,8 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
 
 def validate_config(config):
     model = config[CONF_MODEL]
+    if CONF_LANGUAGE not in config[CONF_LOCALE]:
+        raise cv.Invalid("A language must be specified in locale")
     # Build a list of custom card ids
     card_ids = []
     for card_config in config.get(CONF_CARDS, []):
@@ -375,7 +407,7 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
         cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(2, 43200),
         cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
-        cv.Optional(CONF_LOCALE): SCHEMA_LOCALE,
+        cv.Optional(CONF_LOCALE, default={}): SCHEMA_LOCALE,
         cv.Optional(CONF_SCREENSAVER, default={}): SCHEMA_SCREENSAVER,
         cv.Optional(CONF_INCOMING_MSG): automation.validate_automation(
             cv.Schema({
@@ -400,7 +432,7 @@ CONFIG_SCHEMA = cv.All(
                 }),
                 CARD_ALARM: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ALARM_ENTITY_ID): valid_entity_id(['alarm_control_panel']),
-                    cv.Optional(CONF_CARD_ALARM_SUPPORTED_MODES, default=ALARM_ARM_OPTIONS): 
+                    cv.Optional(CONF_CARD_ALARM_SUPPORTED_MODES, default=ALARM_ARM_DEFAULT_OPTIONS): 
                         cv.All(
                             cv.ensure_list(cv.one_of(*ALARM_ARM_OPTIONS)),
                             cv.Length(1, 4, f"Must be a list of up to 4 items from the following list: {ALARM_ARM_OPTIONS}"),
@@ -578,33 +610,47 @@ async def to_code(config):
     if CONF_SLEEP_TIMEOUT in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
 
-    if CONF_LOCALE in config:
-        locale_config = config[CONF_LOCALE]
-        if CONF_TEMPERATURE_UNIT in locale_config:
-            cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
-        if CONF_DAY_OF_WEEK_MAP in locale_config:
-            dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
-            if CONF_DOW_SUNDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.sunday, dow_config[CONF_DOW_SUNDAY]))
-            if CONF_DOW_MONDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.monday, dow_config[CONF_DOW_MONDAY]))
-            if CONF_DOW_TUESDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.tuesday, dow_config[CONF_DOW_TUESDAY]))
-            if CONF_DOW_WEDNESDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.wednesday, dow_config[CONF_DOW_WEDNESDAY]))
-            if CONF_DOW_THURSDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.thursday, dow_config[CONF_DOW_THURSDAY]))
-            if CONF_DOW_FRIDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.friday, dow_config[CONF_DOW_FRIDAY]))
-            if CONF_DOW_SATURDAY in dow_config:
-                cg.add(nspanel.set_day_of_week_override(
-                    DOW.saturday, dow_config[CONF_DOW_SATURDAY]))
+    locale_config = config[CONF_LOCALE]
+    global translationJson
+    load_translations(locale_config[CONF_LANGUAGE])
+
+    cgv = []
+    for k,v in translationJson.items():
+        if k in REQUIRED_TRANSLATION_KEYS:
+            if k in cv.RESERVED_IDS:
+                k += '_'
+            k = TRANSLATION_ITEM.class_(k)
+        cgv.append(cg.ArrayInitializer(k, v))
+    cg.add_define("TRANSLATION_MAP_SIZE", len(cgv))
+    cg.add_global(cg.RawStatement(
+        "constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> "
+        f"esphome::{nspanel_lovelace_ns}::TRANSLATION_MAP {{{cg.ArrayInitializer(*cgv, multiline=True)}}};"))
+
+    if CONF_TEMPERATURE_UNIT in locale_config:
+        cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
+    if CONF_DAY_OF_WEEK_MAP in locale_config:
+        dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
+        if CONF_DOW_SUNDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.sunday, dow_config[CONF_DOW_SUNDAY]))
+        if CONF_DOW_MONDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.monday, dow_config[CONF_DOW_MONDAY]))
+        if CONF_DOW_TUESDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.tuesday, dow_config[CONF_DOW_TUESDAY]))
+        if CONF_DOW_WEDNESDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.wednesday, dow_config[CONF_DOW_WEDNESDAY]))
+        if CONF_DOW_THURSDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.thursday, dow_config[CONF_DOW_THURSDAY]))
+        if CONF_DOW_FRIDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.friday, dow_config[CONF_DOW_FRIDAY]))
+        if CONF_DOW_SATURDAY in dow_config:
+            cg.add(nspanel.set_day_of_week_override(
+                DOW.saturday, dow_config[CONF_DOW_SATURDAY]))
 
     for conf in config.get(CONF_INCOMING_MSG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
@@ -775,7 +821,7 @@ async def to_code(config):
                 cg.add(card_class.set_qr_text(card_config[CONF_CARD_QR_TEXT]))
         elif card_config[CONF_CARD_TYPE] == CARD_ALARM:
             for mode in card_config[CONF_CARD_ALARM_SUPPORTED_MODES]:
-                cg.add(card_class.set_arm_button(ALARM_ARM_OPTION_MAP[mode][0], ALARM_ARM_OPTION_MAP[mode][1]))
+                cg.add(card_class.add_arm_button(ALARM_ARM_ACTION.class_(mode)))
 
         gen_card_entities(
             card_config.get(CONF_CARD_ENTITIES, []), 

@@ -414,7 +414,7 @@ void StatefulPageItem::state_alarm_fn(StatefulPageItem *me) {
   if (!me->icon_color_overridden_)
     me->icon_color_ = icon.color;
 }
-
+// todo: also change colour
 void StatefulPageItem::state_sun_fn(StatefulPageItem *me) {
   if (me->icon_value_overridden_) return;
   if (me->is_state(entity_state::above_horizon))
@@ -422,7 +422,7 @@ void StatefulPageItem::state_sun_fn(StatefulPageItem *me) {
   else
     me->icon_value_ = icon_t::weather_sunset_down;
 }
-
+// todo: also change colour
 void StatefulPageItem::state_lock_fn(StatefulPageItem *me) {
   if (me->icon_value_overridden_) return;
   if (me->is_state(entity_state::unlocked))

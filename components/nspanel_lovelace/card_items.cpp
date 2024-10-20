@@ -105,7 +105,7 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
-  me_->value_ = me_->get_state();
+  me_->value_ = get_translation(me_->get_state());
 }
 
 void EntitiesCardEntityItem::state_on_off_fn(StatefulPageItem *me) {
@@ -259,11 +259,26 @@ void EntitiesCardEntityItem::state_sun_fn(StatefulPageItem *me) {
   me_->value_ = get_translation(me_->get_state());
 }
 
+void EntitiesCardEntityItem::state_vacuum_fn(StatefulPageItem *me) {
+  auto me_ = static_cast<EntitiesCardEntityItem*>(me);
+  me_->value_ = get_translation(me_->is_state(entity_state::docked) ?
+    translation_item::start_cleaning : translation_item::return_to_base);
+}
+
 void EntitiesCardEntityItem::state_translate_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
-  // person: backend.component.person.state
-  // vacuum: frontend.ui.card.vacuum.actions
-  me_->value_ = get_translation(me_->get_state());
+  // Firstly try to find a match for a specific entity type, then
+  // find a match for the generic state, otherwise use the raw state value
+  const char *ret;
+  std::string key = me->get_type();
+  key.append(1, '.').append(me_->get_state());
+  if (!try_get_value(TRANSLATION_MAP, ret, key)) {
+    if (!try_get_value(TRANSLATION_MAP, ret, me_->get_state())) {
+      me_->value_ = me_->get_state();
+      return;
+    }
+  }
+  me_->value_ = ret;
 }
 
 void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
@@ -300,9 +315,12 @@ void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_weather_fn;
   } else if (type == entity_type::sun) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_sun_fn;
+  } else if (type == entity_type::vacuum) {
+    this->on_state_callback_ = EntitiesCardEntityItem::state_vacuum_fn;
   } else if (
       type == entity_type::person ||
-      type == entity_type::vacuum) {
+      type == entity_type::alarm_control_panel ||
+      type == entity_type::binary_sensor) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_translate_fn;
   } else {
     this->on_state_callback_ = EntitiesCardEntityItem::state_generic_fn;

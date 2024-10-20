@@ -92,9 +92,7 @@ public:
   void accept(PageVisitor& visitor) override;
 
   void set_show_keypad(bool show_keypad) { this->show_keypad_ = show_keypad; }
-  bool set_arm_button(
-      alarm_arm_action action, const std::string &display_name);
-  void set_disarm_button(const std::string &display_name);
+  bool add_arm_button(alarm_arm_action action);
 
   void on_entity_state_change(const std::string &state) override;
   void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;

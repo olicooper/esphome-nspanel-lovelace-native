@@ -89,5 +89,19 @@
   "month_november": "Νοέμβριος",
   "month_nov": "Νοέ",
   "month_december": "Δεκέμβριος",
-  "month_dec": "Δεκ"
+  "month_dec": "Δεκ",
+  "dow_sunday": "Κυριακή",
+  "dow_sun": "Κυρ",
+  "dow_monday": "Δευτέρα",
+  "dow_mon": "Δευ",
+  "dow_tuesday": "Τρίτη",
+  "dow_tue": "Τρι",
+  "dow_wednesday": "Τετάρτη",
+  "dow_wed": "Τετ",
+  "dow_thursday": "Πέμπτη",
+  "dow_thu": "Πεμ",
+  "dow_friday": "Παρασκευή",
+  "dow_fri": "Παρ",
+  "dow_saturday": "Σάββατο",
+  "dow_sat": "Σαβ"
 }

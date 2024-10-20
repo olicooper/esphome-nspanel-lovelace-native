@@ -89,5 +89,19 @@
   "month_november": "November",
   "month_nov": "Nov",
   "month_december": "December",
-  "month_dec": "Dec"
+  "month_dec": "Dec",
+  "dow_sunday": "Sunday",
+  "dow_sun": "Sun",
+  "dow_monday": "Monday",
+  "dow_mon": "Mon",
+  "dow_tuesday": "Tuesday",
+  "dow_tue": "Tue",
+  "dow_wednesday": "Wednesday",
+  "dow_wed": "Wed",
+  "dow_thursday": "Thursday",
+  "dow_thu": "Thu",
+  "dow_friday": "Friday",
+  "dow_fri": "Fri",
+  "dow_saturday": "Saturday",
+  "dow_sat": "Sat"
 }

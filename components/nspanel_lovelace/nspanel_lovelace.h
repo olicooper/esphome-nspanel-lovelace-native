@@ -101,13 +101,13 @@ public:
 #endif
   
   void on_page_item_added_callback(const std::shared_ptr<PageItem> &item);
+  void set_language(const std::string &language) { this->language_ = language; }
   void set_display_timeout(uint16_t timeout);
   void set_display_active_dim(uint8_t active);
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
-  void set_day_of_week_override(DayOfWeekMap::dow dow, const std::array<const char *, 2> &value);
 
   void render_screensaver() { this->render_page_(render_page_option::screensaver); }
   void render_next_page() { this->render_page_(render_page_option::next); }
@@ -240,8 +240,7 @@ protected:
   void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
   void send_weather_update_command_();
   std::string weather_entity_id_;
-  DayOfWeekMap day_of_week_map_;
-  bool day_of_week_map_overridden_ = false;
+  std::string language_;
 
   std::queue<std::string> command_queue_;
   unsigned long command_last_sent_ = 0;

@@ -40,16 +40,6 @@ nspanel_lovelace:
     ##       https://github.com/olicooper/esphome-nspanel-lovelace-native/tree/dev/components/nspanel_lovelace/translations
     # language: en
     # temperature_unit: celcius
-    ## note: This will be depreciated soon.
-    ##       I intend to move this to the translations file but I need to update the code first.
-    # day_of_week_map:
-    #   sunday: ['Sun', 'Sunday']
-    #   monday: ['Mon', 'Monday']
-    #   tuesday: ['Tue', 'Tuesday']
-    #   wednesday: ['Wed', 'Wednesday']
-    #   thursday: ['Thu', 'Thursday']
-    #   friday: ['Fri', 'Friday']
-    #   saturday: ['Sat', 'Saturday']
   screensaver:
     time_id: homeassistant_time
     ## For formatting options see: https://cplusplus.com/reference/ctime/strftime/

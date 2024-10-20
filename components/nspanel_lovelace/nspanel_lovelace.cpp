@@ -433,33 +433,6 @@ void NSPanelLovelace::set_display_dim(uint8_t inactive, uint8_t active) {
   this->send_buffered_command_();
 }
 
-void NSPanelLovelace::set_day_of_week_override(DayOfWeekMap::dow dow, const std::array<const char *, 2> &value) {
-  assert(dow < 7);
-  switch(dow) {
-  case DayOfWeekMap::dow::sunday:
-    this->day_of_week_map_.set_sunday(value);
-    break;
-  case DayOfWeekMap::dow::monday:
-    this->day_of_week_map_.set_monday(value);
-    break;
-  case DayOfWeekMap::dow::tuesday:
-    this->day_of_week_map_.set_tuesday(value);
-    break;
-  case DayOfWeekMap::dow::wednesday:
-    this->day_of_week_map_.set_wednesday(value);
-    break;
-  case DayOfWeekMap::dow::thursday:
-    this->day_of_week_map_.set_thursday(value);
-    break;
-  case DayOfWeekMap::dow::friday:
-    this->day_of_week_map_.set_friday(value);
-    break;
-  case DayOfWeekMap::dow::saturday:
-    this->day_of_week_map_.set_saturday(value);
-    break;
-  }
-}
-
 bool NSPanelLovelace::process_data_() {
   uint32_t at = this->buffer_.size() - 1;
   auto *data = &this->buffer_[0];
@@ -1446,19 +1419,61 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
     if (datefmt.empty())
       datefmt = this->date_format_;
     auto timestr = now.strftime(datefmt);
-    
-    DayOfWeekMap::dow_mode dow_mode = DayOfWeekMap::dow_mode::none;
-    if (datefmt.find("%A", 0) != std::string::npos) {
-      dow_mode = (DayOfWeekMap::dow_mode)(dow_mode |
-                  DayOfWeekMap::dow_mode::long_dow);
+
+    if (this->language_ == "en" || this->language_ == "en-GB") {
+      goto skip_date_translate;
     }
+
     if (datefmt.find("%a", 0) != std::string::npos ||
-        datefmt.find("%c", 0) != std::string::npos || 
-        datefmt.find("%h", 0) != std::string::npos) {
-      dow_mode = (DayOfWeekMap::dow_mode)(dow_mode |
-                  DayOfWeekMap::dow_mode::short_dow);
+        datefmt.find("%A", 0) != std::string::npos || 
+        datefmt.find("%c", 0) != std::string::npos) {
+      switch(now.day_of_week) {
+        case 1:
+          replace_first(timestr, "Sunday",
+            get_translation(translation_item::dow_sunday));
+          replace_first(timestr, "Sun",
+            get_translation(translation_item::dow_sun));
+          break;
+        case 2:
+          replace_first(timestr, "Monday",
+            get_translation(translation_item::dow_monday));
+          replace_first(timestr, "Mon",
+            get_translation(translation_item::dow_mon));
+          break;
+        case 3:
+          replace_first(timestr, "Tuesday",
+            get_translation(translation_item::dow_tuesday));
+          replace_first(timestr, "Tue",
+            get_translation(translation_item::dow_tue));
+          break;
+        case 4:
+          replace_first(timestr, "Wednesday",
+            get_translation(translation_item::dow_wednesday));
+          replace_first(timestr, "Wed",
+            get_translation(translation_item::dow_wed));
+          break;
+        case 5:
+          replace_first(timestr, "Thursday",
+            get_translation(translation_item::dow_thursday));
+          replace_first(timestr, "Thu",
+            get_translation(translation_item::dow_thu));
+          break;
+        case 6:
+          replace_first(timestr, "Friday",
+            get_translation(translation_item::dow_friday));
+          replace_first(timestr, "Fri",
+            get_translation(translation_item::dow_fri));
+          break;
+        case 7:
+          replace_first(timestr, "Saturday",
+            get_translation(translation_item::dow_saturday));
+          replace_first(timestr, "Sat",
+            get_translation(translation_item::dow_sat));
+          break;
+        default:
+          break;
+      }
     }
-    this->day_of_week_map_.replace(timestr, dow_mode);
 
     if (datefmt.find("%b", 0) != std::string::npos || 
         datefmt.find("%B", 0) != std::string::npos ||
@@ -1539,6 +1554,7 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
           break;
       }
     }
+  skip_date_translate:
     this->command_buffer_
       .assign("date").append(1, SEPARATOR)
       .append(timestr);
@@ -2369,7 +2385,39 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
       strftime(buff, sizeof(buff), this->time_format_.c_str(), &t);
       weatherItem->set_display_name(buff);
     } else {
-      weatherItem->set_display_name(this->day_of_week_map_.at(t.tm_wday).at(0));
+      switch(t.tm_wday) {
+        case 0:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_sun));
+          break;
+        case 1:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_mon));
+          break;
+        case 2:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_tue));
+          break;
+        case 3:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_wed));
+          break;
+        case 4:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_thu));
+          break;
+        case 5:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_fri));
+          break;
+        case 6:
+          weatherItem->set_display_name(
+            get_translation(translation_item::dow_sat));
+          break;
+        default:
+          weatherItem->set_display_name("DOW_UNK");
+          break;
+      }
     }
     
     snprintf(buff, sizeof(buff), "%.1f", item["temperature"].as<float>());

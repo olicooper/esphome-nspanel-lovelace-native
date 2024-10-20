@@ -39,7 +39,6 @@ make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
-DOW = nspanel_lovelace_ns.class_("DayOfWeekMap").enum("dow")
 TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 
 ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
@@ -87,15 +86,7 @@ CONF_SLEEP_TIMEOUT = "sleep_timeout"
 
 CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
-CONF_DAY_OF_WEEK_MAP = "day_of_week_map"
 CONF_LANGUAGE = "language"
-CONF_DOW_SUNDAY = "sunday"
-CONF_DOW_MONDAY = "monday"
-CONF_DOW_TUESDAY = "tuesday"
-CONF_DOW_WEDNESDAY = "wednesday"
-CONF_DOW_THURSDAY = "thursday"
-CONF_DOW_FRIDAY = "friday"
-CONF_DOW_SATURDAY = "saturday"
 
 CONF_SCREENSAVER = "screensaver"
 CONF_MODEL = "model"
@@ -268,24 +259,8 @@ def ensure_unique(value: list):
         raise cv.Invalid("Mapping values must be unique.")
     return value
 
-SCHEMA_DOW_ITEM = cv.All(
-    cv.ensure_list(cv.string_strict), 
-    cv.Length(2, 2, 'There must be exactly 2 items specified, the short form then the long form e.g. ["Sun", "Sunday"]'),
-)
-
-SCHEMA_DOW_MAP = cv.Schema({
-    cv.Optional(CONF_DOW_SUNDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_MONDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_TUESDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_WEDNESDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_THURSDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_FRIDAY): SCHEMA_DOW_ITEM,
-    cv.Optional(CONF_DOW_SATURDAY): SCHEMA_DOW_ITEM,
-})
-
 SCHEMA_LOCALE = cv.Schema({
     cv.Optional(CONF_TEMPERATURE_UNIT): cv.one_of(*TEMPERATURE_UNIT_OPTIONS),
-    cv.Optional(CONF_DAY_OF_WEEK_MAP): SCHEMA_DOW_MAP,
     cv.Optional(CONF_LANGUAGE, default='en'): cv.string_strict,
 })
 
@@ -613,6 +588,12 @@ async def to_code(config):
     locale_config = config[CONF_LOCALE]
     global translationJson
     load_translations(locale_config[CONF_LANGUAGE])
+    
+    # file specified, translation unknown
+    if '.' in locale_config[CONF_LANGUAGE] or len(locale_config[CONF_LANGUAGE]) == 0:
+        cg.add(nspanel.set_language("unknown"))
+    else:
+        cg.add(nspanel.set_language(locale_config[CONF_LANGUAGE]))
 
     cgv = []
     for k,v in translationJson.items():
@@ -628,29 +609,6 @@ async def to_code(config):
 
     if CONF_TEMPERATURE_UNIT in locale_config:
         cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
-    if CONF_DAY_OF_WEEK_MAP in locale_config:
-        dow_config = locale_config[CONF_DAY_OF_WEEK_MAP]
-        if CONF_DOW_SUNDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.sunday, dow_config[CONF_DOW_SUNDAY]))
-        if CONF_DOW_MONDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.monday, dow_config[CONF_DOW_MONDAY]))
-        if CONF_DOW_TUESDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.tuesday, dow_config[CONF_DOW_TUESDAY]))
-        if CONF_DOW_WEDNESDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.wednesday, dow_config[CONF_DOW_WEDNESDAY]))
-        if CONF_DOW_THURSDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.thursday, dow_config[CONF_DOW_THURSDAY]))
-        if CONF_DOW_FRIDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.friday, dow_config[CONF_DOW_FRIDAY]))
-        if CONF_DOW_SATURDAY in dow_config:
-            cg.add(nspanel.set_day_of_week_override(
-                DOW.saturday, dow_config[CONF_DOW_SATURDAY]))
 
     for conf in config.get(CONF_INCOMING_MSG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)

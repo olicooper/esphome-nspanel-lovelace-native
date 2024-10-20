@@ -424,8 +424,8 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(2, SEPARATOR);
 
   buffer.append(std::to_string(
-    std::stoi(this->media_entity_->get_attribute(
-      ha_attr_type::volume_level, "0")) * 100));
+    static_cast<uint8_t>(std::stof(this->media_entity_->get_attribute(
+      ha_attr_type::volume_level, "0")) * 100.0f)));
   buffer.append(1, SEPARATOR);
 
   auto icon = this->media_entity_->is_state(entity_state::playing)

@@ -1426,6 +1426,8 @@ void NSPanelLovelace::init_display_(int baud_rate) {
 
 #ifdef USE_TIME
 // see: https://esphome.io/components/time/#strftime
+// note: Because ESP-IDF doesn't support locale (due to memory constraints),
+//       the only way to translate the time is to manually replace the date/time strings
 void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date_format, const char *time_format) {
   ESPTime now = this->time_id_.value()->now();
 
@@ -1443,6 +1445,7 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
     // todo: fetch from config before using default value
     if (datefmt.empty())
       datefmt = this->date_format_;
+    auto timestr = now.strftime(datefmt);
     
     DayOfWeekMap::dow_mode dow_mode = DayOfWeekMap::dow_mode::none;
     if (datefmt.find("%A", 0) != std::string::npos) {
@@ -1455,11 +1458,90 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
       dow_mode = (DayOfWeekMap::dow_mode)(dow_mode |
                   DayOfWeekMap::dow_mode::short_dow);
     }
+    this->day_of_week_map_.replace(timestr, dow_mode);
 
-    auto timestr = now.strftime(datefmt);
+    if (datefmt.find("%b", 0) != std::string::npos || 
+        datefmt.find("%B", 0) != std::string::npos ||
+        datefmt.find("%c", 0) != std::string::npos ||
+        datefmt.find("%h", 0) != std::string::npos) {
+      switch(now.month) {
+        case 1:
+          replace_first(timestr, "January",
+            get_translation(translation_item::month_january));
+          replace_first(timestr, "Jan",
+            get_translation(translation_item::month_jan));
+          break;
+        case 2:
+          replace_first(timestr, "February",
+            get_translation(translation_item::month_february));
+          replace_first(timestr, "Feb",
+            get_translation(translation_item::month_feb));
+          break;
+        case 3:
+          replace_first(timestr, "March",
+            get_translation(translation_item::month_march));
+          replace_first(timestr, "Mar",
+            get_translation(translation_item::month_mar));
+          break;
+        case 4:
+          replace_first(timestr, "April",
+            get_translation(translation_item::month_april));
+          replace_first(timestr, "Apr",
+            get_translation(translation_item::month_apr));
+          break;
+        case 5:
+          replace_first(timestr, "May",
+            get_translation(translation_item::month_may));
+          break;
+        case 6:
+          replace_first(timestr, "June",
+            get_translation(translation_item::month_june));
+          replace_first(timestr, "Jun",
+            get_translation(translation_item::month_jun));
+          break;
+        case 7:
+          replace_first(timestr, "July",
+            get_translation(translation_item::month_july));
+          replace_first(timestr, "Jul",
+            get_translation(translation_item::month_jul));
+          break;
+        case 8:
+          replace_first(timestr, "August",
+            get_translation(translation_item::month_august));
+          replace_first(timestr, "Aug",
+            get_translation(translation_item::month_aug));
+          break;
+        case 9:
+          replace_first(timestr, "September",
+            get_translation(translation_item::month_september));
+          replace_first(timestr, "Sep",
+            get_translation(translation_item::month_sep));
+          break;
+        case 10:
+          replace_first(timestr, "October",
+            get_translation(translation_item::month_october));
+          replace_first(timestr, "Oct",
+            get_translation(translation_item::month_oct));
+          break;
+        case 11:
+          replace_first(timestr, "November",
+            get_translation(translation_item::month_november));
+          replace_first(timestr, "Nov",
+            get_translation(translation_item::month_nov));
+          break;
+        case 12:
+          replace_first(timestr, "December",
+            get_translation(translation_item::month_december));
+          replace_first(timestr, "Dec",
+            get_translation(translation_item::month_dec));
+          break;
+        default:
+          break;
+      }
+    }
     this->command_buffer_
       .assign("date").append(1, SEPARATOR)
-      .append(this->day_of_week_map_.replace(timestr, dow_mode));
+      .append(timestr);
     this->send_buffered_command_();
   }
 

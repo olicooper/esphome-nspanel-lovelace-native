@@ -146,7 +146,7 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
       ESP_LOGD(TAG,
           "Uploaded %0.2f%%, remaining %" PRIu32 " bytes, free heap: %" PRIu32 " bytes, lblk %zu",
           upload_percentage, this->content_length_,
-          esp_get_free_heap_size(MALLOC_CAP_DEFAULT),
+          esp_get_free_heap_size(),
           heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
 #endif
       this->upload_first_chunk_sent_ = true;

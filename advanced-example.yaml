@@ -14,12 +14,9 @@ esphome:
 esp32:
   board: esp32dev
   framework:
+    # ESP-IDF is requried so we can access the NSPanel PSRAM
+    # which is on non-standard pins. ESP-IDF also uses less flash than Arduino!
     type: esp-idf
-    sdkconfig_options:
-      ## These are required to allow access to the PSRAM
-      CONFIG_D0WD_PSRAM_CLK_IO: '5'
-      CONFIG_D0WD_PSRAM_CS_IO: '18'
-      CONFIG_SPIRAM_USE_MALLOC: 'y'
 
 external_components:
   - source:
@@ -33,7 +30,7 @@ nspanel_lovelace:
   id: nspanel
   sleep_timeout: 10
   # locale:
-    ## This can be the ISO 639‑1 language code or custom json file (i.e. custom.json).
+    ## This can be the ISO 639‑1 language code or a custom json file (i.e. custom.json).
     ## Only en,en-GB,de,el have been added so far.
     ## NOTE: This feature is in beta so the translation keys and values could change at any time!
     ##       Any custom translation files you create will need to be kept in sync with the the files on the repo

@@ -13,12 +13,9 @@ esphome:
 esp32:
   board: esp32dev
   framework:
+    # ESP-IDF is requried so we can access the NSPanel PSRAM
+    # which is on non-standard pins. ESP-IDF also uses less flash than Arduino!
     type: esp-idf
-    sdkconfig_options:
-      ## These are required to allow access to the PSRAM
-      CONFIG_D0WD_PSRAM_CLK_IO: '5'
-      CONFIG_D0WD_PSRAM_CS_IO: '18'
-      CONFIG_SPIRAM_USE_MALLOC: 'y'
 
 external_components:
   - source:

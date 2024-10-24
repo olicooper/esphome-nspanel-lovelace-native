@@ -1222,8 +1222,10 @@ void NSPanelLovelace::render_fan_detail_update_(StatefulPageItem *item) {
 void NSPanelLovelace::dump_config() {
   ESP_LOGCONFIG(TAG, "NSPanelLovelace:");
   ESP_LOGCONFIG(TAG, "\tVersion: %s", NSPANEL_LOVELACE_BUILD_VERSION);
-  ESP_LOGCONFIG(TAG, "\tRAM: psram_used:%zu int_free:%zu int_free_blk:%zu",
+  ESP_LOGCONFIG(TAG, "\tRAM: min_heap:%u psram_used:%zu int_min_free:%zu int_free:%zu int_max_free_blk:%zu",
+    esp_get_minimum_free_heap_size(),
     psram_used(),
+    heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
     heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
     heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
   ESP_LOGCONFIG(TAG, "\tState: pages:%zu,stateful_items:%zu,entities:%zu",

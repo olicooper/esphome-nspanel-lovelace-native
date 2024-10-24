@@ -33,9 +33,8 @@ esp32:
   board: lolin32_lite
   framework:
     type: esp-idf
-    # sdkconfig_options:
-    #   CONFIG_D0WD_PSRAM_CLK_IO: '5'
-    #   CONFIG_D0WD_PSRAM_CS_IO: '18'
+    # version: latest
+    # platform_version: '6.9.0'
 
 external_components:
   - source: components
@@ -291,11 +290,13 @@ button:
     name: $node_name PrintDebugInfo
     on_press:
       - logger.log:
-          format: "DebugInfo model:%s ver:%hu mem:{psram_used:%hu,free:%hu,free_blk:%hu}"
+          format: "DebugInfo model:%s ver:%hu mem:{min_heap:%u,psram_used:%hu,int_min_free:%hu,int_free:%hu,int_max_free_blk:%hu}"
           args: [
             'Configuration::get_model_str().c_str()',
             'Configuration::get_version()',
+            'esp_get_minimum_free_heap_size()',
             'psram_used()',
+            'heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)',
             'heap_caps_get_free_size(MALLOC_CAP_INTERNAL)',
             'heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)'
           ]

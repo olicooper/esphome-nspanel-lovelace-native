@@ -22,10 +22,6 @@ DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
 
 def AUTO_LOAD():
     val = ["text_sensor", "json"]
-    # NOTE: Cannot support PSRAM on arduino due to non-default pin configuration
-    if core.CORE.using_esp_idf:
-        val.append("psram")
-        return val
     return val
 
 _LOGGER = logging.getLogger(__name__)
@@ -428,6 +424,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
+    #cv.only_with_esp_idf,
     validate_config
 )
 
@@ -545,20 +542,36 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_
         return cg.RawStatement(f'{basicstr}, {default_icon_value})')
 
 async def to_code(config):
+    # note: not using 'psram' dependency because our sdkconfig options conflict
+    is_test_mode = [string for string in
+                    core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS] 
+                    if string.endswith("TEST_DEVICE_MODE")]
+    if is_test_mode:
+        _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
+    # NSPanel has non-standard PSRAM pins which are not modifiable when building for Arduino
+    elif core.CORE.using_esp_idf:
+        cg.add_define("USE_PSRAM")
+        esp32.add_idf_sdkconfig_option(
+            f"CONFIG_{esp32.get_esp32_variant().upper()}_SPIRAM_SUPPORT", True
+        )
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_USE", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_USE_MALLOC", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_IGNORE_NOTFOUND", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CLK_IO", 5)
+        esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CS_IO", 18)
+        # Also increase flash & CPU speed as NSPanel hardware supports it
+        esp32.add_idf_sdkconfig_option("CONFIG_ESP32_DEFAULT_CPU_FREQ_240", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_SPEED_80M", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_MODE_QUAD", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_ESPTOOLPY_FLASHMODE_QIO", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_ESPTOOLPY_FLASHFREQ_80M", True)
+
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)
     await uart.register_uart_device(nspanel, config)
     cg.add_define("USE_NSPANEL_LOVELACE")
     cg.add_global(nspanel_lovelace_ns.using)
-
-    # NSPanel has non-standard PSRAM pins which are not
-    # modifiable when building for Arduino
-    if core.CORE.using_esp_idf:
-        # FIXME: This doesnt work (sdkconfig file doesnt change), 'to_code' priority wrong?
-        # esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CLK_IO", '5')
-        # esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CS_IO", '18')
-        # todo: this is an arduino define, is this okay to keep using?
-        cg.add_define("BOARD_HAS_PSRAM")
 
     enable_tft_upload = True
     if 'build_flags' in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]:
@@ -572,7 +585,7 @@ async def to_code(config):
         #       an undefined reference to 'upload_tft' during linking
         # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
         # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
-        core.CORE.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
+        cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
         if core.CORE.using_arduino:
             cg.add_library("WiFiClientSecure", None)
             cg.add_library("HTTPClient", None)

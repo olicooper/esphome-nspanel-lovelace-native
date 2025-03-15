@@ -69,6 +69,7 @@ struct translation_item {
   static constexpr const char* arm_custom_bypass = button_type::armCustomBypass;
   static constexpr const char* disarm = button_type::disarm;
   static constexpr const char* disarmed = entity_state::disarmed;
+  static constexpr const char* disarming = entity_state::disarming;
   static constexpr const char* arming = entity_state::arming;
   static constexpr const char* pending = entity_state::pending;
   static constexpr const char* triggered = entity_state::triggered;

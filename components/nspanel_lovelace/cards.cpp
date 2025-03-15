@@ -140,6 +140,7 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
 
   if (state == entity_state::triggered || 
       state == entity_state::arming || 
+      state == entity_state::disarming || 
       state == entity_state::pending) {
     this->status_icon_flashing_ = true;
   }

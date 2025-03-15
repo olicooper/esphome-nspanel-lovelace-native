@@ -182,6 +182,7 @@ struct entity_state {
   // alarm_control_panel
   static constexpr const char* disarmed = "disarmed";
   static constexpr const char* arming = "arming";
+  static constexpr const char* disarming = "disarming";
   static constexpr const char* pending = "pending";
   static constexpr const char* triggered = "triggered";
   static constexpr const char* armed_home = "armed_home";
@@ -199,6 +200,7 @@ struct entity_state {
   static constexpr const char* not_home = "not_home";
   // timer
   static constexpr const char* idle = "idle";
+  static constexpr const char* active = "active";
   // climate
   static constexpr const char* cool = "cool";
   static constexpr const char* dry = "dry";
@@ -936,7 +938,7 @@ static constexpr FrozenCharMap<const icon_char_t *, 9> MEDIA_TYPE_ICON_MAP {{
   std::pair<const char*, const icon_char_t*>{ha_attr_media_content_type::url, icon_t::link_box_outline}, // newly added! (OR cast E117?)
 }};
 
-const FrozenCharMap<Icon, 10> ALARM_ICON_MAP {{
+const FrozenCharMap<Icon, 11> ALARM_ICON_MAP {{
   std::pair<const char*, Icon>{entity_state::unknown, Icon{icon_t::shield_off, 0x0CE6u}}, //green
   std::pair<const char*, Icon>{entity_state::disarmed, Icon{icon_t::shield_off, 0x0CE6u}}, //green
   std::pair<const char*, Icon>{entity_state::armed_home, Icon{icon_t::shield_home, 0xE243u}}, //red
@@ -945,6 +947,7 @@ const FrozenCharMap<Icon, 10> ALARM_ICON_MAP {{
   std::pair<const char*, Icon>{entity_state::armed_vacation, Icon{icon_t::shield_airplane, 0xE243u}}, //red
   std::pair<const char*, Icon>{entity_state::armed_custom_bypass, Icon{icon_t::shield, 0xE243u}}, //red
   std::pair<const char*, Icon>{entity_state::arming, Icon{icon_t::shield, 0xED80u}}, //orange
+  std::pair<const char*, Icon>{entity_state::disarming, Icon{icon_t::shield, 0xED80u}}, //orange
   std::pair<const char*, Icon>{entity_state::pending, Icon{icon_t::shield, 0xED80u}}, //orange
   std::pair<const char*, Icon>{entity_state::triggered, Icon{icon_t::bell_ring, 0xE243u}}, //red
 }};

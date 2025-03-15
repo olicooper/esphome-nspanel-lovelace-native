@@ -279,6 +279,8 @@ void StatefulPageItem::set_on_state_callback_(const char *type) {
     this->on_state_callback_ = StatefulPageItem::state_lock_fn;
   } else if (type == entity_type::weather) {
     this->on_state_callback_ = StatefulPageItem::state_weather_fn;
+  } else if (type == entity_type::timer) {
+    this->on_state_callback_ = StatefulPageItem::state_timer_fn;
   }
 }
 
@@ -442,6 +444,19 @@ void StatefulPageItem::state_weather_fn(StatefulPageItem *me) {
     me->icon_value_ = icon.value;
   if (!me->icon_color_overridden_)
     me->icon_color_ = icon.color;
+}
+
+void StatefulPageItem::state_timer_fn(StatefulPageItem *me) {
+  if (me->icon_value_overridden_ && 
+      me->icon_color_overridden_) return;
+
+  if (!me->icon_color_overridden_) {
+    if (me->is_state(entity_state::active))
+      me->icon_color_ = 64909u; // yellow
+    else
+      me->icon_color_ = 17299u; // blue
+  }
+
 }
 
 } // namespace nspanel_lovelace

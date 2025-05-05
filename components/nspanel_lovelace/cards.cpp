@@ -184,8 +184,7 @@ std::string &AlarmCard::render(std::string &buffer) {
   buffer.append(1, SEPARATOR).append(this->status_icon_->render());
 
   // Only disable keypad when alarm is disarmed, since arming always requires code
-  if (this->alarm_entity_->is_state(entity_state::unknown) ||
-      this->alarm_entity_->is_state(entity_state::disarmed)) {
+  if (this->alarm_entity_->is_state(entity_state::disarmed)) {
         buffer.append(1, SEPARATOR)
         .append(this->show_keypad_ ? 
           generic_type::enable : generic_type::disable);

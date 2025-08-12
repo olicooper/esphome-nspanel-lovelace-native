@@ -115,6 +115,8 @@ public:
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
 
+  void set_double_tap_to_unlock() {this->double_tap_to_unlock_ = true;}
+
   void render_screensaver() { this->render_page_(render_page_option::default_page); }
   void render_next_page() { this->render_page_(render_page_option::next); }
   void render_previous_page() { this->render_page_(render_page_option::prev); }
@@ -221,6 +223,8 @@ protected:
   uint8_t now_minute_, now_hour_;
   bool time_configured_;
 #endif
+  
+  bool double_tap_to_unlock_ = false;
 
   uint8_t display_active_dim_ = 100;
   uint8_t display_inactive_dim_ = 50;

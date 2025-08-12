@@ -45,6 +45,8 @@ nspanel_lovelace:
     # temperature_unit: celcius
   screensaver:
     time_id: homeassistant_time
+    # Use this to enable double tapping to exit the screensaver
+    doubleTapToUnlock: true
     ## For formatting options see: https://cplusplus.com/reference/ctime/strftime/
     # time_format: '%H:%M'
     # date_format: '%A, %d. %B %Y'

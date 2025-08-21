@@ -24,23 +24,16 @@ public:
   Entity(const std::string &entity_id);
   Entity(const std::string &entity_id, const char *type);
 
-  void add_subscriber(IEntitySubscriber *const target);
-  bool remove_subscriber(const IEntitySubscriber *const target);
-
   const std::string &get_entity_id() const;
-  void set_entity_id(const std::string &entity_id);
   
   bool is_type(const char *type) const;
   const char *get_type() const;
-  bool set_type(const char *type);
 
   bool is_state(const std::string &state) const;
   const std::string &get_state() const;
-  void set_state(const std::string &state);
 
   bool has_attribute(ha_attr_type attr) const;
   const std::string &get_attribute(ha_attr_type attr, const std::string &default_value = "") const;
-  void set_attribute(ha_attr_type attr, const std::string &value);
 
 protected:
   std::string entity_id_;
@@ -54,6 +47,22 @@ protected:
   void notify_type_change(const char *type);
   void notify_state_change(const std::string &state);
   void notify_attribute_change(ha_attr_type attr, const std::string &value);
+
+  friend class EntityEditor;
+};
+
+class EntityEditor {
+public:
+  static void add_subscriber(Entity& entity, IEntitySubscriber *const target);
+  static bool remove_subscriber(Entity& entity, const IEntitySubscriber *const target);
+
+  static void set_entity_id(Entity& entity, const std::string &entity_id);
+  
+  static bool set_type(Entity& entity, const char *type);
+
+  static void set_state(Entity& entity, const std::string &state);
+
+  static void set_attribute(Entity& entity, ha_attr_type attr, const std::string &value);
 };
 
 }

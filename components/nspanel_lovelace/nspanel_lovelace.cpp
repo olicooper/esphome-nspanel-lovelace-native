@@ -2259,9 +2259,9 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
   if (ha_attr == ha_attr_type::unknown) return;
 
   if (ha_attr == ha_attr_type::state) {
-    entity->set_state(attr_value);
+    EntityEditor::set_state(*entity, attr_value);
   } else {
-    entity->set_attribute(ha_attr, attr_value);
+    EntityEditor::set_attribute(*entity, ha_attr, attr_value);
   }
 
   ESP_LOGD(TAG, "HA update: %s %s='%s'",

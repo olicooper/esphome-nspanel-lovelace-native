@@ -158,7 +158,7 @@ StatefulPageItem::StatefulPageItem(
     const std::string &uuid, std::shared_ptr<Entity> entity) :
     PageItem(uuid), PageItem_Icon(this),
     entity_(std::move(entity)), render_type_(nullptr) {
-  this->entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*entity_, this);
   this->on_entity_type_change(this->entity_->get_type());
 }
 
@@ -167,7 +167,7 @@ StatefulPageItem::StatefulPageItem(
     const icon_char_t *icon_default_value) :
     PageItem(uuid), PageItem_Icon(this, icon_default_value),
     entity_(std::move(entity)), render_type_(nullptr) {
-  this->entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*entity_, this);
   this->on_entity_type_change(this->entity_->get_type());
 }
 
@@ -176,7 +176,7 @@ StatefulPageItem::StatefulPageItem(
     const uint16_t icon_default_color) :
     PageItem(uuid), PageItem_Icon(this, icon_default_color),
     entity_(std::move(entity)), render_type_(nullptr) {
-  this->entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*entity_, this);
   this->on_entity_type_change(this->entity_->get_type());
 }
 
@@ -187,12 +187,12 @@ StatefulPageItem::StatefulPageItem(
     PageItem(uuid),
     PageItem_Icon(this, icon_default_value, icon_default_color),
     entity_(std::move(entity)), render_type_(nullptr) {
-  this->entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*entity_, this);
   this->on_entity_type_change(this->entity_->get_type());
 }
 
 StatefulPageItem::~StatefulPageItem() {
-  this->entity_->remove_subscriber(this);
+  EntityEditor::remove_subscriber(*entity_, this);
 }
 
 void StatefulPageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }

@@ -57,7 +57,7 @@ AlarmCard::AlarmCard(
     Card(page_type::cardAlarm, uuid),
     alarm_entity_(alarm_entity),
     show_keypad_(true), status_icon_flashing_(false) {
-  alarm_entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*alarm_entity_, this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
@@ -72,7 +72,7 @@ AlarmCard::AlarmCard(
     Card(page_type::cardAlarm, uuid, title),
     alarm_entity_(alarm_entity),
     show_keypad_(true),status_icon_flashing_(false) {
-  alarm_entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*alarm_entity_, this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
@@ -87,7 +87,7 @@ AlarmCard::AlarmCard(
     Card(page_type::cardAlarm, uuid, title, sleep_timeout),
     alarm_entity_(alarm_entity),
     show_keypad_(true),status_icon_flashing_(false) {
-  alarm_entity_->add_subscriber(this);
+  EntityEditor::add_subscriber(*alarm_entity_, this);
   this->status_icon_ = std::unique_ptr<AlarmIconItem>(
     new AlarmIconItem(std::string(uuid).append("_s"), icon_t::shield_off, 0x0CE6)); //green
   this->info_icon_ = std::unique_ptr<AlarmIconItem>(
@@ -98,7 +98,7 @@ AlarmCard::AlarmCard(
 }
 
 AlarmCard::~AlarmCard() {
-  alarm_entity_->remove_subscriber(this);
+  EntityEditor::remove_subscriber(*alarm_entity_, this);
 }
 
 void AlarmCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
@@ -215,7 +215,7 @@ ThermoCard::ThermoCard(const std::string &uuid,
     Card(page_type::cardThermo, uuid),
     thermo_entity_(thermo_entity) {
   this->configure_temperature_unit();
-  thermo_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*thermo_entity, this);
 }
 
 ThermoCard::ThermoCard(const std::string &uuid,
@@ -224,7 +224,7 @@ ThermoCard::ThermoCard(const std::string &uuid,
     Card(page_type::cardThermo, uuid, title),
     thermo_entity_(thermo_entity) {
   this->configure_temperature_unit();
-  thermo_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*thermo_entity, this);
 }
 
 ThermoCard::ThermoCard(
@@ -234,11 +234,11 @@ ThermoCard::ThermoCard(
     Card(page_type::cardThermo, uuid, title, sleep_timeout),
     thermo_entity_(thermo_entity) {
   this->configure_temperature_unit();
-  thermo_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*thermo_entity, this);
 }
 
 ThermoCard::~ThermoCard() {
-  thermo_entity_->remove_subscriber(this);
+  EntityEditor::remove_subscriber(*thermo_entity_, this);
 }
 
 void ThermoCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
@@ -380,7 +380,7 @@ MediaCard::MediaCard(const std::string &uuid,
     const std::shared_ptr<Entity> &media_entity) :
     Card(page_type::cardMedia, uuid),
     media_entity_(media_entity) {
-  media_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*media_entity, this);
 }
 
 MediaCard::MediaCard(const std::string &uuid,
@@ -388,7 +388,7 @@ MediaCard::MediaCard(const std::string &uuid,
     const std::string &title) :
     Card(page_type::cardMedia, uuid, title),
     media_entity_(media_entity) {
-  media_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*media_entity, this);
 }
 
 MediaCard::MediaCard(const std::string &uuid,
@@ -396,11 +396,11 @@ MediaCard::MediaCard(const std::string &uuid,
     const std::string &title, const uint16_t sleep_timeout) :
     Card(page_type::cardMedia, uuid, title, sleep_timeout),
     media_entity_(media_entity) {
-  media_entity->add_subscriber(this);
+  EntityEditor::add_subscriber(*media_entity, this);
 }
 
 MediaCard::~MediaCard() {
-  media_entity_->remove_subscriber(this);
+  EntityEditor::remove_subscriber(*media_entity_, this);
 }
 
 void MediaCard::accept(PageVisitor& visitor) { visitor.visit(*this); }

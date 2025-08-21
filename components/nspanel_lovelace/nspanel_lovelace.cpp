@@ -2211,23 +2211,37 @@ void NSPanelLovelace::call_ha_service_(
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
   api::HomeassistantServiceResponse resp;
-  resp.service = service;
+  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+    resp.set_service(esphome::StringRef(service));
+  #else
+    resp.service = service;
+  #endif
 
-  auto it = data.find(to_string(ha_attr_type::entity_id));
-  if (it == data.end())
-    ESP_LOGD(TAG, "Call HA: %s -> %s", resp.service.c_str(), it->second.c_str());
-  else
-    ESP_LOGD(TAG, "Call HA: %s", resp.service.c_str());
+  #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+    auto it = data.find(to_string(ha_attr_type::entity_id));
+    if (it == data.end())
+      ESP_LOGD(TAG, "Call HA: %s -> %s", service.c_str(), it->second.c_str());
+    else
+      ESP_LOGD(TAG, "Call HA: %s", service.c_str());
+  #endif
 
   for (auto &it : data) {
     api::HomeassistantServiceMap kv;
-    kv.key = it.first;
+    #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+      kv.set_key(esphome::StringRef(it.first));
+    #else
+      kv.key = it.first;
+    #endif
     kv.value = it.second;
     resp.data.push_back(kv);
   }
   for (auto &it : data_template) {
     api::HomeassistantServiceMap kv;
-    kv.key = it.first;
+    #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+      kv.set_key(esphome::StringRef(it.first));
+    #else
+      kv.key = it.first;
+    #endif
     kv.value = it.second;
     resp.data_template.push_back(kv);
   }

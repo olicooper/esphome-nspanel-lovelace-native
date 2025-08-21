@@ -10,6 +10,7 @@ import os, json
 
 from esphome.components import uart, time, esp32
 from esphome.const import (
+    __version__ as ESPHOME_VERSION,
     CONF_ID,
     CONF_TRIGGER_ID,
     CONF_TIME_ID,
@@ -634,9 +635,14 @@ async def to_code(config):
         esp32.add_idf_sdkconfig_option("CONFIG_BT_ALLOCATION_FROM_SPIRAM_FIRST", True)
         esp32.add_idf_sdkconfig_option("CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY", True)
 
-    ## Allow handling of large weather forecast objects
-    cg.add_define("ARDUINOJSON_SLOT_ID_SIZE", 2)
-    cg.add_define("ARDUINOJSON_ENABLE_STD_STRING", 1)
+        ## Allow handling of large weather forecast objects
+        cg.add_define("ARDUINOJSON_SLOT_ID_SIZE", 2)
+        cg.add_define("ARDUINOJSON_ENABLE_STD_STRING", 1)
+
+    ## Explicitly enable services and states in ESPHome v2025.8.0+
+    if cv.Version.parse(ESPHOME_VERSION) >= cv.Version(2025,8,0):
+        cg.add_define("USE_API_HOMEASSISTANT_STATES")
+        cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)

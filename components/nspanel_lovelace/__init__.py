@@ -130,7 +130,7 @@ CONF_SCREENSAVER_WEATHER = "weather"
 CONF_SCREENSAVER_STATUS_ICON_LEFT = "status_icon_left"
 CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
-CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "doubleTapToUnlock"
+CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
 
 CONF_CARDS = "cards"
 CONF_CARD_TYPE = "type"
@@ -332,7 +332,7 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
-    cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK): cv.boolean,
+    cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, default=False): cv.boolean,
     cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
         cv.Required(CONF_ENTITY_ID): valid_entity_id()
     }),
@@ -718,10 +718,8 @@ async def to_code(config):
         if CONF_SCREENSAVER_TIME_FORMAT in screensaver_config:
             cg.add(nspanel.set_time_format(screensaver_config[CONF_SCREENSAVER_TIME_FORMAT]))
 
-        if CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK in screensaver_config:
-            double_tap_to_unlock_config_ = screensaver_config.get(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, False)
-            if double_tap_to_unlock_config_:
-                cg.add(nspanel.set_double_tap_to_unlock())
+        if screensaver_config.get(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, False):
+            cg.add(nspanel.set_double_tap_to_unlock(True))
 
         screensaver_info = PAGE_MAP[CONF_SCREENSAVER]
         screensaver_class = cg.global_ns.class_(screensaver_info[0])

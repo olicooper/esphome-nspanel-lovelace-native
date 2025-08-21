@@ -1717,7 +1717,7 @@ void NSPanelLovelace::process_button_press_(
     // render_card(_current_card);
 
     // exit screensaver when screen tapped once or twice when double tap is enabled
-    if ((value == "1" && !this->double_tap_to_unlock_) || (value == "2")) {
+    if ((!this->double_tap_to_unlock_ && value == "1") || value == "2")
       this->render_page_(render_page_option::first_page);
     }
     // screen tapped multiple times

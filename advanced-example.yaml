@@ -38,6 +38,7 @@ nspanel_lovelace:
     ##   - German/Deutsch: de.json
     ##   - Greek/Νέα Ελληνικά: el.json
     ##   - Spanish/Español: es.json
+    ##   - Polish/Polski: pl.json
     ## NOTE: This feature is in beta so the translation keys and values could change at any time!
     ##       Any custom translation files you create will need to be kept in sync with the the files on the repo
     ##       https://github.com/olicooper/esphome-nspanel-lovelace-native/tree/dev/components/nspanel_lovelace/translations

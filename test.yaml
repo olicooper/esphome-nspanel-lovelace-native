@@ -8,7 +8,7 @@
 # - Simulate TFT reboot (EU model, firmware version 53): `event,startup,53,eu`
 # - Navigate to Extras 1 Card: `event,buttonPress2,navigate.uuid.extras_1_card,button`
 # - Navigate to screensaver: `event,buttonPress2,navigate.uuid.1,button`
-# - Navigate to first card: `event,buttonPress2,screensaver,bExit`
+# - Navigate to first card: `event,buttonPress2,screensaver,bExit,1`
 # - Close the current page / go back to screensaver: `event,sleepReached,`
 # - Open a popupPage (open the page where the entity exists first):
 #    - Timer: `event,pageOpenDetail,popupTimer,uuid.15`
@@ -31,6 +31,7 @@ esphome:
 
 esp32:
   board: lolin32_lite
+  # board: lolin_s3_mini
   framework:
     type: esp-idf
     # version: latest
@@ -62,8 +63,25 @@ nspanel_lovelace:
       entities:
         - entity_id: switch.decorative_lights
           name: switch
+          update_lambda: |-
+            ESP_LOGD("TEST", "UPDATE LAMBDA CALLED on uuid:%s (%s) %s='%s'",
+              item->get_uuid().c_str(), item->get_type(), to_string(attribute), value.c_str());
+
+            // Return 'false' to indicate that this lambda didn't modify anything.
+            // Set this to 'true' to stop the default update callback from running.
+            return false;
         - entity_id: light.ceiling_lights
           name: color_temp,hs
+          update_lambda: |-
+            ESP_LOGD("TEST", "UPDATE LAMBDA CALLED on uuid:%s (%s) %s='%s'",
+              item->get_uuid().c_str(), item->get_type(), to_string(attribute), value.c_str());
+            if (attribute == ha_attr_type::state) {
+              item->set_icon_color({255,255,255});
+              item->set_display_name("TEST:" + value);
+              // note: 'item' is a GridCardEntityItem so it does not have the 'set_value' function
+              // item->set_value("SHOULD NOT WORK");
+            }
+            return true;
         - entity_id: light.entrance_color_white_lights
           name: hs,white
         - entity_id: light.office_rgbw_lights
@@ -268,7 +286,7 @@ binary_sensor:
   - platform: gpio
     name: $node_name Right Button
     pin:
-      number: GPIO27
+      number: GPIO14
       inverted: true
     id: right_button
     internal: true

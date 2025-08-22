@@ -14,9 +14,9 @@ namespace nspanel_lovelace {
 struct IEntitySubscriber {
 public:
   virtual ~IEntitySubscriber() {}
-  virtual void on_entity_type_change(const char *type) {}
-  virtual void on_entity_state_change(const std::string &state) {}
-  virtual void on_entity_attribute_change(ha_attr_type attr, const std::string &value) {}
+  virtual void on_entity_type_change(const char *type, bool run_callbacks = true) {}
+  virtual void on_entity_state_change(const std::string &state, bool run_callbacks = true) {}
+  virtual void on_entity_attribute_change(ha_attr_type attr, const std::string &value, bool run_callbacks = true) {}
 };
 
 class Entity {

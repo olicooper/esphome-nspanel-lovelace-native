@@ -12,6 +12,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include "esphome/core/optional.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -188,9 +189,9 @@ public:
 
   void accept(PageItemVisitor& visitor) override;
 
-  void on_entity_type_change(const char *type) override;
-  void on_entity_state_change(const std::string &state) override;
-  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
+  void on_entity_type_change(const char *type, bool run_callbacks = true) override;
+  void on_entity_state_change(const std::string &state, bool run_callbacks = true) override;
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value, bool run_callbacks = true) override;
 
   bool is_type(const char *type) const { return this->entity_->is_type(type); }
   const char *get_type() const { return this ->entity_->get_type(); }
@@ -203,10 +204,14 @@ public:
   }
   Entity* get_entity() const { return this->entity_.get(); }
 
+  using state_update_func_t = std::function<bool(ha_attr_type, std::string)>;
+  virtual void set_update_lambda(state_update_func_t &&f) { this->state_update_func_ = f; }
+
 protected:
   const std::shared_ptr<Entity> entity_;
   // A function which modifies the entity when the state changes
   std::function<void(StatefulPageItem *)> on_state_callback_;
+  optional<state_update_func_t> state_update_func_{nullopt};
   const char *render_type_;
 
   virtual void set_on_state_callback_(const char *type);

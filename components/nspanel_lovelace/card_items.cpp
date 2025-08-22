@@ -55,23 +55,24 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void EntitiesCardEntityItem::on_entity_attribute_change(
-    ha_attr_type attr, const std::string &value) {
-  StatefulPageItem::on_entity_attribute_change(attr, value);
+    ha_attr_type attr, const std::string &value, bool run_callbacks) {
+  StatefulPageItem::on_entity_attribute_change(attr, value, false);
 
   if (attr == ha_attr_type::unit_of_measurement) {
     this->set_value_postfix(value);
-    return;
+    this->set_render_invalid();
+    goto user_func;
   }
 
   // Sometimes attribute changes also require updating the state for certain
   // entity types seen below
-  if (!this->on_state_callback_) return;
+  if (!this->on_state_callback_) goto user_func;
 
   if (this->is_type(entity_type::cover)) {
     if (attr == ha_attr_type::current_position) {
       // this is a cheat/shortcut to avoid state change spamming
       if (!value.empty() && value != "100" && value != "0") {
-        return;
+        goto user_func;
       }
     }
   } else if (this->is_type(entity_type::climate)) {
@@ -79,29 +80,37 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
     // so avoid the state callback for anything else
     if (attr != ha_attr_type::temperature &&
         attr != ha_attr_type::current_temperature) {
-      return;
+      goto user_func;
     }
   } else if (
       this->is_type(entity_type::number) ||
       this->is_type(entity_type::input_number)) {
     if (attr != ha_attr_type::min &&
         attr != ha_attr_type::max) {
-      return;
+      goto user_func;
     }
   } else if (this->is_type(entity_type::weather)) {
     if (attr != ha_attr_type::temperature &&
         attr != ha_attr_type::temperature_unit) {
-      return;
+      goto user_func;
     }
   } else if (this->is_type(entity_type::media_player)) {
     // All attribute updates effect render output for this entity
   } else {
     // Any entity type not mentioned above doesn't need re-rendering
-    return;
+    goto user_func;
   }
 
-  this->on_state_callback_(this);
-  this->set_render_invalid();
+  if (run_callbacks) {
+    this->on_state_callback_(this);
+    this->set_render_invalid();
+  }
+
+user_func:
+  if (run_callbacks && this->state_update_func_.has_value() &&
+      (*this->state_update_func_)(attr, value)) {
+    this->set_render_invalid();
+  }
 }
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {

@@ -38,6 +38,7 @@ nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
 TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 icon_t = nspanel_lovelace_ns.enum("icon_t", True)
+ha_attr_type = nspanel_lovelace_ns.enum("ha_attr_type", True)
 custom_icons: dict[str, list] = {}
 custom_icons_index = 0
 
@@ -118,6 +119,7 @@ CONF_ICON_VALUE = "value"
 CONF_ICON_COLOR = "color"
 CONF_ENTITY_ID = "entity_id"
 CONF_SLEEP_TIMEOUT = "sleep_timeout"
+CONF_UPDATE_LAMBDA = "update_lambda"
 
 CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
@@ -341,11 +343,15 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
 
-SCHEMA_CARD_ENTITY = cv.Schema({
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
-    cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
-    cv.Optional(CONF_ICON): SCHEMA_ICON,
-})
+SCHEMA_CARD_ENTITY = cv.All(
+    cv.Schema({
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+        cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
+        cv.Optional(CONF_ICON): SCHEMA_ICON,
+        cv.Optional(CONF_UPDATE_LAMBDA): cv.returning_lambda,
+    }),
+    cv.has_at_most_one_key(CONF_UPDATE_LAMBDA),
+)
 
 SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
@@ -561,7 +567,7 @@ def generate_icon_config(icon_config, parent_class: cg.MockObj = None) -> Union[
     if parent_class is None:
         return attrs
 
-def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass):
+async def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass):
     for i, entity_config in enumerate(entities_config):
         variable_name = card_variable.__str__() + "_item_" + str(i + 1)
         entity_class = cg.global_ns.class_(variable_name)
@@ -585,6 +591,15 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
             f"{make_shared.template(entity_type).__call__(get_new_uuid(), entity_id, display_name)}"))
 
         generate_icon_config(entity_config.get(CONF_ICON, None), entity_class)
+
+        if update_lambda := entity_config.get(CONF_UPDATE_LAMBDA):
+            update_lambda_template_ = await cg.process_lambda(
+                update_lambda,
+                [(ha_attr_type, "attribute"), (cg.std_string, "value")],
+                capture=f"item = {cg.global_ns.class_(variable_name).get()}",
+                return_type=cg.bool_,
+            )
+            cg.add(entity_class.set_update_lambda(update_lambda_template_))
 
         cg.add(card_variable.add_item(entity_class))
 
@@ -880,7 +895,7 @@ async def to_code(config):
             for mode in card_config[CONF_CARD_ALARM_SUPPORTED_MODES]:
                 cg.add(card_class.add_arm_button(ALARM_ARM_ACTION.class_(mode)))
 
-        gen_card_entities(
+        await gen_card_entities(
             card_config.get(CONF_CARD_ENTITIES, []), 
             page_info[2], 
             card_class, 

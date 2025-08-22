@@ -135,7 +135,7 @@ bool AlarmCard::add_arm_button(alarm_arm_action action) {
   return true;
 }
 
-void AlarmCard::on_entity_state_change(const std::string &state) {
+void AlarmCard::on_entity_state_change(const std::string &state, bool run_callbacks) {
   this->status_icon_flashing_ = false;
 
   if (state == entity_state::triggered || 
@@ -152,7 +152,7 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
   this->status_icon_->set_icon_value(icon.value);
 }
 
-void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value, bool run_callbacks) {
   if (attr == ha_attr_type::code_arm_required) {
     this->set_show_keypad(value != entity_state::off);
   }

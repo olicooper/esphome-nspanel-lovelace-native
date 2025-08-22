@@ -197,7 +197,7 @@ StatefulPageItem::~StatefulPageItem() {
 
 void StatefulPageItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
-void StatefulPageItem::on_entity_type_change(const char *type) {
+void StatefulPageItem::on_entity_type_change(const char *type, bool run_callbacks) {
   if (type == entity_type::delete_) {
     this->render_type_ = "";
   }
@@ -218,42 +218,55 @@ void StatefulPageItem::on_entity_type_change(const char *type) {
   this->set_render_invalid();
 
   // also need to make sure the state is updated based on the new 'type'
-  if (this->on_state_callback_) {
+  if (run_callbacks && this->on_state_callback_) {
     this->on_state_callback_(this);
   }
 }
 
-void StatefulPageItem::on_entity_state_change(const std::string &state) {
-  this->set_render_invalid();
-
+void StatefulPageItem::on_entity_state_change(const std::string &state, bool run_callbacks) {
+  if (!run_callbacks) return;
+  
   if (this->on_state_callback_) {
     this->on_state_callback_(this);
+    this->set_render_invalid();
+  }
+
+  if (this->state_update_func_.has_value() &&
+      (*this->state_update_func_)(ha_attr_type::state, state)) {
+    this->set_render_invalid();
   }
 }
 
-void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::string &value, bool run_callbacks) {
   // this class only needs to react to the following attributes
   if (attr == ha_attr_type::device_class) {
     if (!this->icon_value_overridden_) {
       if (this->entity_->is_type(entity_type::sensor)) {
         this->icon_default_value_ = this->icon_value_ =
           get_icon(SENSOR_ICON_MAP, value);
+        this->set_render_invalid();
       }
     }
   } else if (attr == ha_attr_type::media_content_type) {
-    if (this->icon_value_overridden_) return;
+    if (this->icon_value_overridden_) goto user_func;
     this->icon_value_ = get_icon(MEDIA_TYPE_ICON_MAP,
       this->entity_->get_attribute(ha_attr_type::media_content_type),
       entity_state::off);
+    this->set_render_invalid();
   } else {
-    return;
+    goto user_func;
   }
-
-  if (this->on_state_callback_) {
+  
+  if (run_callbacks && this->on_state_callback_) {
     this->on_state_callback_(this);
+    this->set_render_invalid();
   }
 
-  this->set_render_invalid();
+user_func:
+  if (run_callbacks && this->state_update_func_.has_value() &&
+      (*this->state_update_func_)(attr, value)) {
+    this->set_render_invalid();
+  }
 }
 
 void StatefulPageItem::set_on_state_callback_(const char *type) {

@@ -1335,6 +1335,7 @@ void NSPanelLovelace::notify_on_screensaver(
     // hide the notification after a period of time
     this->set_timeout(timeout_ms, [this]() {
       if (!this->current_page_->is_type(page_type::screensaver)) return;
+      force_current_page_update_ = true;
       this->render_screensaver();
     });
   }

@@ -12,7 +12,13 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-enum class render_page_option : uint8_t { prev, next, default_page, first_page };
+enum class render_page_option : uint8_t {
+  prev, next,
+  // The page that is used when the screen is inactive/sleeping
+  screensaver_page,
+  // The page that is used when the screen goes from 'inactive' to 'active' (exiting sleep)
+  default_page
+};
 
 enum class alarm_arm_action : uint8_t { arm_home, arm_away, arm_night, arm_vacation, arm_custom_bypass };
 

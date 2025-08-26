@@ -1,0 +1,29 @@
+packages:
+  - !include 'test.yaml'
+
+esphome:
+  build_path: ./.build/${node_name}-s3zero
+  on_boot:
+    priority: 800.0
+    then:
+      lambda: |-
+        uart_set_pin(UART_NUM_1, 43, 44, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+esp32:
+  board: lolin_s3_mini
+
+logger:
+  hardware_uart: UART1
+
+uart:
+  id: uart_nextion
+  tx_pin: 13
+  rx_pin: 12
+
+binary_sensor:
+  # Right button below the display
+  - platform: gpio
+    id: !extend right_button
+    pin:
+      number: GPIO14
+      inverted: true

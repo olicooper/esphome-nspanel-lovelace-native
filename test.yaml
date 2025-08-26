@@ -8,13 +8,13 @@
 # - Simulate TFT reboot (EU model, firmware version 53): `event,startup,53,eu`
 # - Navigate to Extras 1 Card: `event,buttonPress2,navigate.uuid.extras_1_card,button`
 # - Navigate to screensaver: `event,buttonPress2,navigate.uuid.1,button`
-# - Navigate to first card: `event,buttonPress2,screensaver,bExit`
+# - Navigate to first card: `event,buttonPress2,screensaver,bExit,1`
 # - Close the current page / go back to screensaver: `event,sleepReached,`
 # - Open a popupPage (open the page where the entity exists first):
-#    - Timer: `event,pageOpenDetail,popupTimer,uuid.15`
-#       - Start timer with time 0:35:40: `event,buttonPress2,uuid.15,timer-start,0:35:40`
-#    - RGBW Light: `event,pageOpenDetail,popupLight,uuid.12`
-#    - Input Select: `event,pageOpenDetail,popupInSel,climate.ecobee`
+#    - Timer: `event,pageOpenDetail,popupTimer,uuid.16` (extras_1_card)
+#       - Start timer with time 0:35:40: `event,buttonPress2,uuid.16,timer-start,0:35:40`
+#    - RGBW Light: `event,pageOpenDetail,popupLight,uuid.12` (lights_card)
+#    - Input Select: `event,pageOpenDetail,popupInSel,climate.ecobee` (extras_3_card)
 
 substitutions:
   node_name: nspanel-test
@@ -28,6 +28,8 @@ esphome:
     build_flags:
       - -DTEST_DEVICE_MODE
       - -DFAKE_TFT_UPLOAD
+      # - -Wall
+      # - -Wextra
 
 esp32:
   board: lolin32_lite
@@ -35,6 +37,8 @@ esp32:
     type: esp-idf
     # version: latest
     # platform_version: '6.9.0'
+    # advanced:
+    #   compiler_optimization: DEBUG
 
 external_components:
   - source: components
@@ -46,6 +50,7 @@ nspanel_lovelace:
     temperature_unit: celcius
     language: en
   sleep_timeout: 10
+  default_card: extras_2_card
   screensaver:
     time_id: homeassistant_time
     weather:
@@ -203,6 +208,22 @@ logger:
     ntc: INFO
     ota: INFO
 
+debug:
+  update_interval: 5s
+
+sensor:
+  - platform: debug
+    free:
+      name: ${node_name} Heap Free
+    block:
+      name: ${node_name} Heap Max Block
+    loop_time:
+      name: ${node_name} Loop Time
+    # psram:
+    #   name: ${node_name} Free PSRAM
+    # cpu_frequency:
+    #   name: ${node_name} CPU Frequency
+
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
@@ -266,7 +287,7 @@ time:
 binary_sensor:
   # Right button below the display
   - platform: gpio
-    name: $node_name Right Button
+    name: ${node_name} Right Button
     pin:
       number: GPIO27
       inverted: true
@@ -279,15 +300,15 @@ binary_sensor:
 button:
   - platform: restart
     id: restart_switch
-    name: $node_name Restart
+    name: ${node_name} Restart
   - platform: template
-    name: $node_name TFT Reboot
+    name: ${node_name} TFT Reboot
     id: tft_reboot
     on_press:
       # Simulate TFT reboot
       - lambda: 'id(nspanel).process_command("event,startup,53,eu");'
   - platform: template
-    name: $node_name PrintDebugInfo
+    name: ${node_name} PrintDebugInfo
     on_press:
       - logger.log:
           format: "DebugInfo model:%s ver:%hu mem:{min_heap:%u,psram_used:%hu,int_min_free:%hu,int_free:%hu,int_max_free_blk:%hu}"
@@ -307,3 +328,6 @@ text_sensor:
       name: ${node_name} IP Address
     bssid:
       name: ${node_name} BSSID
+  - platform: debug
+    reset_reason:
+      name: ${node_name} Reset Reason

@@ -2272,7 +2272,7 @@ void NSPanelLovelace::call_ha_service_(
     const std::string &service,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
-  api::HomeAssistantStateResponse resp;
+  api::HomeassistantActionRequest resp;
   #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
     resp.set_service(esphome::StringRef(service));
   #else

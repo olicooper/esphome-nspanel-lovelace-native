@@ -2272,7 +2272,11 @@ void NSPanelLovelace::call_ha_service_(
     const std::string &service,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
-  api::HomeassistantServiceResponse resp;
+  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
+    api::HomeassistantActionRequest resp;
+  #else
+    api::HomeassistantServiceResponse resp;
+  #endif
   #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
     resp.set_service(esphome::StringRef(service));
   #else
@@ -2308,7 +2312,11 @@ void NSPanelLovelace::call_ha_service_(
     resp.data_template.push_back(kv);
   }
 
-  api::global_api_server->send_homeassistant_service_call(resp);
+  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
+    api::global_api_server->send_homeassistant_action(resp);
+  #else
+    api::global_api_server->send_homeassistant_service_call(resp);
+  #endif
 }
 
 void NSPanelLovelace::on_entity_state_update_(std::string entity_id, std::string state) {

@@ -2291,7 +2291,9 @@ void NSPanelLovelace::call_ha_service_(
       ESP_LOGD(TAG, "Call HA: %s", service.c_str());
   #endif
   
-  resp.data.init(data.size());
+  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
+    resp.data.init(data.size());
+  #endif
   for (auto &it : data) {
     api::HomeassistantServiceMap kv;
     #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
@@ -2303,7 +2305,9 @@ void NSPanelLovelace::call_ha_service_(
     resp.data.push_back(kv);
   }
 
-  resp.data_template.init(data_template.size());
+  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
+    resp.data_template.init(data_template.size());
+  #endif
   for (auto &it : data_template) {
     api::HomeassistantServiceMap kv;
     #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)

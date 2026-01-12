@@ -123,10 +123,19 @@ void NSPanelLovelace::setup() {
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
     this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_weather_forecast_update_, this->weather_entity_id_,
-        to_string(ha_attr_type::forecast));
+        &NSPanelLovelace::on_weather_temperature_unit_update_,
+        this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
+
+    if (this->weather_forecast_type_.empty()) {
+      this->subscribe_homeassistant_state(
+          &NSPanelLovelace::on_weather_forecast_update_,
+          this->weather_entity_id_, to_string(ha_attr_type::forecast));
+    } else {
+      this->register_service(&NSPanelLovelace::set_weather_forecast_data,
+                             "set_weather_forecast", {"forecast"});
+    }
   }
-  
+
   for (auto &entity : this->entities_) {
     auto &entity_id = entity->get_entity_id();
     ESP_LOGV(TAG, "Adding subscriptions for entity '%s'", entity_id.c_str());
@@ -2435,9 +2444,14 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
   this->send_weather_update_command_();
 }
 
+void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
+  this->on_weather_forecast_update_(this->weather_entity_id_, forecast_json);
+}
+
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
-  ESP_LOGV(TAG, "Weather forecast update (%u): %zu %s",
-    this->screensaver_ == nullptr, forecast_json.length(), forecast_json.c_str());
+  ESP_LOGI(TAG, "Weather forecast update (%u): %zu %s",
+           this->screensaver_ == nullptr, forecast_json.length(),
+           forecast_json.c_str());
   if (this->screensaver_ == nullptr) return;
   // todo: check if we are on the screensaver otherwise don't update
   // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
@@ -2449,6 +2463,9 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   filter[0]["datetime"] = true;
   filter[0]["condition"] = true;
   filter[0]["temperature"] = true;
+  filter["forecast"][0]["datetime"] = true;
+  filter["forecast"][0]["condition"] = true;
+  filter["forecast"][0]["temperature"] = true;
 
   if (filter.overflowed()) {
     ESP_LOGW(TAG, "Weather unparsable: filter overflowed");
@@ -2475,14 +2492,29 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   }
 
   this->command_buffer_.clear();
-  ArduinoJson::JsonArray docArr = doc.as<ArduinoJson::JsonArray>();
+
+  ArduinoJson::JsonArray docArr;
+  if (doc.is<ArduinoJson::JsonArray>()) {
+    docArr = doc.as<ArduinoJson::JsonArray>();
+  } else if (doc.is<ArduinoJson::JsonObject>() && doc["forecast"].is<ArduinoJson::JsonArray>()) {
+    docArr = doc["forecast"].as<ArduinoJson::JsonArray>();
+  } else {
+    ESP_LOGW(
+        TAG,
+        "Weather forecast JSON is not an array or object with 'forecast' key");
+    return;
+  }
+
   ESP_LOGV(TAG, "Weather forecast update s=%u", docArr.size());
 
   // check if forecast is hourly or daily
   auto weather_entity_is_hourly = false;
-  if (docArr.size() > 1) {
-    const char * date1 = docArr[0]["datetime"];
-    const char * date2 = docArr[1]["datetime"];
+
+  if (!this->weather_forecast_type_.empty()) {
+    weather_entity_is_hourly = this->weather_forecast_type_ == "hourly";
+  } else if (docArr.size() > 1) {
+    const char *date1 = docArr[0]["datetime"];
+    const char *date2 = docArr[1]["datetime"];
     tm t{};
     if (iso8601_to_tm(date1, t)) {
       uint8_t hr = t.tm_hour;
@@ -2492,10 +2524,29 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
     }
   }
 
+  ESPTime now;
+#ifdef USE_TIME
+  if (this->time_id_.has_value()) {
+    now = this->time_id_.value()->now();
+  }
+#endif
+
   char buff[16] = {};
   uint8_t index = 1, item_count = this->screensaver_->get_items().size();
 
   for (const ArduinoJson::JsonObject &item : docArr) {
+    if (weather_entity_is_hourly && now.is_valid()) {
+      tm t_filter{};
+      if (iso8601_to_tm(item["datetime"].as<const char *>(), t_filter)) {
+        long f_time = (t_filter.tm_year + 1900) * 1000000 +
+                      (t_filter.tm_mon + 1) * 10000 + t_filter.tm_mday * 100 +
+                      t_filter.tm_hour;
+        long n_time = now.year * 1000000 + now.month * 10000 +
+                      now.day_of_month * 100 + now.hour;
+        if (f_time <= n_time)
+          continue;
+      }
+    }
     // can only display the first 4 items (minus 1 for the current weather)
     if (index >= item_count)
       break;

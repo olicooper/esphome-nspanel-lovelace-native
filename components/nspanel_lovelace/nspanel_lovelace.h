@@ -123,8 +123,8 @@ public:
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
-  void set_weather_forecast_type(const std::string &weather_forecast_type) {
-    this->weather_forecast_type_ = weather_forecast_type;
+  void set_weather_forecast_method_service(bool value) {
+    this->weather_forecast_method_service_ = value;
   }
   void set_weather_forecast_data(std::string forecast_json);
 
@@ -265,7 +265,7 @@ protected:
   void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
   void send_weather_update_command_();
   std::string weather_entity_id_;
-  std::string weather_forecast_type_;
+  bool weather_forecast_method_service_ = false;
   std::string language_;
 
   std::queue<std::string> command_queue_;

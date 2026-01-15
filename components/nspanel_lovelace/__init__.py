@@ -134,7 +134,7 @@ CONF_SCREENSAVER_STATUS_ICON_LEFT = "status_icon_left"
 CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
 CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
-CONF_SCREENSAVER_FORECAST_TYPE = "forecast_type"
+CONF_SCREENSAVER_FORECAST_METHOD = "forecast_method"
 
 CONF_CARDS = "cards"
 CONF_CARD_TYPE = "type"
@@ -338,7 +338,7 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, default=False): cv.boolean,
     cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
         cv.Required(CONF_ENTITY_ID): valid_entity_id(),
-        cv.Optional(CONF_SCREENSAVER_FORECAST_TYPE): cv.one_of("daily", "hourly"),
+        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
     }),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
@@ -770,10 +770,10 @@ async def to_code(config):
 
         if CONF_SCREENSAVER_WEATHER in screensaver_config:
             weather_config = screensaver_config[CONF_SCREENSAVER_WEATHER]
-            entity_id = weather_config[CONF_ENTITY_ID]
-            cg.add(nspanel.set_weather_entity_id(entity_id))
-            if CONF_SCREENSAVER_FORECAST_TYPE in weather_config:
-                cg.add(nspanel.set_weather_forecast_type(weather_config[CONF_SCREENSAVER_FORECAST_TYPE]))
+            if CONF_ENTITY_ID in weather_config:
+                cg.add(nspanel.set_weather_entity_id(weather_config[CONF_ENTITY_ID]))
+            if CONF_SCREENSAVER_FORECAST_METHOD in weather_config:
+                cg.add(nspanel.set_weather_forecast_method_service(weather_config[CONF_SCREENSAVER_FORECAST_METHOD] == "service"))
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):

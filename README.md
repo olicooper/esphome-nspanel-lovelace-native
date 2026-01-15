@@ -52,7 +52,44 @@ PRs to expand the functionality or fix bugs are very welcome!
 This issue is due to the `forecast` attribute being removed from weather entities. There is currently no alternative way to fetch this data with the current ESPHome functionality but I hope to get this fixed (see [this feature request](https://github.com/esphome/feature-requests/issues/2703)).
 More info on the issue can be [found here](https://github.com/olicooper/esphome-nspanel-lovelace-native/issues/8).
 
-As a workaround, please add the following to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`).
+**Solution**: Use the `service` forecast method to manually push weather data to the panel.
+1. Update your ESPHome configuration:
+```yaml
+  screensaver:
+    weather:
+      entity_id: weather.home # Required for current temperature
+      forecast_method: service
+```
+2. Add an automation to Home Assistant to push the forecast:
+```yaml
+alias: NSPanel Lovelace Weather Forecast Sync
+description: >-
+  This automation fetches the weather forecast and pushes only the upcoming
+  entries to the NSPanel. It filters the forecast to only include entries
+  starting from the current hour.
+triggers:
+  - minutes: /15
+    trigger: time_pattern
+  - entity_id: weather.home # change this to your weather entity
+    trigger: state
+conditions: []
+actions:
+  - target:
+      entity_id: weather.home # change this to your weather entity
+    data:
+      type: hourly # or daily
+    response_variable: forecast_data
+    action: weather.get_forecasts
+  - data:
+      forecast: >- # change the next line to your weather entity
+        {% set forecast = forecast_data['weather.home'].forecast %}
+        {% set filtered = forecast | selectattr('datetime', 'ge', now().isoformat()) | list %}
+        {{ filtered[:5] | to_json }}
+    action: esphome.nspanel_set_weather_forecast_data # change this to your NSPanel service name
+mode: single
+```
+
+**Alternative Workaround**: Add a template sensor to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`).
 
 ```yaml
 template:

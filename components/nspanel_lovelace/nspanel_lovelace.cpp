@@ -122,18 +122,17 @@ void NSPanelLovelace::setup() {
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
-    this->subscribe_homeassistant_state(
-        &NSPanelLovelace::on_weather_temperature_unit_update_,
-        this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
 
-    if (this->weather_forecast_type_.empty()) {
+    if (!this->weather_forecast_method_service_) {
       this->subscribe_homeassistant_state(
           &NSPanelLovelace::on_weather_forecast_update_,
           this->weather_entity_id_, to_string(ha_attr_type::forecast));
-    } else {
-      this->register_service(&NSPanelLovelace::set_weather_forecast_data,
-                             "set_weather_forecast", {"forecast"});
     }
+  }
+
+  if (this->weather_forecast_method_service_) {
+    this->register_service(&NSPanelLovelace::set_weather_forecast_data,
+                           "set_weather_forecast_data", {"forecast"});
   }
 
   for (auto &entity : this->entities_) {
@@ -2510,9 +2509,7 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   // check if forecast is hourly or daily
   auto weather_entity_is_hourly = false;
 
-  if (!this->weather_forecast_type_.empty()) {
-    weather_entity_is_hourly = this->weather_forecast_type_ == "hourly";
-  } else if (docArr.size() > 1) {
+  if (docArr.size() > 1) {
     const char *date1 = docArr[0]["datetime"];
     const char *date2 = docArr[1]["datetime"];
     tm t{};
@@ -2524,29 +2521,10 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
     }
   }
 
-  ESPTime now;
-#ifdef USE_TIME
-  if (this->time_id_.has_value()) {
-    now = this->time_id_.value()->now();
-  }
-#endif
-
   char buff[16] = {};
   uint8_t index = 1, item_count = this->screensaver_->get_items().size();
 
   for (const ArduinoJson::JsonObject &item : docArr) {
-    if (weather_entity_is_hourly && now.is_valid()) {
-      tm t_filter{};
-      if (iso8601_to_tm(item["datetime"].as<const char *>(), t_filter)) {
-        long f_time = (t_filter.tm_year + 1900) * 1000000 +
-                      (t_filter.tm_mon + 1) * 10000 + t_filter.tm_mday * 100 +
-                      t_filter.tm_hour;
-        long n_time = now.year * 1000000 + now.month * 10000 +
-                      now.day_of_month * 100 + now.hour;
-        if (f_time <= n_time)
-          continue;
-      }
-    }
     // can only display the first 4 items (minus 1 for the current weather)
     if (index >= item_count)
       break;

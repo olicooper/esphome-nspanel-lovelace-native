@@ -1,0 +1,27 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  test:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        version: [2025.11.0, dev]
+        variant: [basic-example, advanced-example]
+    container:
+      image: ghcr.io/esphome/esphome:${{ matrix.version }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Copy test secrets
+      run: |
+        cp secrets-example.yaml secrets.yaml
+    - run: esphome compile ${{ matrix.variant }}.yaml

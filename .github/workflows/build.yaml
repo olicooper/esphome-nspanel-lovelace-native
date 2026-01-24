@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        version: [2025.11.0, dev]
+        version: [stable]
         variant: [basic-example, advanced-example]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}

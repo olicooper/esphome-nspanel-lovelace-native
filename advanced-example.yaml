@@ -134,6 +134,8 @@ wifi:
   password: !secret wifi_password
 
 api:
+#  ## This is required when using `forecast_method: service` for weather updates
+#  custom_services: true
   services:
     ## Service to update the TFT firmware using a URL that is accessible to the nspanel
     - service: upload_tft

@@ -2448,7 +2448,7 @@ void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
 }
 
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
-  ESP_LOGI(TAG, "Weather forecast update (%u): %zu %s",
+  ESP_LOGV(TAG, "Weather forecast update (%u): %zu %s",
            this->screensaver_ == nullptr, forecast_json.length(),
            forecast_json.c_str());
   if (this->screensaver_ == nullptr) return;

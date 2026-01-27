@@ -1,11 +1,22 @@
 name: Build
 
 on:
+  workflow_dispatch:
+
   push:
     branches:
       - dev
-  workflow_dispatch:
+    paths:
+      - "components/nspanel_lovelace/**"
+      - ".github/workflows/build.yaml"
+      - "*example.yaml"
+
   pull_request:
+    branches:
+      - dev
+    paths:
+      - "components/nspanel_lovelace/**"
+      - "*example.yaml"
 
 jobs:
   test:

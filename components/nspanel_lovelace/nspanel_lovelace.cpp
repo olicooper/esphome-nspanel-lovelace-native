@@ -2462,9 +2462,6 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   filter[0]["datetime"] = true;
   filter[0]["condition"] = true;
   filter[0]["temperature"] = true;
-  filter["forecast"][0]["datetime"] = true;
-  filter["forecast"][0]["condition"] = true;
-  filter["forecast"][0]["temperature"] = true;
 
   if (filter.overflowed()) {
     ESP_LOGW(TAG, "Weather unparsable: filter overflowed");

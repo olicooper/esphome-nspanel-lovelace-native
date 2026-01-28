@@ -123,17 +123,16 @@ void NSPanelLovelace::setup() {
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
 
-    if (!this->weather_forecast_method_service_) {
-      this->subscribe_homeassistant_state(
-          &NSPanelLovelace::on_weather_forecast_update_,
-          this->weather_entity_id_, to_string(ha_attr_type::forecast));
-    }
+    #ifndef USE_NSPANEL_CUSTOM_SERVICES
+        this->subscribe_homeassistant_state(
+            &NSPanelLovelace::on_weather_forecast_update_,
+            this->weather_entity_id_, to_string(ha_attr_type::forecast));
+    #endif
   }
 
-  if (this->weather_forecast_method_service_) {
-    this->register_service(&NSPanelLovelace::set_weather_forecast_data,
-                           "set_weather_forecast_data", {"forecast"});
-  }
+  #ifdef USE_NSPANEL_CUSTOM_SERVICES
+    this->register_service(&NSPanelLovelace::set_weather_forecast_data, "set_weather_forecast_data", {"forecast"});
+  #endif
 
   for (auto &entity : this->entities_) {
     auto &entity_id = entity->get_entity_id();
@@ -2443,9 +2442,11 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id,
   this->send_weather_update_command_();
 }
 
+#ifdef USE_NSPANEL_CUSTOM_SERVICES
 void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
   this->on_weather_forecast_update_(this->weather_entity_id_, forecast_json);
 }
+#endif
 
 void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
   ESP_LOGV(TAG, "Weather forecast update (%u): %zu %s",

@@ -122,11 +122,10 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
-  void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
-  void set_weather_forecast_method_service(bool value) {
-    this->weather_forecast_method_service_ = value;
-  }
+#ifdef USE_NSPANEL_CUSTOM_SERVICES
   void set_weather_forecast_data(std::string forecast_json);
+#endif
+  void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
 
   bool get_double_tap_to_unlock() const { return this->double_tap_to_unlock_; }
   void set_double_tap_to_unlock(bool value) { this->double_tap_to_unlock_ = value; }
@@ -265,7 +264,6 @@ protected:
   void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
   void send_weather_update_command_();
   std::string weather_entity_id_;
-  bool weather_forecast_method_service_ = false;
   std::string language_;
 
   std::queue<std::string> command_queue_;

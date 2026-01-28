@@ -773,7 +773,8 @@ async def to_code(config):
             if CONF_ENTITY_ID in weather_config:
                 cg.add(nspanel.set_weather_entity_id(weather_config[CONF_ENTITY_ID]))
             if CONF_SCREENSAVER_FORECAST_METHOD in weather_config:
-                cg.add(nspanel.set_weather_forecast_method_service(weather_config[CONF_SCREENSAVER_FORECAST_METHOD] == "service"))
+                if weather_config[CONF_SCREENSAVER_FORECAST_METHOD] == "service":
+                    cg.add_define("USE_NSPANEL_CUSTOM_SERVICES")
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):

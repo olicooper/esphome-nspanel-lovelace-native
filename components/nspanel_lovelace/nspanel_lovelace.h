@@ -14,6 +14,8 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
+#include "esphome/core/string_ref.h"
+#include "esphome/core/version.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/api/custom_api_device.h"
 
@@ -189,11 +191,16 @@ protected:
   void send_nextion_command_(const std::string &command);
 
   void subscribe_homeassistant_state_attr(
-      void (NSPanelLovelace::*callback)(std::string, std::string, std::string),
-      std::string entity_id, std::string attribute) {
-    auto f = std::bind(callback, this, entity_id, attribute, std::placeholders::_1);
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    void (NSPanelLovelace::*callback)(const std::string &, const std::string &, esphome::StringRef),
+#else
+    void (NSPanelLovelace::*callback)(std::string, std::string, std::string),
+#endif
+    const std::string &entity_id, const std::string &attr_name
+  ) {
+    auto f = std::bind(callback, this, entity_id, attr_name, std::placeholders::_1);
     api::global_api_server->
-      subscribe_home_assistant_state(entity_id, optional<std::string>(attribute), f);
+      subscribe_home_assistant_state(entity_id, optional<std::string>(attr_name), std::move(f));
   }
 
   bool process_data_();
@@ -254,6 +261,16 @@ protected:
     const std::string& service,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template = {});
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+  void on_entity_state_update_(const std::string &entity_id, esphome::StringRef state);
+  void on_entity_attribute_update_(
+    const std::string &entity_id, const std::string &attr_name, esphome::StringRef attr_value);
+
+  void on_weather_state_update_(const std::string &entity_id, esphome::StringRef state);
+  void on_weather_temperature_update_(const std::string &entity_id, esphome::StringRef temperature);
+  void on_weather_temperature_unit_update_(const std::string &entity_id, esphome::StringRef temperature_unit);
+  void on_weather_forecast_update_(const std::string &entity_id, esphome::StringRef forecast_json);
+#else
   void on_entity_state_update_(std::string entity_id, std::string state);
   void on_entity_attribute_update_(
     std::string entity_id, std::string attr_name, std::string attr_value);
@@ -262,6 +279,7 @@ protected:
   void on_weather_temperature_update_(std::string entity_id, std::string temperature);
   void on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit);
   void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
+#endif
   void send_weather_update_command_();
   std::string weather_entity_id_;
   std::string language_;

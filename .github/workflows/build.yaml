@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - dev
+    paths:
+      - "components/nspanel_lovelace/**"
+      - ".github/workflows/build.yaml"
+      - "*example.yaml"
+
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - "components/nspanel_lovelace/**"
+      - "*example.yaml"
+
+jobs:
+  test:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        version: [stable]
+        variant: [advanced-example]
+    container:
+      image: ghcr.io/esphome/esphome:${{ matrix.version }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Copy test secrets
+      run: |
+        cp secrets-example.yaml secrets.yaml
+    - run: esphome compile ${{ matrix.variant }}.yaml

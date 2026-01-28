@@ -77,7 +77,7 @@ bool Entity::set_type(const char *type) {
   this->type_ = type;
 
   if (this->enable_notifications_) {
-    this->notify_type_change(type);
+    this->notify_type_change(this->type_);
   }
   return true;
 }
@@ -91,7 +91,7 @@ void Entity::set_state(const std::string &state) {
   this->state_ = state;
 
   if (this->enable_notifications_) {
-    this->notify_state_change(state);
+    this->notify_state_change(this->state_);
   }
 }
 

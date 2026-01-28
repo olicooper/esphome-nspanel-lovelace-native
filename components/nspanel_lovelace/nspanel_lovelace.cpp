@@ -2279,67 +2279,96 @@ void NSPanelLovelace::call_ha_service_(
     const std::string &service,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template) {
-  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
-    api::HomeassistantActionRequest resp;
-  #else
-    api::HomeassistantServiceResponse resp;
-  #endif
-  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
-    resp.set_service(esphome::StringRef(service));
-  #else
-    resp.service = service;
-  #endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
+  api::HomeassistantActionRequest resp;
+#else
+  api::HomeassistantServiceResponse resp;
+#endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+  resp.service = esphome::StringRef(service);
+#elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+  resp.set_service(esphome::StringRef(service));
+#else
+  resp.service = service;
+#endif
 
-  #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
-    auto it = data.find(to_string(ha_attr_type::entity_id));
-    if (it == data.end())
-      ESP_LOGD(TAG, "Call HA: %s -> %s", service.c_str(), it->second.c_str());
-    else
-      ESP_LOGD(TAG, "Call HA: %s", service.c_str());
-  #endif
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+  auto it = data.find(to_string(ha_attr_type::entity_id));
+  if (it == data.end())
+    ESP_LOGD(TAG, "Call HA: %s -> %s", service.c_str(), it->second.c_str());
+  else
+    ESP_LOGD(TAG, "Call HA: %s", service.c_str());
+#endif
   
-  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
-    resp.data.init(data.size());
-  #endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
+  resp.data.init(data.size());
+#endif
   for (auto &it : data) {
     api::HomeassistantServiceMap kv;
-    #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
-      kv.set_key(esphome::StringRef(it.first));
-    #else
-      kv.key = it.first;
-    #endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    kv.key = esphome::StringRef(it.first);
+#elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+    kv.set_key(esphome::StringRef(it.first));
+#else
+    kv.key = it.first;
+#endif
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    kv.value = esphome::StringRef(it.second);
+#else
     kv.value = it.second;
+#endif
     resp.data.push_back(kv);
   }
 
-  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
-    resp.data_template.init(data_template.size());
-  #endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,11,0)
+  resp.data_template.init(data_template.size());
+#endif
   for (auto &it : data_template) {
     api::HomeassistantServiceMap kv;
-    #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
-      kv.set_key(esphome::StringRef(it.first));
-    #else
-      kv.key = it.first;
-    #endif
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    kv.key = esphome::StringRef(it.first);
+#elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
+    kv.set_key(esphome::StringRef(it.first));
+#else
+    kv.key = it.first;
+#endif
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    kv.value = esphome::StringRef(it.second);
+#else
     kv.value = it.second;
+#endif
     resp.data_template.push_back(kv);
   }
 
-  #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025,10,0)
     api::global_api_server->send_homeassistant_action(resp);
-  #else
+#else
     api::global_api_server->send_homeassistant_service_call(resp);
-  #endif
+#endif
 }
 
-void NSPanelLovelace::on_entity_state_update_(std::string entity_id, std::string state) {
+void NSPanelLovelace::on_entity_state_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, esphome::StringRef state
+#else
+    std::string entity_id, std::string state
+#endif
+) {
   this->on_entity_attribute_update_(entity_id, to_string(ha_attr_type::state), state);
 }
-void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::string attr, std::string attr_value) {
+
+void NSPanelLovelace::on_entity_attribute_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, const std::string &attr_name, esphome::StringRef attr_value
+#else
+    std::string entity_id, std::string attr_name, std::string attr_value
+#endif
+) {
   auto entity = this->get_entity_(entity_id);
   if (entity == nullptr) return;
-  auto ha_attr = to_ha_attr(attr);
+  auto ha_attr = to_ha_attr(attr_name);
   if (ha_attr == ha_attr_type::unknown) return;
 
   if (ha_attr == ha_attr_type::state) {
@@ -2349,7 +2378,7 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
   }
 
   ESP_LOGD(TAG, "HA update: %s %s='%s'",
-    entity_id.c_str(), attr.c_str(), 
+    entity_id.c_str(), attr_name.c_str(), 
     ha_attr == ha_attr_type::state
       ? entity->get_state().c_str()
       : entity->get_attribute(ha_attr).c_str());
@@ -2359,7 +2388,7 @@ void NSPanelLovelace::on_entity_attribute_update_(std::string entity_id, std::st
   // If there are lots of entity attributes that update within a short time
   // then this will queue lots of commands unnecessarily.
   // This re-schedules updates every time one happens within a 200ms period.
-  this->set_timeout(entity_id, 200, [this, entity_id] () {
+  this->set_timeout(entity->get_entity_id().c_str(), 200, [this, entity_id] () {
     if (this->force_current_page_update_) return;
     auto page = this->page_mgr_.current_page();
     if (!page) return;
@@ -2419,7 +2448,13 @@ void NSPanelLovelace::send_weather_update_command_() {
   this->send_buffered_command_();
 }
 
-void NSPanelLovelace::on_weather_state_update_(std::string entity_id, std::string state) {
+void NSPanelLovelace::on_weather_state_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, esphome::StringRef state
+#else
+    std::string entity_id, std::string state
+#endif
+) {
   if (this->screensaver_ == nullptr) return;
   auto item = this->screensaver_->get_item<WeatherItem>(0);
   if (item == nullptr) return;
@@ -2427,17 +2462,29 @@ void NSPanelLovelace::on_weather_state_update_(std::string entity_id, std::strin
   this->send_weather_update_command_();
 }
 
-void NSPanelLovelace::on_weather_temperature_update_(std::string entity_id, std::string temperature) {
+void NSPanelLovelace::on_weather_temperature_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, esphome::StringRef temperature
+#else
+    std::string entity_id, std::string temperature
+#endif
+) {
   if (this->screensaver_ == nullptr) return;
   auto item = this->screensaver_->get_item<WeatherItem>(0);
   if (item == nullptr) return;
-  item->set_value(std::move(temperature));
+  item->set_value(temperature);
   this->send_weather_update_command_();
 }
 
-void NSPanelLovelace::on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit) {
+void NSPanelLovelace::on_weather_temperature_unit_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, esphome::StringRef temperature_unit
+#else
+    std::string entity_id, std::string temperature_unit
+#endif
+) {
   if (this->screensaver_ == nullptr) return;
-  WeatherItem::temperature_unit = std::move(temperature_unit);
+  WeatherItem::temperature_unit = temperature_unit;
   this->screensaver_->set_items_render_invalid();
   this->send_weather_update_command_();
 }
@@ -2448,10 +2495,22 @@ void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
 }
 #endif
 
-void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::string forecast_json) {
+#ifdef USE_NSPANEL_CUSTOM_SERVICES
+void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
+  this->on_weather_forecast_update_(this->weather_entity_id_, forecast_json);
+}
+#endif
+
+
+void NSPanelLovelace::on_weather_forecast_update_(
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
+    const std::string &entity_id, esphome::StringRef forecast_json
+#else
+    std::string entity_id, std::string forecast_json
+#endif
+) {
   ESP_LOGV(TAG, "Weather forecast update (%u): %zu %s",
-           this->screensaver_ == nullptr, forecast_json.length(),
-           forecast_json.c_str());
+    this->screensaver_ == nullptr, forecast_json.size(), forecast_json.c_str());
   if (this->screensaver_ == nullptr) return;
   // todo: check if we are on the screensaver otherwise don't update
   // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
@@ -2479,12 +2538,12 @@ void NSPanelLovelace::on_weather_forecast_update_(std::string entity_id, std::st
   BasicJsonDocument<SpiRamAllocator> doc(psram_available() ? 7680 : 6144);
 #endif
   ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(
-    doc, forecast_json, DeserializationOption::Filter(filter));
+    doc, forecast_json.c_str(), DeserializationOption::Filter(filter));
   App.feed_wdt();
 
   if (error || doc.overflowed()) {
     ESP_LOGW(TAG, "Weather unparsable: %s %zu '%s'", error ? error.c_str() : "doc overflow",
-      forecast_json.length(), forecast_json.c_str());
+      forecast_json.size(), forecast_json.c_str());
     return;
   }
 

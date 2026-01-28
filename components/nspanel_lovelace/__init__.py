@@ -20,6 +20,7 @@ from esphome.const import (
 
 CODEOWNERS = ["@olicooper"]
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
+CONFLICTS_WITH = ["psram"]
 
 def AUTO_LOAD():
     val = ["text_sensor", "json"]
@@ -631,7 +632,7 @@ async def to_code(config):
         esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CLK_IO", 5)
         esp32.add_idf_sdkconfig_option("CONFIG_D0WD_PSRAM_CS_IO", 18)
         # Also increase flash & CPU speed as NSPanel hardware supports it
-        esp32.add_idf_sdkconfig_option("CONFIG_ESP32_DEFAULT_CPU_FREQ_240", True)
+        esp32.add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240", True)
         esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_SPEED_80M", True)
         esp32.add_idf_sdkconfig_option("CONFIG_SPIRAM_MODE_QUAD", True)
         esp32.add_idf_sdkconfig_option("CONFIG_ESPTOOLPY_FLASHMODE_QIO", True)

@@ -55,6 +55,7 @@ nspanel_lovelace:
     time_id: homeassistant_time
     weather:
       entity_id: weather.forecast_home
+      forecast_method: template_sensor # service
   
   ## WARNING: There is not enough RAM to support lots of cards on a basic ESP32 without PSRAM
   ##          If you have memory issues, try disabling a few unused cards and try again.

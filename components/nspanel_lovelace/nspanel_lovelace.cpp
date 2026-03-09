@@ -123,14 +123,14 @@ void NSPanelLovelace::setup() {
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
 
-    #ifndef USE_NSPANEL_CUSTOM_SERVICES
+    #ifndef USE_NSPANEL_WEATHER_SERVICE
         this->subscribe_homeassistant_state(
             &NSPanelLovelace::on_weather_forecast_update_,
             this->weather_entity_id_, to_string(ha_attr_type::forecast));
     #endif
   }
 
-  #ifdef USE_NSPANEL_CUSTOM_SERVICES
+  #ifdef USE_NSPANEL_WEATHER_SERVICE
     this->register_service(&NSPanelLovelace::set_weather_forecast_data, "set_weather_forecast_data", {"forecast"});
   #endif
 
@@ -2489,15 +2489,15 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(
   this->send_weather_update_command_();
 }
 
-#ifdef USE_NSPANEL_CUSTOM_SERVICES
+#ifdef USE_NSPANEL_WEATHER_SERVICE
 void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
-  this->on_weather_forecast_update_(this->weather_entity_id_, forecast_json);
-}
-#endif
-
-#ifdef USE_NSPANEL_CUSTOM_SERVICES
-void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
-  this->on_weather_forecast_update_(this->weather_entity_id_, forecast_json);
+  this->on_weather_forecast_update_(this->weather_entity_id_,
+# if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,2,0)
+    esphome::StringRef(forecast_json)
+# else
+    forecast_json
+# endif
+  );
 }
 #endif
 

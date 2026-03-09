@@ -58,42 +58,54 @@ More info on the issue can be [found here](https://github.com/olicooper/esphome-
 
 **Solution**: Use the `service` forecast method to manually push weather data to the panel.
 1. Update your ESPHome configuration:
-```yaml
-  screensaver:
-    weather:
-      entity_id: weather.home # Required for current temperature
-      forecast_method: service
-```
+    ```yaml
+      screensaver:
+        weather:
+          entity_id: weather.home # Change this to your weather entity
+          forecast_method: service
+    ```
 2. Add an automation to Home Assistant to push the forecast:
-```yaml
-alias: NSPanel Lovelace Weather Forecast Sync
-description: >-
-  This automation fetches the weather forecast and pushes only the upcoming
-  entries to the NSPanel. It filters the forecast to only include entries
-  starting from the current hour.
-triggers:
-  - minutes: /15
-    trigger: time_pattern
-  - entity_id: weather.home # change this to your weather entity
-    trigger: state
-conditions: []
-actions:
-  - target:
-      entity_id: weather.home # change this to your weather entity
-    data:
-      type: hourly # or daily
-    response_variable: forecast_data
-    action: weather.get_forecasts
-  - data:
-      forecast: >- # change the next line to your weather entity
-        {% set forecast = forecast_data['weather.home'].forecast %}
-        {% set filtered = forecast | selectattr('datetime', 'ge', now().isoformat()) | list %}
-        {{ filtered[:5] | to_json }}
-    action: esphome.nspanel_set_weather_forecast_data # change this to your NSPanel service name
-mode: single
-```
+    ```yaml
+    alias: NSPanel Lovelace Weather Forecast Sync
+    description: >-
+      This automation fetches the weather forecast and pushes only the upcoming
+      entries to the NSPanel. It filters the forecast to only include entries
+      starting from the current hour, keeping only datetime, condition, and
+      temperature as these are the only attributes used by the nspanel.
+    triggers:
+      - minutes: /30
+        trigger: time_pattern
+      - entity_id: weather.home # Change this to your weather entity
+        trigger: state
+    conditions: []
+    actions:
+      - target:
+          entity_id: weather.home # Change this to your weather entity
+        data:
+          type: hourly # or daily/twice_daily
+        response_variable: forecast_data
+        action: weather.get_forecasts
+      - variables:
+          forecast: >-
+            {% set forecast = (forecast_data.values() | first).forecast %}
+            {% set ns = namespace(items=[]) %}
+            {% for item in forecast if as_timestamp(item.datetime) >= as_timestamp(now()) %}
+              {% if (ns.items | length) < 5 %}
+                {% set ns.items = ns.items + [{
+                  "datetime": item.datetime | as_datetime | as_timestamp | timestamp_custom('%Y-%m-%dT%H:%M:%S'),
+                  "condition": item.condition,
+                  "temperature": item.temperature | float(1)
+                }] %}
+              {% endif %}
+            {% endfor %}
+            {{- ns.items }}
+      - action: esphome.<NSPANEL_ENTITY_ID>_set_weather_forecast_data # Change this to your NSPanel service name (replace <NSPANEL_ENTITY_ID>)
+        data:
+          forecast: "{{ forecast }}"
+    mode: single
+    ```
 
-**Alternative Workaround**: Add a template sensor to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`).
+**Alternative Workaround (deprecated)**: Add a template sensor to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`).
 
 ```yaml
 template:
@@ -109,16 +121,16 @@ template:
         data:
           type: daily
         target:
-          entity_id: weather.home # change to your weather entity
+          entity_id: weather.home # Change this to your weather entity
         response_variable: data
     sensor:
       - name: Weather Forecast Daily
         unique_id: weather_forecast_daily # Use this id in your esphome config (screensaver -> weather -> entity_id)
-        state: "{{ states('weather.home') }}" # change to your weather entity
+        state: "{{ states('weather.home') }}" # Change this to your weather entity
         attributes:
-          temperature: "{{ state_attr('weather.home', 'temperature') }}" # change to your weather entity
-          temperature_unit: "{{ state_attr('weather.home', 'temperature_unit') }}" # change to your weather entity
-          # change 'weather.home' below to your weather entity
+          temperature: "{{ state_attr('weather.home', 'temperature') }}" # Change this to your weather entity
+          temperature_unit: "{{ state_attr('weather.home', 'temperature_unit') }}" # Change this to your weather entity
+          # Change 'weather.home' below to your weather entity
           forecast: >
             {%- with ns = namespace(arr=[],obj={}) -%}
             {%- for n in data['weather.home'].forecast[:5] -%}

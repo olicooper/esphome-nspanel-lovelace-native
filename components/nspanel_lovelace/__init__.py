@@ -778,7 +778,13 @@ async def to_code(config):
                 cg.add(nspanel.set_weather_entity_id(weather_config[CONF_ENTITY_ID]))
             if CONF_SCREENSAVER_FORECAST_METHOD in weather_config:
                 if weather_config[CONF_SCREENSAVER_FORECAST_METHOD] == "service":
-                    cg.add_define("USE_NSPANEL_CUSTOM_SERVICES")
+                    cg.add_define("USE_API_CUSTOM_SERVICES")
+                    cg.add_define("USE_NSPANEL_WEATHER_SERVICE")
+                else:
+                    _LOGGER.warning(
+                        "forecast_method 'template_sensor' is deprecated and will be removed in esphome 2026.6. "
+                        "Please use forecast_method 'service' instead (see the README for the required HA automation template)."
+                    )
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):

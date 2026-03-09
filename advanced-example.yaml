@@ -54,8 +54,13 @@ nspanel_lovelace:
     # date_format: '%A, %d. %B %Y'
     weather:
       entity_id: !secret weather_entity_id
-      ## NOTE: use this version (after following the instructions on the README) with Home Assistant v4.4.0+
-      # entity_id: sensor.weather_forecast_daily
+      ## NOTE: Please see README for more info on weather 'forecast_method' options. Default is 'template_sensor' (deprecated).
+      ## This option uses a Home Assistant action to send forecast data to the nspanel (see README for the HA automation template).
+      forecast_method: service
+      ## This option uses a Home Assistant template sensor to replicate the old HA entity behaviour. The entity_id (seen above) should be 
+      ## configured to use the template sensor unique_id (see README for the HA template sensor).
+      ## NOTE: this option is less flexible and will be deprecated in esphome 2026.6.
+      #forecast_method: template_sensor
     # status_icon_left:
     #   entity_id: light.front_room_inner
     #   icon: hiking
@@ -135,8 +140,8 @@ wifi:
   password: !secret wifi_password
 
 api:
-#  ## This is required when using `forecast_method: service` for weather updates
-#  custom_services: true
+  ## NOTE: This is automatically set when using `forecast_method: service` for weather updates
+  # custom_services: true
   services:
     ## Service to update the TFT firmware using a URL that is accessible to the nspanel
     - service: upload_tft

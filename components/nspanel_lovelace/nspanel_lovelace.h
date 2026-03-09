@@ -124,7 +124,7 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
-#ifdef USE_NSPANEL_CUSTOM_SERVICES
+#ifdef USE_NSPANEL_WEATHER_SERVICE
   void set_weather_forecast_data(std::string forecast_json);
 #endif
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }

@@ -674,6 +674,9 @@ async def to_code(config):
             cg.add_library("WiFiClientSecure", None)
             cg.add_library("HTTPClient", None)
         elif core.CORE.using_esp_idf:
+            ## todo: Remove this condition by esphome version 2026.6.x
+            if hasattr(esp32, "include_builtin_idf_component"):
+                esp32.include_builtin_idf_component("esp_http_client")
             esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
             esp32.add_idf_sdkconfig_option(
                 "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True

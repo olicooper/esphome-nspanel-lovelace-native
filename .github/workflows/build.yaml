@@ -10,6 +10,7 @@ on:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
       - "*example.yaml"
+      - "ci/*.yaml"
 
   pull_request:
     branches:
@@ -17,6 +18,7 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - "*example.yaml"
+      - "ci/*.yaml"
 
 jobs:
   test:
@@ -27,7 +29,7 @@ jobs:
       max-parallel: 2
       matrix:
         version: [stable]
-        variant: [advanced-example]
+        variant: [advanced]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}
     steps:
@@ -35,4 +37,4 @@ jobs:
     - name: Copy test secrets
       run: |
         cp secrets-example.yaml secrets.yaml
-    - run: esphome compile ${{ matrix.variant }}.yaml
+    - run: esphome compile ci/${{ matrix.variant }}.yaml

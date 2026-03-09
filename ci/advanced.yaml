@@ -1,0 +1,12 @@
+packages:
+  - !include '../advanced-example.yaml'
+
+esphome:
+  comment: "CI advanced-example.yaml test"
+  build_path: ./build/ci-advanced
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [nspanel_lovelace]

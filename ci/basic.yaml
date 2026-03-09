@@ -1,0 +1,12 @@
+packages:
+  - !include '../basic-example.yaml'
+
+esphome:
+  comment: "CI basic-example.yaml test"
+  build_path: ./build/ci-basic
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [nspanel_lovelace]

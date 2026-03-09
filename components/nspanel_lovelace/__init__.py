@@ -497,7 +497,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
-    cv.require_esphome_version(2025,5,0),
+    cv.require_esphome_version(2025,8,0),
     #cv.only_with_esp_idf,
     validate_config
 )

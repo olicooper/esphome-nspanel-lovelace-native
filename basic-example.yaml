@@ -98,6 +98,8 @@ switch:
       number: 22
     restore_mode: ALWAYS_ON
   ## Turn screen power on/off
+  ## NOTE: When using weather forecast_method 'service', this entity is used by the HA automation template
+  ##       to send a forecast update when the nspanel comes online. It is not required but is recommended.
   - platform: gpio
     name: Screen Power
     id: screen_power

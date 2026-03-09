@@ -77,6 +77,17 @@ More info on the issue can be [found here](https://github.com/olicooper/esphome-
         trigger: time_pattern
       - entity_id: weather.home # Change this to your weather entity
         trigger: state
+      ## NOTE: This makes sure the forecast is sent when the panel is turned on
+      - trigger: state
+        entity_id:
+          - switch.nspanel_screen_power # Change this to your NSPanel 'screen_power' entity_id
+        for:
+          hours: 0
+          minutes: 0
+          seconds: 2
+        to:
+          - "on"
+        alias: When nspanel becomes available
     conditions: []
     actions:
       - target:
@@ -99,7 +110,7 @@ More info on the issue can be [found here](https://github.com/olicooper/esphome-
               {% endif %}
             {% endfor %}
             {{- ns.items }}
-      - action: esphome.<NSPANEL_ENTITY_ID>_set_weather_forecast_data # Change this to your NSPanel service name (replace <NSPANEL_ENTITY_ID>)
+      - action: esphome.nspanel_set_weather_forecast_data # Change this to your NSPanel 'set_weather_forecast_data' action/service name. This can be found in HA developer tools > actions (after the nspanel has been re-configured to use the 'service' forecast_method and has connected to HA).
         data:
           forecast: "{{ forecast }}"
     mode: single

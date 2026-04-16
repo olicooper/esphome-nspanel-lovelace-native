@@ -54,7 +54,7 @@ PACK(struct NSPanelRestoreState {
   uint8_t display_inactive_dim_ = 50;
 });
 
-class NSPanelLovelace : public Component, public uart::UARTDevice, protected api::CustomAPIDevice {
+class NSPanelLovelace : public Component, public uart::UARTDevice, public api::CustomAPIDevice {
 public:
   NSPanelLovelace();
   void setup() override;

@@ -59,10 +59,15 @@ public:
 
   void accept(PageItemVisitor& visitor) override;
 
+  page_type get_parent_page_type() const { return this->parent_page_type_; }
+  void set_parent_page_type(page_type type) { this->parent_page_type_ = type; }
+
 protected:
   // output: type~internalName~icon~iconColor~displayName~
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
+
+  page_type parent_page_type_{page_type::cardGrid};
 };
 
 } // namespace nspanel_lovelace

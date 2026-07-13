@@ -43,7 +43,11 @@ std::string &GridCardEntityItem::render_(std::string &buffer) {
     float f_val = std::strtof(temp_val.c_str(), &endptr);
     if (endptr != temp_val.c_str()) {
       char formatted[16];
-      std::snprintf(formatted, sizeof(formatted), "%.1f", f_val);
+      if (this->get_parent_page_type() == page_type::cardGrid2) {
+        std::snprintf(formatted, sizeof(formatted), "%.0f", f_val);
+      } else {
+        std::snprintf(formatted, sizeof(formatted), "%.1f", f_val);
+      }
       temp_val = formatted;
     }
     
@@ -52,6 +56,12 @@ std::string &GridCardEntityItem::render_(std::string &buffer) {
     }
     if (!temp_val.empty() && temp_val.back() == '.') {
       temp_val.pop_back();
+    }
+    
+    if (this->get_parent_page_type() == page_type::cardGrid2) {
+      temp_val.append("¬2");
+    } else {
+      temp_val.append("¬3");
     }
     
     this->icon_value_ = reinterpret_cast<const icon_char_t *>(temp_val.c_str());

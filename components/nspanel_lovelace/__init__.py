@@ -121,6 +121,7 @@ CONF_ICON_COLOR = "color"
 CONF_ENTITY_ID = "entity_id"
 CONF_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_DEFAULT_CARD = "default_card"
+CONF_EXP_VERT_UI = "experimental_vertical_ui"
 
 CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
@@ -449,6 +450,7 @@ CONFIG_SCHEMA = cv.All(
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
         # Timeout range from 0s to 65s. 0s means disable screensaver.
         cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, 65),
+        cv.Optional(CONF_EXP_VERT_UI, default=False): cv.boolean,
         cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
         cv.Optional(CONF_DEFAULT_CARD): cv.string_strict,
         cv.Optional(CONF_LOCALE, default={}): SCHEMA_LOCALE,
@@ -684,6 +686,9 @@ async def to_code(config):
 
     if CONF_SCREENSAVER in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
+
+    if CONF_EXP_VERT_UI in config:
+        cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
 
     locale_config = config[CONF_LOCALE]
     global translationJson

@@ -461,7 +461,8 @@ void NSPanelLovelace::set_display_dim(uint8_t inactive, uint8_t active) {
     // brightness when active (when buttons pressed)
     .append(esphome::to_string(this->display_active_dim_)).append(1, SEPARATOR)
     // background colour when active (not screensaver background, defaults to ha-dark)
-    .append(esphome::to_string(6371));
+    .append(esphome::to_string(6371)).append(2, SEPARATOR)
+    .append(esphome::to_string(this->global_vertical_ui_ ? 1 : 0));
   
   this->send_buffered_command_();
 }

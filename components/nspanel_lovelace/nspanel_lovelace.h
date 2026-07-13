@@ -128,6 +128,7 @@ public:
 
   bool get_double_tap_to_unlock() const { return this->double_tap_to_unlock_; }
   void set_double_tap_to_unlock(bool value) { this->double_tap_to_unlock_ = value; }
+  void set_global_vertical_ui(bool val) { this->global_vertical_ui_ = val; }
   
   void render_screensaver_page() { this->render_page_(render_page_option::screensaver_page); }
   void render_next_page() { this->render_page_(render_page_option::next); }
@@ -292,6 +293,7 @@ protected:
   PageManager page_mgr_;
   std::string popup_page_current_uuid_;
   bool force_current_page_update_ = false;
+  bool global_vertical_ui_{false};
   std::vector<std::shared_ptr<Entity>> entities_;
   std::vector<std::shared_ptr<StatefulPageItem>> stateful_page_items_;
   Screensaver* screensaver_ = nullptr;

@@ -4,6 +4,8 @@
 #include "helpers.h"
 #include "types.h"
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -312,7 +314,57 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
   }
 
   if (me->is_state(entity_state::on)) {
-    me->icon_color_ = 64909u; // yellow
+    uint8_t r = 253, g = 216, b = 53; // Default HA yellow: #FDD835
+    
+    if (me->is_type(entity_type::light)) {
+      std::string color_mode = me->get_attribute(ha_attr_type::color_mode);
+      std::string temp_str = me->get_attribute(ha_attr_type::color_temp);
+      std::string rgb_str = me->get_attribute(ha_attr_type::rgb_color);
+      
+      // If color mode is color temperature, or it's a CCT-only light
+      if (color_mode == "color_temp" || (rgb_str.empty() && !temp_str.empty())) {
+        char *endptr = nullptr;
+        long color_temp_val = std::strtol(temp_str.c_str(), &endptr, 10);
+        if (endptr != temp_str.c_str()) {
+          // color_temp_val is scaled 0 to 100 (0 = coolest, 100 = warmest)
+          double t = color_temp_val / 100.0;
+          if (t < 0.5) {
+            // Interpolate Cool Blue-White [166, 209, 255] to Neutral Pure White [255, 255, 255]
+            r = static_cast<uint8_t>(166 + (255 - 166) * (t / 0.5));
+            g = static_cast<uint8_t>(209 + (255 - 209) * (t / 0.5));
+            b = 255;
+          } else {
+            // Interpolate Neutral Pure White [255, 255, 255] to Warm Amber [255, 160, 60]
+            r = 255;
+            g = static_cast<uint8_t>(255 + (160 - 255) * ((t - 0.5) / 0.5));
+            b = static_cast<uint8_t>(255 + (60 - 255) * ((t - 0.5) / 0.5));
+          }
+        }
+      } else if (!rgb_str.empty()) {
+        // RGB Mode
+        unsigned int red_val = 253, green_val = 216, blue_val = 53;
+        if (std::sscanf(rgb_str.c_str(), "[%u, %u, %u]", &red_val, &green_val, &blue_val) == 3 ||
+            std::sscanf(rgb_str.c_str(), "(%u, %u, %u)", &red_val, &green_val, &blue_val) == 3) {
+          r = static_cast<uint8_t>(red_val);
+          g = static_cast<uint8_t>(green_val);
+          b = static_cast<uint8_t>(blue_val);
+        }
+      }
+      
+      std::string bright_str = me->get_attribute(ha_attr_type::brightness);
+      if (!bright_str.empty()) {
+        char *endptr = nullptr;
+        long brightness = std::strtol(bright_str.c_str(), &endptr, 10);
+        if (endptr != bright_str.c_str()) {
+          double scaled_brightness = ((brightness - 0.0) / (100.0 - 0.0)) * (255.0 - 70.0) + 70.0;
+          r = static_cast<uint8_t>(r / 255.0 * scaled_brightness);
+          g = static_cast<uint8_t>(g / 255.0 * scaled_brightness);
+          b = static_cast<uint8_t>(b / 255.0 * scaled_brightness);
+        }
+      }
+    }
+    
+    me->icon_color_ = rgb_dec565(r, g, b);
   } else if (me->is_state(entity_state::off)) {
     me->icon_color_ = 17299u; // blue
   } else {

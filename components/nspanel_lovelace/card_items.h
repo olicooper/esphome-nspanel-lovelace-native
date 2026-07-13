@@ -23,6 +23,9 @@ public:
   // virtual ~GridCardEntityItem() {}
 
   void accept(PageItemVisitor& visitor) override;
+
+protected:
+  std::string &render_(std::string &buffer) override;
 };
 
 /*

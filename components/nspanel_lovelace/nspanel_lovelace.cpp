@@ -161,6 +161,9 @@ void NSPanelLovelace::setup() {
           entity_id, to_string(ha_attr_type::brightness));
       this->subscribe_homeassistant_state_attr(
           &NSPanelLovelace::on_entity_attribute_update_, 
+          entity_id, to_string(ha_attr_type::rgb_color));
+      this->subscribe_homeassistant_state_attr(
+          &NSPanelLovelace::on_entity_attribute_update_, 
           entity_id, to_string(ha_attr_type::effect_list));
     }
     else if (entity->is_type(entity_type::switch_) ||

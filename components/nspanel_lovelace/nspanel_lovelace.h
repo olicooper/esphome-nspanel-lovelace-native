@@ -19,17 +19,14 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/api/custom_api_device.h"
 
-#ifdef USE_ESP_IDF
 #include <driver/gpio.h>
 #include "esphome/components/uart/uart_component_esp_idf.h"
 #ifdef USE_NSPANEL_TFT_UPLOAD
+// #ifndef USE_ARDUINO
 #include <esp_http_client.h>
-#endif
-#else
-#ifdef USE_NSPANEL_TFT_UPLOAD
-#include <HTTPClient.h>
-#endif
-#include "esphome/components/uart/uart_component_esp32_arduino.h"
+// #else
+// #include <HTTPClient.h>
+// #endif
 #endif
 
 #ifdef USE_TIME
@@ -146,7 +143,7 @@ public:
    */
   void soft_reset_display() {
     // this->send_nextion_command_("rest"); // only for stock FW
-#ifdef USE_ESP_IDF
+#ifndef USE_ARDUINO
     gpio_set_level(GPIO_NUM_4, 1);
     vTaskDelay(pdMS_TO_TICKS(1000));
     gpio_set_level(GPIO_NUM_4, 0);
@@ -184,9 +181,9 @@ protected:
   void init_display_(int baud_rate);
 #ifdef USE_NSPANEL_TFT_UPLOAD
   uint16_t recv_ret_string_(std::string &response, uint32_t timeout, bool recv_flag);
-#ifdef USE_ARDUINO
-  void set_reparse_mode_(bool active);
-#endif
+// #ifdef USE_ARDUINO
+//   void set_reparse_mode_(bool active);
+// #endif
 #endif
   void send_nextion_command_(const std::string &command);
 
@@ -314,13 +311,13 @@ protected:
   uint32_t content_length_ = 0;
   size_t tft_size_ = 0;
   bool upload_first_chunk_sent_ = false;
-#ifdef USE_ESP_IDF
+// #ifndef USE_ARDUINO
   int upload_by_chunks_(esp_http_client_handle_t http_client, uint32_t &range_start);
-#else // USE_ARDUINO
-  uint8_t *transfer_buffer_ = nullptr;
-  size_t transfer_buffer_size_;
-  int upload_by_chunks_(HTTPClient *http, const std::string &url, uint32_t &range_start);
-#endif
+// #else
+//   uint8_t *transfer_buffer_ = nullptr;
+//   size_t transfer_buffer_size_;
+//   int upload_by_chunks_(HTTPClient *http, const std::string &url, uint32_t &range_start);
+// #endif
   bool upload_end_(bool successful);
 #endif // USE_NSPANEL_TFT_UPLOAD
 };

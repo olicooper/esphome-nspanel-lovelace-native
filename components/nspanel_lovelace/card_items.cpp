@@ -7,6 +7,7 @@
 #include "translations.h"
 #include "types.h"
 #include <type_traits>
+#include <cstdlib>
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -29,6 +30,51 @@ GridCardEntityItem::GridCardEntityItem(
 }
 
 void GridCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
+
+std::string &GridCardEntityItem::render_(std::string &buffer) {
+  const icon_char_t *orig_icon = this->icon_value_;
+  bool restore = false;
+  std::string temp_val;
+  
+  if (this->entity_->is_type(entity_type::sensor) && !this->icon_value_overridden_) {
+    temp_val = this->entity_->get_state();
+    
+    char *endptr = nullptr;
+    float f_val = std::strtof(temp_val.c_str(), &endptr);
+    if (endptr != temp_val.c_str()) {
+      char formatted[16];
+      if (this->get_parent_page_type() == page_type::cardGrid2) {
+        std::snprintf(formatted, sizeof(formatted), "%.0f", f_val);
+      } else {
+        std::snprintf(formatted, sizeof(formatted), "%.1f", f_val);
+      }
+      temp_val = formatted;
+    }
+    
+    if (temp_val.length() > 4) {
+      temp_val = temp_val.substr(0, 4);
+    }
+    if (!temp_val.empty() && temp_val.back() == '.') {
+      temp_val.pop_back();
+    }
+    
+    if (this->get_parent_page_type() == page_type::cardGrid2) {
+      temp_val.append("¬2");
+    } else {
+      temp_val.append("¬3");
+    }
+    
+    this->icon_value_ = reinterpret_cast<const icon_char_t *>(temp_val.c_str());
+    restore = true;
+  }
+
+  CardItem::render_(buffer);
+
+  if (restore) {
+    this->icon_value_ = orig_icon;
+  }
+  return buffer;
+}
 
 /*
  * =============== EntitiesCardEntityItem ===============

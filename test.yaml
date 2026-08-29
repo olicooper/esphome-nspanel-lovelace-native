@@ -24,12 +24,11 @@ esphome:
   name_add_mac_suffix: true
   comment: "NSPanel test device"
   build_path: ./.build/${node_name}
-  platformio_options:
-    build_flags:
-      - -DTEST_DEVICE_MODE
-      - -DFAKE_TFT_UPLOAD
-      # - -Wall
-      # - -Wextra
+  build_flags:
+    - -DTEST_DEVICE_MODE
+    - -DFAKE_TFT_UPLOAD
+    # - -Wall
+    # - -Wextra
 
 esp32:
   board: lolin32_lite

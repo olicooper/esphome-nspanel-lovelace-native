@@ -497,7 +497,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
-    cv.require_esphome_version(2025,8,0),
+    cv.require_esphome_version(2026,4,0),
     #cv.only_with_esp_idf,
     validate_config
 )
@@ -619,8 +619,8 @@ async def to_code(config):
                     if string.endswith("TEST_DEVICE_MODE")]
     if is_test_mode:
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
-    # NSPanel has non-standard PSRAM pins which are not modifiable when building for Arduino
-    elif core.CORE.is_esp32:
+    elif not core.CORE.using_arduino or cv.Version.parse(ESPHOME_VERSION) >= cv.Version(2026,6,0):
+        # NSPanel has non-standard PSRAM pins
         cg.add_define("USE_PSRAM")
         esp32.add_idf_sdkconfig_option(
             f"CONFIG_{esp32.get_esp32_variant().upper()}_SPIRAM_SUPPORT", True
@@ -670,17 +670,20 @@ async def to_code(config):
         # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
         # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
         cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
-        if core.CORE.using_arduino:
-            cg.add_library("WiFiClientSecure", None)
-            cg.add_library("HTTPClient", None)
-        elif core.CORE.is_esp32:
-            ## todo: Remove this condition by esphome version 2026.6.x
-            if hasattr(esp32, "include_builtin_idf_component"):
-                esp32.include_builtin_idf_component("esp_http_client")
-            esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
-            esp32.add_idf_sdkconfig_option(
-                "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
-            )
+
+        ## FIXME: HTTPClient missing when building for Arduino so compilation fails. Using IDF version instead for now
+        # if core.CORE.using_arduino:
+        #     # cg.add_library("WiFiClientSecure", None)
+        #     cg.add_library("NetworkClientSecure", None)
+        #     cg.add_library("HTTPClient", None)
+        # else:
+        ## todo: Remove this condition by esphome version 2026.6.x
+        if hasattr(esp32, "include_builtin_idf_component"):
+            esp32.include_builtin_idf_component("esp_http_client")
+        esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
+        esp32.add_idf_sdkconfig_option(
+            "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
+        )
 
     if CONF_SCREENSAVER in config:
         cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))

@@ -1,3 +1,4 @@
+#if 0 // Disable Arduino code until we decide if we need to remove it (using IDF version instead)
 #ifdef USE_NSPANEL_TFT_UPLOAD
 #ifdef USE_ARDUINO
 
@@ -302,3 +303,4 @@ bool NSPanelLovelace::upload_end_(bool successful) {
 
 #endif // USE_ARDUINO
 #endif // USE_NSPANEL_TFT_UPLOAD
+#endif // if 0

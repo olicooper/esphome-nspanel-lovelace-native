@@ -12,6 +12,8 @@ A special thanks goes to these great projects for making this possible:
 
 # Installation
 
+This library only works with the latest minor versions of ESPHome, older versions are not officially supported but may still work.
+
 The installation of ESPHome on the ESP32 follows the standard ESPHome build method e.g. `esphome run --device COM6 basic-example.yaml`. It is possible to do OTA updates with the ESPHome CLI after the initial upload.
 
 For the GUI, this project relies on the HMI TFT firmware from the [ESPHome NSPanel Lovelace UI](https://github.com/sairon/esphome-nspanel-lovelace-ui) project. 

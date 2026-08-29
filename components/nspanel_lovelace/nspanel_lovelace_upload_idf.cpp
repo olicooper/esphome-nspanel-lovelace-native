@@ -1,5 +1,5 @@
 #ifdef USE_NSPANEL_TFT_UPLOAD
-#ifdef USE_ESP_IDF
+// #ifndef USE_ARDUINO
 
 // Adapted from: https://github.com/esphome/esphome/blob/5b6b7c0d15098f7477bae68329fe76a1d8993cf5/esphome/components/nextion/nextion_upload_idf.cpp
 // See:
@@ -458,5 +458,5 @@ bool NSPanelLovelace::upload_end_(bool successful) {
 }  // namespace nspanel_lovelace
 }  // namespace esphome
 
-#endif // USE_ESP_IDF
+// #endif // not USE_ARDUINO
 #endif // USE_NSPANEL_TFT_UPLOAD

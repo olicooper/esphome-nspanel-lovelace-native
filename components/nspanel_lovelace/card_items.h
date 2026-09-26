@@ -44,8 +44,12 @@ public:
   void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
 
   const std::string &get_value() const { return this->value_; }
+  // number of decimals for numeric states, -1 = show state as received
+  void set_precision(int8_t precision) { this->precision_ = precision; }
 
 protected:
+  int8_t precision_ = -1;
+
   static void state_generic_fn(StatefulPageItem *me);
   static void state_on_off_fn(StatefulPageItem *me);
   static void state_button_fn(StatefulPageItem *me);
@@ -66,6 +70,19 @@ protected:
   // output: type~internalName~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
+};
+
+/*
+ * =============== ScreensaverEntityItem ===============
+ */
+
+class ScreensaverEntityItem : public EntitiesCardEntityItem {
+public:
+  using EntitiesCardEntityItem::EntitiesCardEntityItem;
+
+protected:
+  // output: ~~icon~iconColor~displayName~value
+  std::string &render_(std::string &buffer) override;
 };
 
 } // namespace nspanel_lovelace

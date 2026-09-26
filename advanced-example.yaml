@@ -57,6 +57,7 @@ nspanel_lovelace:
       ## NOTE: Please see README for more info on weather 'forecast_method' options. Default is 'template_sensor' (deprecated).
       ## This option uses a Home Assistant action to send forecast data to the nspanel (see README for the HA automation template).
       forecast_method: service
+      # icon_color: "#FFFFFF" # fixed weather icon color: RGB565 int (65535), [r, g, b] or hex "#RRGGBB"
       ## This option uses a Home Assistant template sensor to replicate the old HA entity behaviour. The entity_id (seen above) should be 
       ## configured to use the template sensor unique_id (see README for the HA template sensor).
       ## NOTE: this option is less flexible and will be deprecated in esphome 2026.6.
@@ -68,7 +69,7 @@ nspanel_lovelace:
     #   entity_id: light.front_room_outer
     #   icon:
     #     value: robot-outline
-    #     color: 200
+    #     color: [255, 255, 255] # RGB565 int (65535), [r, g, b] or hex "#RRGGBB"
   cards:
     - type: cardGrid
       id: front_room

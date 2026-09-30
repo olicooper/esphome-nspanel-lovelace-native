@@ -18,13 +18,14 @@ namespace esphome {
 namespace nspanel_lovelace {
 
 // see: https://stackoverflow.com/a/13890501/2634818
-inline void replace_first(
+inline bool replace_first(
     std::string &s, std::string const &toReplace,
     std::string const &replaceWith) {
   std::size_t pos = s.find(toReplace);
   if (pos == std::string::npos)
-    return;
+    return false;
   s.replace(pos, toReplace.length(), replaceWith);
+  return true;
 }
 
 // see: https://stackoverflow.com/a/13890501/2634818

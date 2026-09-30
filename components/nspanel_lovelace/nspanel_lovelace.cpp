@@ -1523,46 +1523,46 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
         datefmt.find("%c", 0) != std::string::npos) {
       switch(now.day_of_week) {
         case 1:
-          replace_first(timestr, "Sunday",
-            get_translation(translation_item::dow_sunday));
-          replace_first(timestr, "Sun",
-            get_translation(translation_item::dow_sun));
+          if (!replace_first(timestr, "Sunday",
+                get_translation(translation_item::dow_sunday)))
+            replace_first(timestr, "Sun",
+              get_translation(translation_item::dow_sun));
           break;
         case 2:
-          replace_first(timestr, "Monday",
-            get_translation(translation_item::dow_monday));
-          replace_first(timestr, "Mon",
-            get_translation(translation_item::dow_mon));
+          if (!replace_first(timestr, "Monday",
+                get_translation(translation_item::dow_monday)))
+            replace_first(timestr, "Mon",
+              get_translation(translation_item::dow_mon));
           break;
         case 3:
-          replace_first(timestr, "Tuesday",
-            get_translation(translation_item::dow_tuesday));
-          replace_first(timestr, "Tue",
-            get_translation(translation_item::dow_tue));
+          if (!replace_first(timestr, "Tuesday",
+                get_translation(translation_item::dow_tuesday)))
+            replace_first(timestr, "Tue",
+              get_translation(translation_item::dow_tue));
           break;
         case 4:
-          replace_first(timestr, "Wednesday",
-            get_translation(translation_item::dow_wednesday));
-          replace_first(timestr, "Wed",
-            get_translation(translation_item::dow_wed));
+          if (!replace_first(timestr, "Wednesday",
+                get_translation(translation_item::dow_wednesday)))
+            replace_first(timestr, "Wed",
+              get_translation(translation_item::dow_wed));
           break;
         case 5:
-          replace_first(timestr, "Thursday",
-            get_translation(translation_item::dow_thursday));
-          replace_first(timestr, "Thu",
-            get_translation(translation_item::dow_thu));
+          if (!replace_first(timestr, "Thursday",
+                get_translation(translation_item::dow_thursday)))
+            replace_first(timestr, "Thu",
+              get_translation(translation_item::dow_thu));
           break;
         case 6:
-          replace_first(timestr, "Friday",
-            get_translation(translation_item::dow_friday));
-          replace_first(timestr, "Fri",
-            get_translation(translation_item::dow_fri));
+          if (!replace_first(timestr, "Friday",
+                get_translation(translation_item::dow_friday)))
+            replace_first(timestr, "Fri",
+              get_translation(translation_item::dow_fri));
           break;
         case 7:
-          replace_first(timestr, "Saturday",
-            get_translation(translation_item::dow_saturday));
-          replace_first(timestr, "Sat",
-            get_translation(translation_item::dow_sat));
+          if (!replace_first(timestr, "Saturday",
+                get_translation(translation_item::dow_saturday)))
+            replace_first(timestr, "Sat",
+              get_translation(translation_item::dow_sat));
           break;
         default:
           break;
@@ -1575,74 +1575,74 @@ void NSPanelLovelace::update_datetime(const datetime_mode mode, const char *date
         datefmt.find("%h", 0) != std::string::npos) {
       switch(now.month) {
         case 1:
-          replace_first(timestr, "January",
-            get_translation(translation_item::month_january));
-          replace_first(timestr, "Jan",
-            get_translation(translation_item::month_jan));
+          if (!replace_first(timestr, "January",
+                get_translation(translation_item::month_january)))
+            replace_first(timestr, "Jan",
+              get_translation(translation_item::month_jan));
           break;
         case 2:
-          replace_first(timestr, "February",
-            get_translation(translation_item::month_february));
-          replace_first(timestr, "Feb",
-            get_translation(translation_item::month_feb));
+          if (!replace_first(timestr, "February",
+                get_translation(translation_item::month_february)))
+            replace_first(timestr, "Feb",
+              get_translation(translation_item::month_feb));
           break;
         case 3:
-          replace_first(timestr, "March",
-            get_translation(translation_item::month_march));
-          replace_first(timestr, "Mar",
-            get_translation(translation_item::month_mar));
+          if (!replace_first(timestr, "March",
+                get_translation(translation_item::month_march)))
+            replace_first(timestr, "Mar",
+              get_translation(translation_item::month_mar));
           break;
         case 4:
-          replace_first(timestr, "April",
-            get_translation(translation_item::month_april));
-          replace_first(timestr, "Apr",
-            get_translation(translation_item::month_apr));
+          if (!replace_first(timestr, "April",
+                get_translation(translation_item::month_april)))
+            replace_first(timestr, "Apr",
+              get_translation(translation_item::month_apr));
           break;
         case 5:
           replace_first(timestr, "May",
             get_translation(translation_item::month_may));
           break;
         case 6:
-          replace_first(timestr, "June",
-            get_translation(translation_item::month_june));
-          replace_first(timestr, "Jun",
-            get_translation(translation_item::month_jun));
+          if (!replace_first(timestr, "June",
+                get_translation(translation_item::month_june)))
+            replace_first(timestr, "Jun",
+              get_translation(translation_item::month_jun));
           break;
         case 7:
-          replace_first(timestr, "July",
-            get_translation(translation_item::month_july));
-          replace_first(timestr, "Jul",
-            get_translation(translation_item::month_jul));
+          if (!replace_first(timestr, "July",
+                get_translation(translation_item::month_july)))
+            replace_first(timestr, "Jul",
+              get_translation(translation_item::month_jul));
           break;
         case 8:
-          replace_first(timestr, "August",
-            get_translation(translation_item::month_august));
-          replace_first(timestr, "Aug",
-            get_translation(translation_item::month_aug));
+          if (!replace_first(timestr, "August",
+                get_translation(translation_item::month_august)))
+            replace_first(timestr, "Aug",
+              get_translation(translation_item::month_aug));
           break;
         case 9:
-          replace_first(timestr, "September",
-            get_translation(translation_item::month_september));
-          replace_first(timestr, "Sep",
-            get_translation(translation_item::month_sep));
+          if (!replace_first(timestr, "September",
+                get_translation(translation_item::month_september)))
+            replace_first(timestr, "Sep",
+              get_translation(translation_item::month_sep));
           break;
         case 10:
-          replace_first(timestr, "October",
-            get_translation(translation_item::month_october));
-          replace_first(timestr, "Oct",
-            get_translation(translation_item::month_oct));
+          if (!replace_first(timestr, "October",
+                get_translation(translation_item::month_october)))
+            replace_first(timestr, "Oct",
+              get_translation(translation_item::month_oct));
           break;
         case 11:
-          replace_first(timestr, "November",
-            get_translation(translation_item::month_november));
-          replace_first(timestr, "Nov",
-            get_translation(translation_item::month_nov));
+          if (!replace_first(timestr, "November",
+                get_translation(translation_item::month_november)))
+            replace_first(timestr, "Nov",
+              get_translation(translation_item::month_nov));
           break;
         case 12:
-          replace_first(timestr, "December",
-            get_translation(translation_item::month_december));
-          replace_first(timestr, "Dec",
-            get_translation(translation_item::month_dec));
+          if (!replace_first(timestr, "December",
+                get_translation(translation_item::month_december)))
+            replace_first(timestr, "Dec",
+              get_translation(translation_item::month_dec));
           break;
         default:
           break;

@@ -66,10 +66,14 @@ public:
   virtual void set_render_invalid() { this->render_invalid_ = true; }
   virtual const std::string &render();
 
+  Page* get_parent_page() const { return this->parent_page_; }
+  void set_parent_page(Page* page) { this->parent_page_ = page; }
+
 protected:
   std::string uuid_;
   std::string render_buffer_;
   bool render_invalid_ = true;
+  Page* parent_page_{nullptr};
 
   virtual uint16_t get_render_buffer_reserve_() const { return 5; }
   

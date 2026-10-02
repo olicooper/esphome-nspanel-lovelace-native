@@ -3,6 +3,7 @@
 #include "config.h"
 #include "page_base.h"
 #include "page_item_base.h"
+#include "page_item_visitor.h"
 #include <cstring>
 #include <stdint.h>
 #include <string>

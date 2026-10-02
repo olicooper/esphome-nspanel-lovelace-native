@@ -38,9 +38,6 @@ std::string &Card::render(std::string &buffer) {
   this->render_nav(buffer);
 
   for (auto& item : this->items_) {
-    if (auto* card_item = page_item_cast<CardItem>(item.get())) {
-      card_item->set_parent_page_type(this->type_);
-    }
     buffer.append(1, SEPARATOR).append(item->render());
   }
 

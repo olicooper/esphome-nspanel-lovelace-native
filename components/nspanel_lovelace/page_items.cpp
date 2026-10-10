@@ -8,6 +8,10 @@
 #include <string>
 #include <vector>
 #include "esphome/core/helpers.h"
+// ESPHome 2026.11 no longer pulls alloc_helpers.h in through helpers.h
+#if __has_include("esphome/core/alloc_helpers.h")
+#include "esphome/core/alloc_helpers.h"
+#endif
 
 namespace esphome {
 namespace nspanel_lovelace {

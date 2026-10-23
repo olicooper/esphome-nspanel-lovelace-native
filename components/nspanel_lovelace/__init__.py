@@ -382,6 +382,12 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
 
 def validate_config(config):
     global card_ids
+    if core.CORE.using_arduino:
+        raise cv.Invalid(
+            "nspanel_lovelace requires the ESP-IDF framework (framework: type: esp-idf). "
+            "Arduino is not supported since the NSPanel's PSRAM is on non-standard pins "
+            "that can't be configured under Arduino."
+        )
     model = config[CONF_MODEL]
     if CONF_LANGUAGE not in config[CONF_LOCALE]:
         raise cv.Invalid("A language must be specified in locale")
@@ -500,7 +506,6 @@ CONFIG_SCHEMA = cv.All(
     .extend(cv.COMPONENT_SCHEMA),
     cv.only_on_esp32,
     cv.require_esphome_version(2026,4,0),
-    #cv.only_with_esp_idf,
     validate_config
 )
 
@@ -621,7 +626,7 @@ async def to_code(config):
                     if string.endswith("TEST_DEVICE_MODE")]
     if is_test_mode:
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
-    elif not core.CORE.using_arduino or cv.Version.parse(ESPHOME_VERSION) >= cv.Version(2026,6,0):
+    else:
         # NSPanel has non-standard PSRAM pins
         cg.add_define("USE_PSRAM")
         esp32.add_idf_sdkconfig_option(
@@ -673,12 +678,6 @@ async def to_code(config):
         # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
         cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
 
-        ## FIXME: HTTPClient missing when building for Arduino so compilation fails. Using IDF version instead for now
-        # if core.CORE.using_arduino:
-        #     # cg.add_library("WiFiClientSecure", None)
-        #     cg.add_library("NetworkClientSecure", None)
-        #     cg.add_library("HTTPClient", None)
-        # else:
         ## todo: Remove this condition by esphome version 2026.6.x
         if hasattr(esp32, "include_builtin_idf_component"):
             esp32.include_builtin_idf_component("esp_http_client")

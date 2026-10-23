@@ -26,7 +26,7 @@ A basic configuration can be found in the [basic example](basic-example.yaml), b
 
 ## PSRAM
 
-The NSPanel has on-board PSRAM which this project makes use of automatically, which means that the `psram` component is unavailable because the PSRAM is configured during code generation by adding specific `sdkconfig_options`. Additionally, when using Arduino (which is deprecated) the PSRAM cannot be used as it is not possible to customise the PSRAM pins for the Arduino framework build.
+The NSPanel has on-board PSRAM which this project makes use of automatically, which means that the `psram` component is unavailable because the PSRAM is configured during code generation by adding specific `sdkconfig_options`. The ESP-IDF framework is required; Arduino is not supported as it is not possible to customise the PSRAM pins for the Arduino framework build.
 
 ### Icons
 

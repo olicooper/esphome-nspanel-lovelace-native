@@ -1467,22 +1467,6 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
 #endif
 }
 
-// #ifdef USE_ARDUINO
-// void NSPanelLovelace::set_reparse_mode_(bool active) {
-//   // if (this->reparse_mode_ == active) return;
-
-//   if (active) {
-//     this->send_nextion_command_("recmod=1");
-//   } else {
-//     this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
-//     this->send_nextion_command_("recmod=0");
-//     this->send_nextion_command_("recmod=0");
-//     this->send_nextion_command_("connect");
-//   }
-
-//   this->reparse_mode_ = active;
-// }
-// #endif // USE_ARDUINO
 #endif // USE_NSPANEL_TFT_UPLOAD
 
 void NSPanelLovelace::init_display_(int baud_rate) {

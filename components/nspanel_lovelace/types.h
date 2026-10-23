@@ -583,6 +583,7 @@ enum class ha_attr_type : uint8_t {
   // fan
   percentage,
   percentage_step,
+  _count,
 };
 
 static constexpr const char* ha_attr_names [] = {
@@ -736,33 +737,38 @@ inline bool try_get_value(
   return false;
 }
 
-template<typename Value, size_t Size>
+template<typename Value, size_t Size, typename KeyT>
 inline bool try_get_value(
     const FrozenCharMap<Value, Size> &map,
     Value &return_value,
-    const std::string &key,
+    const KeyT &key,
     const char *fallback_key = nullptr) {
   return try_get_value(map, return_value, key.c_str(), fallback_key);
 }
 
-template<typename Value, size_t Size>
+template<typename Value, size_t Size, typename KeyT>
 inline const Value &get_value_or_default(
     const FrozenCharMap<Value, Size> &map,
-    const std::string &key,
+    const KeyT &key,
     const Value &default_value,
     const char *fallback_key = nullptr) {
   // todo: fix this bad implementation
   //       use pointers and unwrap Value?
   static Value ret{};
-  if (try_get_value(map, ret, key.c_str(), fallback_key))
+  const char *key_cstr;
+  if constexpr (std::is_same_v<std::decay_t<KeyT>, const char*>)
+    key_cstr = key;
+  else
+    key_cstr = key.c_str();
+  if (try_get_value(map, ret, key_cstr, fallback_key))
     return ret;
   return default_value;
 }
 
-template<size_t Size>
+template<size_t Size, typename KeyT>
 inline const icon_char_t *get_icon(
     const FrozenCharMap<const icon_char_t *, Size> &map,
-    const std::string &key,
+    const KeyT &key,
     const char *fallback_key = nullptr) {
   return get_value_or_default(map, key, icon_t::alert_circle_outline, fallback_key);
 }

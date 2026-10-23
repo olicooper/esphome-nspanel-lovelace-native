@@ -55,11 +55,11 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void EntitiesCardEntityItem::on_entity_attribute_change(
-    ha_attr_type attr, const std::string &value) {
+    ha_attr_type attr, const psram_string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
 
   if (attr == ha_attr_type::unit_of_measurement) {
-    this->set_value_postfix(value);
+    this->set_value_postfix(std::string(value.c_str(), value.size()));
     return;
   }
 
@@ -161,10 +161,10 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
   me_->value_.clear();
 
   if (!position_str.empty()) {
-    position = std::stoi(position_str);
+    position = str_to_int(position_str);
   }
   if (!supported_features_str.empty()) {
-    supported_features = std::stoi(supported_features_str);
+    supported_features = str_to_int(supported_features_str);
   }
 
   // see: https://github.com/home-assistant/core/blob/dev/homeassistant/components/cover/__init__.py#L112
@@ -248,7 +248,7 @@ void EntitiesCardEntityItem::state_weather_fn(StatefulPageItem *me) {
     ha_attr_type::temperature, "0");
   auto temperature_unit = me_->get_attribute(
     ha_attr_type::temperature_unit,
-    Configuration::get_temperature_unit_str());
+    Configuration::get_temperature_unit_str().c_str());
   
   me_->value_.assign(temperature).append(temperature_unit);
 }

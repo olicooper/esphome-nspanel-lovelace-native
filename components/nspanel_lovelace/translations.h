@@ -145,7 +145,8 @@ static inline const char *get_translation(const char *key) {
   return ret;
 }
 
-static inline const char *get_translation(const std::string &key) {
+template<typename StringT>
+static inline const char *get_translation(const StringT &key) {
   if (key.empty()) return key.c_str();
   return get_translation(key.c_str());
 }

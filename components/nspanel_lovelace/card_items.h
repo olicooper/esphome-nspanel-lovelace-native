@@ -68,5 +68,39 @@ protected:
   uint16_t get_render_buffer_reserve_() const override;
 };
 
+/*
+ * =============== PowerCardItem ===============
+ */
+
+class PowerCardItem : public CardItem {
+public:
+  PowerCardItem(const std::string &uuid, std::shared_ptr<Entity> entity);
+  PowerCardItem(
+      const std::string &uuid, std::shared_ptr<Entity> entity,
+      const std::string &display_name);
+
+  void accept(PageItemVisitor& visitor) override;
+
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
+
+  int16_t get_speed() const { return this->speed_; }
+
+  // rgb565 grey shown when power == 0; active color comes from icon_color (set via YAML)
+  static constexpr uint16_t COLOR_INACTIVE = 33808u; // #808080
+
+protected:
+  std::string value_str_;
+  std::string ha_unit_;
+  int16_t speed_ = 0;
+  bool is_active_ = false;
+
+  static void state_power_fn(StatefulPageItem *me);
+  void set_on_state_callback_(const char *type) override;
+
+  // output: text~entityId~icon~iconColor~displayName~valueStr~speed
+  std::string &render_(std::string &buffer) override;
+  uint16_t get_render_buffer_reserve_() const override;
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

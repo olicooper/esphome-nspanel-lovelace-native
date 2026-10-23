@@ -43,6 +43,11 @@ bool InheritancePageItemVisitor::visit(EntitiesCardEntityItem &item) {
           visit(static_cast<StatefulPageItem &>(item)) ||
           visit(static_cast<PageItem &>(item));
 }
+bool InheritancePageItemVisitor::visit(PowerCardItem &item) {
+  return visit(static_cast<CardItem &>(item)) ||
+          visit(static_cast<StatefulPageItem &>(item)) ||
+          visit(static_cast<PageItem &>(item));
+}
 
 } // namespace nspanel_lovelace
 } // namespace esphome

@@ -20,6 +20,7 @@ class CardItem;
 class StatefulPageItem;
 class GridCardEntityItem;
 class EntitiesCardEntityItem;
+class PowerCardItem;
 
 class PageItemVisitor {
 public:
@@ -34,6 +35,7 @@ public:
   virtual bool visit(StatefulPageItem &) = 0;
   virtual bool visit(GridCardEntityItem &) = 0;
   virtual bool visit(EntitiesCardEntityItem &) = 0;
+  virtual bool visit(PowerCardItem &) = 0;
 };
 
 class InheritancePageItemVisitor : public PageItemVisitor {
@@ -49,6 +51,7 @@ public:
   virtual bool visit(StatefulPageItem &);
   virtual bool visit(GridCardEntityItem &);
   virtual bool visit(EntitiesCardEntityItem &);
+  virtual bool visit(PowerCardItem &);
 };
 
 template <class T = PageItem>

@@ -43,11 +43,74 @@ There are many UI components missing and the [python build script](components/ns
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display
-- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`, `cardMedia`
+- Support for `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`, `cardMedia`, `cardPower`
 - Most entity types should display on cards. Lights, switches, sensors and scenes have been tested to work, with additional support for the `popupLight` and `popupTimer` pages.
 
-There is currently no support for these cards: `cardPower`. `cardUnlock`, `cardChart` - but these are planned for the future.
+There is currently no support for these cards: `cardUnlock`, `cardChart` - but these are planned for the future.
 Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for more info on the cards mentioned above.
+
+## Power Card (`cardPower`)
+
+The power card is designed to display a home energy overview. A central home entity (e.g. a whole-home power sensor) is shown in the middle of the card with up to six surrounding entities (e.g. solar, EV charger, heat pump) displayed around it, each with an animated flow indicator showing the direction and magnitude of power.
+
+### Configuration
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `type` | Yes | Must be `cardPower` |
+| `home_entity_id` | Yes | A `sensor` entity representing whole-home power consumption/generation |
+| `title` | No | Card title. Also used as the label for the home entity (defaults to `Home` if not set) |
+| `sleep_timeout` | No | Seconds before returning to the screensaver (default: global setting) |
+| `entities` | No | Up to 6 power sensor entities displayed around the home entity |
+
+Each entry in `entities` supports the same options as other card types (`entity_id`, `name`, `icon`, `icon_color`).
+
+### Colours
+
+Icons automatically switch between two colours to indicate power flow state:
+- **Active** (power ≥ 1 W/0.001 kW): the configured `icon: color`, or HA blue (`17299`) by default
+- **Inactive** (zero, unavailable, or unknown): grey (`#808080`, `33808`)
+
+Set `icon: color` per entity for Tesla-style colour coding, e.g. yellow for solar, green for EV, red for grid import. See [icon colour picker](https://chrishewett.com/blog/true-rgb565-colour-picker/) for rgb565 values.
+
+### Units
+
+Both the home entity and the surrounding entities handle `W` and `kW` units automatically:
+
+- **W**: values ≥ 1000 W are displayed as kW (e.g. `1.2kW`); smaller values as whole watts (e.g. `450W`)
+- **kW**: displayed with two decimal places (e.g. `2.35kW`)
+- **Other / no unit**: the raw state value is shown as-is
+
+The animated speed indicator on each surrounding entity scales with the power value:
+- `W` unit: `speed = watts / 20`, clamped to the range `[-120, 120]`
+- `kW` unit: `speed = kilowatts × 50`, clamped to the same range
+- Negative values animate in the reverse direction (e.g. for battery discharge or export)
+
+Entities reporting `unknown` or `unavailable` show a `-` and a stopped animation.
+
+### Example
+
+```yaml
+- type: cardPower
+  title: Energy
+  home_entity_id: sensor.home_power
+  entities:
+    - entity_id: sensor.solar_power
+      name: Solar
+      icon:
+        value: solar-power
+        color: 65504    # yellow (#FFFF00)
+    - entity_id: sensor.ev_charger_power
+      name: EV
+      icon:
+        value: ev-station
+        color: 2016     # green (#00FF00)
+    - entity_id: sensor.heat_pump_power
+      name: Heat pump
+      icon:
+        value: heat-pump
+        color: 64512    # orange (#FF8000)
+```
 
 PRs to expand the functionality or fix bugs are very welcome!
 

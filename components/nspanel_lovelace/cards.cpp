@@ -517,9 +517,9 @@ void PowerCard::on_entity_state_change(const std::string &state) {
   this->set_items_render_invalid();
 }
 
-void PowerCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void PowerCard::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
   if (attr == ha_attr_type::unit_of_measurement) {
-    this->home_ha_unit_ = value;
+    this->home_ha_unit_.assign(value.c_str(), value.size());
     this->update_home_value_();
     this->set_items_render_invalid();
   }

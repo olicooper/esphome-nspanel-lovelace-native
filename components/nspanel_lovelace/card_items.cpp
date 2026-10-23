@@ -365,10 +365,10 @@ PowerCardItem::PowerCardItem(
 void PowerCardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void PowerCardItem::on_entity_attribute_change(
-    ha_attr_type attr, const std::string &value) {
+    ha_attr_type attr, const psram_string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
   if (attr == ha_attr_type::unit_of_measurement) {
-    this->ha_unit_ = value;
+    this->ha_unit_.assign(value.c_str(), value.size());
     if (this->on_state_callback_) {
       this->on_state_callback_(this);
       this->set_render_invalid();

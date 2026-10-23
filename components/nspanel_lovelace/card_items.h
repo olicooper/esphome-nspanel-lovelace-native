@@ -81,7 +81,7 @@ public:
 
   void accept(PageItemVisitor& visitor) override;
 
-  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
+  void on_entity_attribute_change(ha_attr_type attr, const psram_string &value) override;
 
   int16_t get_speed() const { return this->speed_; }
 

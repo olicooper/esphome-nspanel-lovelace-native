@@ -280,11 +280,11 @@ std::string &ThermoCard::render(std::string &buffer) {
       ha_attr_type::target_temp_low);
     if (!dest_temp2_str.empty()) {
       dest_temp2_str = std::to_string(
-        static_cast<int>(std::stof(dest_temp2_str) * 10));
+        static_cast<int>(str_to_float(dest_temp2_str) * 10));
     }
   }
   dest_temp_str = std::to_string(
-    static_cast<int>(std::stof(dest_temp_str) * 10));
+    static_cast<int>(str_to_float(dest_temp_str) * 10));
 
   buffer.append(dest_temp_str).append(1, SEPARATOR);
 
@@ -304,17 +304,17 @@ std::string &ThermoCard::render(std::string &buffer) {
   buffer.append(1, SEPARATOR);
 
   buffer.append(std::to_string(static_cast<int>(
-    std::stof(this->thermo_entity_->get_attribute(
+    str_to_float(this->thermo_entity_->get_attribute(
       ha_attr_type::min_temp, "0")) * 10)));
   buffer.append(1, SEPARATOR);
 
   buffer.append(std::to_string(static_cast<int>(
-    std::stof(this->thermo_entity_->get_attribute(
+    str_to_float(this->thermo_entity_->get_attribute(
       ha_attr_type::max_temp, "0")) * 10)));
   buffer.append(1, SEPARATOR);
 
   buffer.append(std::to_string(static_cast<int>(
-    std::stof(this->thermo_entity_->get_attribute(
+    str_to_float(this->thermo_entity_->get_attribute(
       ha_attr_type::target_temp_step, "0.5")) * 10)));
   
   //TODO: add overwrite_supported_modes
@@ -426,7 +426,7 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(2, SEPARATOR);
 
   buffer.append(std::to_string(
-    static_cast<uint8_t>(std::stof(this->media_entity_->get_attribute(
+    static_cast<uint8_t>(str_to_float(this->media_entity_->get_attribute(
       ha_attr_type::volume_level, "0")) * 100.0f)));
   buffer.append(1, SEPARATOR);
 

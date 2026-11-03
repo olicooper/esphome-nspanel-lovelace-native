@@ -69,7 +69,12 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     return -1;
   }
 
-  ESP_LOGD(TAG, "Opening HTTP connetion");
+  char range_header[32];
+  snprintf(range_header, sizeof(range_header), "bytes=%" PRIu32 "-%" PRIu32, range_start, range_end);
+  ESP_LOGD(TAG, "Range: %s", range_header);
+  esp_http_client_set_header(http_client, "Range", range_header);
+
+  ESP_LOGD(TAG, "Opening HTTP connection");
   esp_err_t err;
   if ((err = esp_http_client_open(http_client, 0)) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
@@ -132,8 +137,15 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     if (read_len > 0) {
       this->write_array(buffer, buffer_size);
       App.feed_wdt();
-      this->recv_ret_string_(recv_string, this->upload_first_chunk_sent_ ? 500 : 5000, true);
+      // Any block can take seconds to answer: a display rewriting everything erases its flash as it goes
+      this->recv_ret_string_(recv_string, 5000, true);
       this->content_length_ -= read_len;
+      if (recv_string.empty()) {
+        ESP_LOGW(TAG, "No response from display during upload");
+        allocator.deallocate(buffer, 4096);
+        buffer = nullptr;
+        return -1;
+      }
       const float upload_percentage = 100.0f * (this->tft_size_ - this->content_length_) / this->tft_size_;
 #ifdef USE_PSRAM
       ESP_LOGD(TAG,
@@ -278,7 +290,9 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   // config.host = nullptr;
   config.cert_pem = nullptr;
   config.method = HTTP_METHOD_HEAD;
-  config.timeout_ms = 15000;
+  // Under the 5 s task watchdog: a longer wait on a stalled or unreachable server reboots the ESP mid-upload
+  // instead of failing the read, which the chunk loop retries
+  config.timeout_ms = 4000;
   config.disable_auto_redirect = false;
   config.max_redirection_count = 10;
   config.is_async = false;
@@ -328,14 +342,8 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 
   // The Nextion will ignore the upload command if it is sleeping
   ESP_LOGD(TAG, "Wake-up Nextion");
-  if (Configuration::get_model() != nspanel_model_t::unknown) {
-    // This command targets nspanel firmware
-    this->send_nextion_command_("dimmode~100~100");
-  } else {
-    // These commands target the stock firmware
-    this->send_nextion_command_("dims=100");
-    this->send_nextion_command_("sleep=0");
-  }
+  this->send_nextion_command_("sleep=0");
+  this->send_nextion_command_("dim=100");
   vTaskDelay(pdMS_TO_TICKS(250));  // NOLINT
 
   App.feed_wdt();
@@ -361,6 +369,9 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   this->send_nextion_command_(command);
 
   if (this->parent_->get_baud_rate() != this->update_baud_rate_) {
+    // Changing the baud rate reinstalls the UART driver, so let the command finish sending first
+    this->flush();
+    vTaskDelay(pdMS_TO_TICKS(50));  // NOLINT
     this->parent_->set_baud_rate(this->update_baud_rate_);
     this->parent_->load_settings();
   }
@@ -428,30 +439,34 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
 }
 
 bool NSPanelLovelace::upload_end_(bool successful) {
-  if (successful)
-    ESP_LOGI(TAG, "Nextion TFT upload finished");
-  else
-    ESP_LOGW(TAG, "Nextion TFT upload failed");
   this->is_updating_ = false;
-
   this->flush();
-  vTaskDelay(pdMS_TO_TICKS(2000));  // NOLINT
-  // Make sure we are running with the configured baud rate
-  // so we can communicate normally with the TFT again
+
   if (this->parent_->get_baud_rate() != this->default_baud_rate_) {
     this->parent_->set_baud_rate(this->default_baud_rate_);
     this->parent_->load_settings();
   }
-  this->soft_reset_display();
-  // todo: Why do we need to reset the ESP after a TFT update?
-  //       The TFT should send us the startup command when reset
-  // if (successful) {
-  //   ESP_LOGD(TAG, "Restarting ESPHome");
-  //   delay(1500);  // NOLINT
-  //   App.safe_reboot();
-  // } else {
-  //   ESP_LOGE(TAG, "Nextion TFT upload failed");
-  // }
+
+  if (successful) {
+    // The display finishes writing and restarts by itself after the last block.
+    // Cutting its power here leaves it showing "System data ERROR!".
+    ESP_LOGI(TAG, "Nextion TFT upload finished, waiting for the display before rebooting");
+    std::string recv_string;
+    const uint32_t wait_start = millis();
+    while (millis() - wait_start < 30000 && recv_string.find("startup") == std::string::npos) {
+      uint8_t c;
+      while (this->available() && this->read_byte(&c)) {
+        recv_string += static_cast<char>(c);
+      }
+      vTaskDelay(pdMS_TO_TICKS(50));  // NOLINT
+      App.feed_wdt();
+    }
+    ESP_LOGI(TAG, "Display %s after %" PRIu32 " ms", recv_string.find("startup") != std::string::npos ? "restarted" : "gave no startup message", millis() - wait_start);
+    App.safe_reboot();
+  } else {
+    ESP_LOGW(TAG, "Nextion TFT upload failed");
+    this->soft_reset_display();
+  }
   return successful;
 }
 

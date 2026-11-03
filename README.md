@@ -1,3 +1,19 @@
+> [!NOTE]
+> **About this branch.** This is [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native) (`dev`) with fixes that make TFT uploads through `upload_tft` work. They are proposed upstream in [#77](https://github.com/olicooper/esphome-nspanel-lovelace-native/pull/77) and [#82](https://github.com/olicooper/esphome-nspanel-lovelace-native/pull/82). Everything else is unchanged.
+>
+> Without them, an upload can stall or corrupt after the first 4 KiB, time out while the display rewrites its flash, leave the display on "System data ERROR!", or reboot the ESP mid-upload when the network stalls.
+>
+> To use it, point `external_components` at this branch:
+>
+> ```yaml
+> external_components:
+>   - source:
+>       type: git
+>       url: https://github.com/santibur06/esphome-nspanel-lovelace-native
+>       ref: fix/tft-upload-finish
+>     components: [nspanel_lovelace]
+> ```
+
 # ESPHome Native Component for NSPanel (beta)
 
 This project is designed to utilise the UI provided by [NSPanel Lovelace UI](https://github.com/joBr99/nspanel-lovelace-ui), but use a native [ESPHome](https://github.com/esphome/esphome) component for the backend. My core goals for the project were to:
@@ -18,7 +34,12 @@ The installation of ESPHome on the ESP32 follows the standard ESPHome build meth
 
 For the GUI, this project relies on the HMI TFT firmware from the [ESPHome NSPanel Lovelace UI](https://github.com/sairon/esphome-nspanel-lovelace-ui) project. 
 The firmware version reported by the screen needs to be `52` or `53` for it to be compatible with this project.
-If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L60)) exposed by the device in HomeAssistant.
+If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L64)) exposed by the device in HomeAssistant.
+
+When uploading a TFT:
+- Serve the file from a server that supports HTTP Range requests, which the uploader uses for every block. Home Assistant's `/local` folder (`config/www`) does.
+- An upload takes a few minutes. When it finishes, the display restarts by itself and the ESP reboots once the display has started. Don't cut the power before then.
+- The [basic example](basic-example.yaml) retries a failed upload up to 3 times. If an upload is interrupted, the display stays blank until it is flashed again; turning it off and on with the `Screen Power` switch and uploading again recovers it.
 
 # Configuration
 

@@ -307,7 +307,7 @@ protected:
 
 #ifdef USE_NSPANEL_TFT_UPLOAD
   uint32_t default_baud_rate_ = 0;
-  uint32_t update_baud_rate_ = 115200;
+  uint32_t update_baud_rate_ = 921600;
   bool is_updating_ = false;
   bool reparse_mode_ = false;
   uint32_t content_length_ = 0;

@@ -137,7 +137,8 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     if (read_len > 0) {
       this->write_array(buffer, buffer_size);
       App.feed_wdt();
-      this->recv_ret_string_(recv_string, this->upload_first_chunk_sent_ ? 500 : 5000, true);
+      // Any block can take seconds to answer: a display rewriting everything erases its flash as it goes
+      this->recv_ret_string_(recv_string, 5000, true);
       this->content_length_ -= read_len;
       if (recv_string.empty()) {
         ESP_LOGW(TAG, "No response from display during upload");
@@ -366,6 +367,9 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   this->send_nextion_command_(command);
 
   if (this->parent_->get_baud_rate() != this->update_baud_rate_) {
+    // Changing the baud rate reinstalls the UART driver, so let the command finish sending first
+    this->flush();
+    vTaskDelay(pdMS_TO_TICKS(50));  // NOLINT
     this->parent_->set_baud_rate(this->update_baud_rate_);
     this->parent_->load_settings();
   }
@@ -442,12 +446,20 @@ bool NSPanelLovelace::upload_end_(bool successful) {
   }
 
   if (successful) {
-    ESP_LOGI(TAG, "Nextion TFT upload finished, rebooting");
-    this->soft_reset_display();
-    for (uint8_t i = 0; i <= 5; i++) {
-      vTaskDelay(pdMS_TO_TICKS(1000));  // NOLINT
+    // The display finishes writing and restarts by itself after the last block.
+    // Cutting its power here leaves it showing "System data ERROR!".
+    ESP_LOGI(TAG, "Nextion TFT upload finished, waiting for the display before rebooting");
+    std::string recv_string;
+    const uint32_t wait_start = millis();
+    while (millis() - wait_start < 30000 && recv_string.find("startup") == std::string::npos) {
+      uint8_t c;
+      while (this->available() && this->read_byte(&c)) {
+        recv_string += static_cast<char>(c);
+      }
+      vTaskDelay(pdMS_TO_TICKS(50));  // NOLINT
       App.feed_wdt();
     }
+    ESP_LOGI(TAG, "Display %s after %" PRIu32 " ms", recv_string.find("startup") != std::string::npos ? "restarted" : "gave no startup message", millis() - wait_start);
     App.safe_reboot();
   } else {
     ESP_LOGW(TAG, "Nextion TFT upload failed");

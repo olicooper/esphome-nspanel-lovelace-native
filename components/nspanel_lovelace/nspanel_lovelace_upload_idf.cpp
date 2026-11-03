@@ -290,7 +290,9 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   // config.host = nullptr;
   config.cert_pem = nullptr;
   config.method = HTTP_METHOD_HEAD;
-  config.timeout_ms = 15000;
+  // Under the 5 s task watchdog: a longer wait on a stalled or unreachable server reboots the ESP mid-upload
+  // instead of failing the read, which the chunk loop retries
+  config.timeout_ms = 4000;
   config.disable_auto_redirect = false;
   config.max_redirection_count = 10;
   config.is_async = false;

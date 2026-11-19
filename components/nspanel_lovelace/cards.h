@@ -161,5 +161,42 @@ protected:
   std::shared_ptr<Entity> media_entity_;
 };
 
+/*
+ * =============== PowerCard ===============
+ */
+
+class PowerCard : public Card, public IEntitySubscriber {
+public:
+  PowerCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &home_entity);
+  PowerCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &home_entity,
+      const std::string &title);
+  PowerCard(const std::string &uuid,
+      const std::shared_ptr<Entity> &home_entity,
+      const std::string &title, const uint16_t sleep_timeout);
+  virtual ~PowerCard();
+
+  void accept(PageVisitor& visitor) override;
+
+  void on_entity_state_change(const std::string &state) override;
+  void on_entity_attribute_change(ha_attr_type attr, const std::string &value) override;
+
+  std::string &render(std::string &buffer) override;
+
+  // rgb565 grey shown when home entity is unavailable/zero
+  static constexpr uint16_t COLOR_INACTIVE = 33808u; // #808080
+
+protected:
+  std::shared_ptr<Entity> home_entity_;
+  std::string home_value_str_;
+  std::string home_ha_unit_;
+  const icon_char_t *home_icon_ = icon_t::home;
+  uint16_t home_color_ = 17299u;
+  bool home_is_active_ = false;
+
+  void update_home_value_();
+};
+
 } // namespace nspanel_lovelace
 } // namespace esphome

@@ -76,6 +76,10 @@ public:
 
     auto page = std::make_unique<TPage>(std::forward<TArgs>(args)...);
     TPage* p_page = page.get();
+    for (auto &[uuid, idx] : uuid_index_map_) {
+      if (idx >= index) ++idx;
+    }
+    uuid_index_map_.emplace(p_page->get_uuid(), index);
     if (pages_empty()) pages_.emplace_back(std::move(page));
     else {
       pages_.insert(pages_.begin() + index, std::move(page));
@@ -96,6 +100,7 @@ public:
 
     auto page = std::make_unique<TPage>(std::forward<TArgs>(args)...);
     TPage* p_page = page.get();
+    uuid_index_map_.emplace(p_page->get_uuid(), pages_.size());
     pages_.emplace_back(std::move(page));
     return p_page;
   }
@@ -107,6 +112,7 @@ protected:
   size_t current_index_;
   std::vector<std::unique_ptr<Page>> pages_;
   std::unordered_map<uint8_t, size_t> bookmarks_;
+  std::unordered_map<std::string, size_t> uuid_index_map_;
 };
 
 } // namespace nspanel_lovelace

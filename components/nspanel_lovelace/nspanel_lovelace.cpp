@@ -1080,8 +1080,8 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
       std::vector<std::string> time_parts;
       split_str(':', time_remaining_str, time_parts);
       if (time_parts.size() == 3) {
-        min_remaining = (stoi(time_parts[0]) * 60) + stoi(time_parts[1]);
-        sec_remaining = stoi(time_parts[2]);
+        min_remaining = (str_to_int(time_parts[0]) * 60) + str_to_int(time_parts[1]);
+        sec_remaining = str_to_int(time_parts[2]);
         render = true;
       }
     }
@@ -1281,9 +1281,9 @@ void NSPanelLovelace::render_fan_detail_update_(StatefulPageItem *item) {
     if (speed.empty()) {
       speed = "0";
     } else {
-      speed_val = std::stof(speed);
+      speed_val = str_to_float(speed);
     }
-    auto step_val = std::stof(percentage_step);
+    auto step_val = str_to_float(percentage_step);
     if (step_val < 1.0f) step_val = 1.0f; // avoid divide-by-zero
     speed = esphome::to_string(
       static_cast<uint16_t>(round(speed_val / step_val)));
@@ -1793,10 +1793,10 @@ void NSPanelLovelace::process_button_press_(
     if (entity_type == entity_type::fan) {
       auto entity = this->get_entity_(entity_id);
       if (entity == nullptr) return;
-      auto step = std::stof(
+      auto step = str_to_float(
         entity->get_attribute(ha_attr_type::percentage_step, "0"));
       if (step > 100.0f) step = 100.0f;
-      auto val = std::stof(value) * step;
+      auto val = str_to_float(value) * step;
       if (val > 100.0f) val = 100.0f;
       auto pct = esphome::str_snprintf("%.6f", 11, val);
       
@@ -1937,7 +1937,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::shuffle), shuffle}
       }});
   } else if (button_type == button_type::volumeSlider) {
-    auto volume = esphome::str_snprintf("%.2f", 7, std::stoi(value) * 0.01f);
+    auto volume = esphome::str_snprintf("%.2f", 7, str_to_int(value) * 0.01f);
     this->call_ha_service_(
       entity_type,
       ha_action_type::volume_set,
@@ -1960,7 +1960,7 @@ void NSPanelLovelace::process_button_press_(
     if (source_list_str.empty()) return;
     std::vector<std::string> source_list;
     split_str(',', source_list_str, source_list);
-    uint8_t index = stoi(value);
+    uint8_t index = str_to_int(value);
     if (source_list.size() <= index) return;
     this->call_ha_service_(
       entity_type,
@@ -1981,7 +1981,7 @@ void NSPanelLovelace::process_button_press_(
         // scale 0-100 to ha brightness range
         {to_string(ha_attr_type::brightness), std::to_string(
           static_cast<int>(
-            scale_value(std::stoi(value), {0, 100}, {0, 255})
+            scale_value(str_to_int(value), {0, 100}, {0, 255})
           ))}
       }});
   } else if (button_type == button_type::colorTempSlider) {
@@ -1990,8 +1990,8 @@ void NSPanelLovelace::process_button_press_(
     if (entity == nullptr) return;
     auto &minstr = entity->get_attribute(ha_attr_type::min_mireds);
     auto &maxstr = entity->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = minstr.empty() ? 153 : std::stoi(minstr);
-    uint16_t max_mireds = maxstr.empty() ? 500 : std::stoi(maxstr);
+    uint16_t min_mireds = minstr.empty() ? 153 : str_to_int(minstr);
+    uint16_t max_mireds = maxstr.empty() ? 500 : str_to_int(maxstr);
     if (min_mireds >= max_mireds) {
       ESP_LOGW(TAG, "min/max mired range invalid %i>=%i", min_mireds, max_mireds);
       min_mireds = 153;
@@ -2006,7 +2006,7 @@ void NSPanelLovelace::process_button_press_(
         // scale 0-100 from slider to color range of the light
         {to_string(ha_attr_type::color_temp), std::to_string(
           static_cast<int>(
-            scale_value(std::stoi(value), {0, 100},
+            scale_value(str_to_int(value), {0, 100},
             {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
           ))}
       }});
@@ -2019,9 +2019,9 @@ void NSPanelLovelace::process_button_press_(
 
     std::string rgb_str = to_string(
         xy_to_rgb(
-          std::stod(xy_tokens[0]),
-          std::stod(xy_tokens[1]),
-          std::stod(xy_tokens[2])
+          str_to_double(xy_tokens[0]),
+          str_to_double(xy_tokens[1]),
+          str_to_double(xy_tokens[2])
         ), ',', '[', ']');
 
     this->call_ha_service_(
@@ -2036,7 +2036,7 @@ void NSPanelLovelace::process_button_press_(
   }
   // thermo/climate card
   else if (button_type == button_type::tempUpd) {
-    auto val = esphome::str_snprintf("%.1f", 6, std::stoi(value) * 0.1);
+    auto val = esphome::str_snprintf("%.1f", 6, str_to_int(value) * 0.1);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -2047,10 +2047,11 @@ void NSPanelLovelace::process_button_press_(
   } else if (button_type == button_type::tempUpdHighLow) {
     std::vector<std::string> temp_values;
     split_str('|', value, temp_values);
+    if (temp_values.size() < 2) return;
     auto temp_high = esphome::str_snprintf(
-      "%.1f", 6, std::stoi(temp_values[0]) * 0.1);
+      "%.1f", 6, str_to_int(temp_values[0]) * 0.1);
     auto temp_low = esphome::str_snprintf(
-      "%.1f", 6, std::stoi(temp_values[1]) * 0.1);
+      "%.1f", 6, str_to_int(temp_values[1]) * 0.1);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -2074,7 +2075,9 @@ void NSPanelLovelace::process_button_press_(
     if (modes_str.empty()) return;
     std::vector<std::string> modes;
     split_str(',', modes_str, modes);
-    auto &selected_mode = modes.at(std::stoi(value));
+    uint8_t index = str_to_int(value);
+    if (modes.size() <= index) return;
+    auto &selected_mode = modes.at(index);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_preset_mode, 
@@ -2089,7 +2092,9 @@ void NSPanelLovelace::process_button_press_(
     if (modes_str.empty()) return;
     std::vector<std::string> modes;
     split_str(',', modes_str, modes);
-    auto &selected_mode = modes.at(std::stoi(value));
+    uint8_t index = str_to_int(value);
+    if (modes.size() <= index) return;
+    auto &selected_mode = modes.at(index);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_swing_mode, 
@@ -2104,7 +2109,9 @@ void NSPanelLovelace::process_button_press_(
     if (modes_str.empty()) return;
     std::vector<std::string> modes;
     split_str(',', modes_str, modes);
-    auto &selected_mode = modes.at(std::stoi(value));
+    uint8_t index = str_to_int(value);
+    if (modes.size() <= index) return;
+    auto &selected_mode = modes.at(index);
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_fan_mode, 
@@ -2162,7 +2169,7 @@ void NSPanelLovelace::process_button_press_(
     if (options_str.empty()) return;
     std::vector<std::string> options;
     split_str(',', options_str, options);
-    uint8_t index = stoi(value);
+    uint8_t index = str_to_int(value);
     if (options.size() <= index) return;
     this->call_ha_service_(
       entity_type,
@@ -2180,7 +2187,7 @@ void NSPanelLovelace::process_button_press_(
     if (effects_str.empty()) return;
     std::vector<std::string> effects;
     split_str(',', effects_str, effects);
-    uint8_t index = stoi(value);
+    uint8_t index = str_to_int(value);
     if (effects.size() <= index) return;
     this->call_ha_service_(
       entity_type,

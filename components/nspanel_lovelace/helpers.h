@@ -65,12 +65,12 @@ inline const char* value_or_empty(const char* s) {
 
 inline unsigned long value_or_default(const std::string &str, unsigned long default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stoul(str);
+    ? default_value : strtoul(str.c_str(), nullptr, 10);
 }
 
 inline int value_or_default(const std::string &str, int default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stoi(str);
+    ? default_value : static_cast<int>(strtol(str.c_str(), nullptr, 10));
 }
 
 inline unsigned int value_or_default(const std::string &str, unsigned int default_value) {
@@ -79,7 +79,7 @@ inline unsigned int value_or_default(const std::string &str, unsigned int defaul
 
 inline double value_or_default(const std::string &str, double default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stod(str);
+    ? default_value : strtod(str.c_str(), nullptr);
 }
 
 inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
@@ -191,16 +191,16 @@ inline static constexpr bool str_equal(const char *a, const char *b) {
 
 inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {
   size_t pos_start = 0, pos_end = 0;
-  std::string item;
   uint16_t item_count = 0;
   while ((pos_end = str.find(delimiter, pos_start)) != std::string::npos) {
     if (item_count == max_items) return;
-    item = str.substr(pos_start, pos_end - pos_start);
+    if (pos_end > pos_start)
+      array.emplace_back(str, pos_start, pos_end - pos_start);
     pos_start = pos_end + 1;
-    if (!item.empty()) { array.push_back(item); }
     item_count++;
   }
-  if (!item.empty()) { array.push_back(str.substr(pos_start)); }
+  if (pos_start < str.size())
+    array.emplace_back(str, pos_start);
 }
 
 inline size_t find_nth_of(char delimiter, uint16_t count, const std::string &str) {
@@ -231,7 +231,7 @@ inline std::string convert_python_arr_str(const std::string &str, const char del
       pos_start = str.find(quote, pos_end + 1);
     }
     if (pos_start == std::string::npos) {
-      if (tmp.back() == delimiter) tmp.pop_back();
+      if (!tmp.empty() && tmp.back() == delimiter) tmp.pop_back();
       break;
     }
     pos_end = str.find(quote, (pos_end > pos_start ? pos_end : pos_start) + 1);
@@ -290,6 +290,20 @@ inline bool psram_available() {
 inline size_t psram_used() {
   return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - 
       heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+}
+
+// Non-throwing alternatives to std::stoi/stof/stod. C++ exceptions are disabled
+// on ESP-IDF so the std:: versions abort on empty or non-numeric input.
+inline int str_to_int(const std::string &s, int base = 10) {
+  return static_cast<int>(strtol(s.c_str(), nullptr, base));
+}
+
+inline float str_to_float(const std::string &s) {
+  return strtof(s.c_str(), nullptr);
+}
+
+inline double str_to_double(const std::string &s) {
+  return strtod(s.c_str(), nullptr);
 }
 
 } // namespace nspanel_lovelace

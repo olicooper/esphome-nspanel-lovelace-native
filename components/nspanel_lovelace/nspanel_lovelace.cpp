@@ -1467,22 +1467,6 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
 #endif
 }
 
-// #ifdef USE_ARDUINO
-// void NSPanelLovelace::set_reparse_mode_(bool active) {
-//   // if (this->reparse_mode_ == active) return;
-
-//   if (active) {
-//     this->send_nextion_command_("recmod=1");
-//   } else {
-//     this->send_nextion_command_("DRAKJHSUYDGBNCJHGJKSHBDN");
-//     this->send_nextion_command_("recmod=0");
-//     this->send_nextion_command_("recmod=0");
-//     this->send_nextion_command_("connect");
-//   }
-
-//   this->reparse_mode_ = active;
-// }
-// #endif // USE_ARDUINO
 #endif // USE_NSPANEL_TFT_UPLOAD
 
 void NSPanelLovelace::init_display_(int baud_rate) {
@@ -2281,7 +2265,8 @@ void NSPanelLovelace::call_ha_service_(
   api::HomeassistantServiceResponse resp;
 #endif
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
-  resp.service = esphome::StringRef(service);
+  // decltype: ESPHome 2026.11 made these fields ProgmemStringRef, constructed explicitly from a StringRef
+  resp.service = decltype(resp.service)(esphome::StringRef(service));
 #elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
   resp.set_service(esphome::StringRef(service));
 #else
@@ -2302,7 +2287,7 @@ void NSPanelLovelace::call_ha_service_(
   for (auto &it : data) {
     api::HomeassistantServiceMap kv;
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
-    kv.key = esphome::StringRef(it.first);
+    kv.key = decltype(kv.key)(esphome::StringRef(it.first));
 #elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
     kv.set_key(esphome::StringRef(it.first));
 #else
@@ -2310,7 +2295,7 @@ void NSPanelLovelace::call_ha_service_(
 #endif
 
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
-    kv.value = esphome::StringRef(it.second);
+    kv.value = decltype(kv.value)(esphome::StringRef(it.second));
 #else
     kv.value = it.second;
 #endif
@@ -2323,7 +2308,7 @@ void NSPanelLovelace::call_ha_service_(
   for (auto &it : data_template) {
     api::HomeassistantServiceMap kv;
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
-    kv.key = esphome::StringRef(it.first);
+    kv.key = decltype(kv.key)(esphome::StringRef(it.first));
 #elif ESPHOME_VERSION_CODE >= VERSION_CODE(2025,8,0)
     kv.set_key(esphome::StringRef(it.first));
 #else
@@ -2331,7 +2316,7 @@ void NSPanelLovelace::call_ha_service_(
 #endif
 
 #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
-    kv.value = esphome::StringRef(it.second);
+    kv.value = decltype(kv.value)(esphome::StringRef(it.second));
 #else
     kv.value = it.second;
 #endif

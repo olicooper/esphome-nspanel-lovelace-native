@@ -10,9 +10,13 @@ A special thanks goes to these great projects for making this possible:
 - [ESPHome NSPanel Lovelace UI](https://github.com/sairon/esphome-nspanel-lovelace-ui)
 - [ESPHome](https://github.com/esphome/esphome)
 
-# Installation
+## Fork and ESPHome version policy
 
-This library only works with the latest minor versions of ESPHome, older versions are not officially supported but may still work.
+This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native). It aims to stay ahead of ESPHome's monthly releases (for example, 2026.11.0, 2026.12.0, and 2027.1.0), targeting compatibility one or two releases ahead when possible. Future-release compatibility is an aim, not a guarantee.
+
+Backward compatibility with older ESPHome releases is not maintained. The minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
+
+# Installation
 
 The installation of ESPHome on the ESP32 follows the standard ESPHome build method e.g. `esphome run --device COM6 basic-example.yaml`. It is possible to do OTA updates with the ESPHome CLI after the initial upload.
 
@@ -26,7 +30,7 @@ A basic configuration can be found in the [basic example](basic-example.yaml), b
 
 ## PSRAM
 
-The NSPanel has on-board PSRAM which this project makes use of automatically, which means that the `psram` component is unavailable because the PSRAM is configured during code generation by adding specific `sdkconfig_options`. Additionally, when using Arduino (which is deprecated) the PSRAM cannot be used as it is not possible to customise the PSRAM pins for the Arduino framework build.
+The NSPanel has on-board PSRAM which this project makes use of automatically, which means that the `psram` component is unavailable because the PSRAM is configured during code generation by adding specific `sdkconfig_options`. The ESP-IDF framework is required; Arduino is not supported as it is not possible to customise the PSRAM pins for the Arduino framework build.
 
 ### Icons
 

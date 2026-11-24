@@ -29,7 +29,7 @@ jobs:
       max-parallel: 2
       matrix:
         version: [stable]
-        variant: [advanced]
+        variant: [basic, advanced]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}
     steps:

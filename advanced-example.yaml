@@ -16,7 +16,7 @@ esp32:
   framework:
     # ESP-IDF is requried so we can access the NSPanel PSRAM
     # which is on non-standard pins. ESP-IDF also uses less flash than Arduino!
-    # note: Arduino support is deprecated and will be dropped in the future
+    # note: Arduino is not supported
     type: esp-idf
 
 external_components:

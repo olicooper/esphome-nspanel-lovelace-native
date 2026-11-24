@@ -100,6 +100,103 @@ def test_card_entity_limits_baseline() -> None:
     assert nsl.get_card_entities_length_limits("cardMedia") == [0, 8]
 
 
+def _point_icons_at(nsl, tmp_path: Path, file_name: str = "icons.json"):
+    """Point the component's icon catalog lookup at a temp file. Returns the
+    file path; restores the module state on test end via _restore_icons."""
+    import os
+    nsl._orig_file = nsl.__file__
+    nsl.__file__ = str(tmp_path / "nspanel_lovelace" / "__init__.py")
+    target = tmp_path / "nspanel_lovelace" / file_name
+    return target
+
+
+def _restore_icons(nsl):
+    nsl.__file__ = nsl._orig_file
+    del nsl._orig_file
+    nsl.iconJson = None
+
+
+def test_load_icons_missing_catalog(tmp_path: Path) -> None:
+    nsl = load_component()
+    target = _point_icons_at(nsl, tmp_path)
+    try:
+        with pytest.raises(nsl.cv.Invalid) as exc_info:
+            nsl.load_icons()
+        assert str(target) in str(exc_info.value)
+    finally:
+        _restore_icons(nsl)
+
+
+def test_load_icons_bad_json(tmp_path: Path) -> None:
+    nsl = load_component()
+    target = _point_icons_at(nsl, tmp_path)
+    target.parent.mkdir(parents=True)
+    target.write_text("{not json", encoding="utf-8")
+    try:
+        with pytest.raises(nsl.cv.Invalid) as exc_info:
+            nsl.load_icons()
+        assert str(target) in str(exc_info.value)
+        # The loader must not write anything to the catalog path
+        assert target.read_text(encoding="utf-8") == "{not json"
+    finally:
+        _restore_icons(nsl)
+
+
+def test_load_icons_empty_catalog(tmp_path: Path) -> None:
+    nsl = load_component()
+    target = _point_icons_at(nsl, tmp_path)
+    target.parent.mkdir(parents=True)
+    target.write_text("[]", encoding="utf-8")
+    try:
+        with pytest.raises(nsl.cv.Invalid) as exc_info:
+            nsl.load_icons()
+        assert str(target) in str(exc_info.value)
+    finally:
+        _restore_icons(nsl)
+
+
+def test_load_icons_invalid_later_entry(tmp_path: Path) -> None:
+    nsl = load_component()
+    target = _point_icons_at(nsl, tmp_path)
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '[{"name": "ok-icon", "hex": "E001"}, {"name": "bad-icon", "hex": "xy12"}]',
+        encoding="utf-8",
+    )
+    try:
+        with pytest.raises(nsl.cv.Invalid) as exc_info:
+            nsl.load_icons()
+        assert "bad-icon" in str(exc_info.value)
+        assert str(target) in str(exc_info.value)
+    finally:
+        _restore_icons(nsl)
+
+
+def test_load_icons_valid_two_entries(tmp_path: Path) -> None:
+    nsl = load_component()
+    target = _point_icons_at(nsl, tmp_path)
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        '[{"name": "ok-icon", "hex": "E001"}, {"name": "other-icon", "hex": "E002"}]',
+        encoding="utf-8",
+    )
+    try:
+        nsl.load_icons()
+        assert nsl.get_icon_hex("ok-icon") == "E001"
+        assert nsl.get_icon_hex("hex:E002") == "E002"
+    finally:
+        _restore_icons(nsl)
+
+
+def test_get_icon_hex_real_catalog() -> None:
+    nsl = load_component()
+    nsl.iconJson = None
+    nsl.load_icons()  # loads the bundled catalog
+    assert nsl.get_icon_hex("hiking") == "ED7E"
+    assert nsl.get_icon_hex("hex:ED7E") == "ED7E"
+    assert nsl.get_icon_hex("no-such-icon-xyz") is None
+
+
 def test_entity_id_exact_domain_matching() -> None:
     """Entity domains must match exactly, not by prefix."""
     nsl = load_component()

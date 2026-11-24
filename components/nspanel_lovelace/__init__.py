@@ -167,7 +167,11 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 CONF_CARD_MEDIA_ENTITY_ID = "media_entity_id"
 
+ICON_HEX_RE = re.compile(r"^[0-9A-Fa-f]{4}$")
+
 def load_icons():
+    """Load the bundled icons.json catalog. The catalog must be a nonempty list
+    of objects with a nonempty string 'name' and a 4-character hex 'hex'."""
     global iconJson
     current_directory = os.path.dirname(__file__)
     iconJsonPath = os.path.join(current_directory, 'icons.json')
@@ -175,18 +179,17 @@ def load_icons():
     try:
         with open(iconJsonPath, encoding="utf-8") as read_file:
             iconJson = json.load(read_file)
-    except (UnicodeDecodeError, OSError):
-        import requests
-        response = requests.get("https://raw.githubusercontent.com/olicooper/esphome-nspanel-lovelace-native/dev/components/nspanel_lovelace/icons.json")
-        if response.ok:
-            with open(iconJsonPath, mode="w", encoding="utf-8") as new_file:
-                new_file.write(response.text)
-            iconJson = json.loads(response.text)
-        else:
-            raise cv.invalid("Failed to load icons, do you have internet connection?")
-
-    if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
-        raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise cv.Invalid(f"Failed to load icons catalog from '{iconJsonPath}': {err}")
+    if not isinstance(iconJson, list) or len(iconJson) == 0:
+        raise cv.Invalid(f"Icons catalog is empty: '{iconJsonPath}'")
+    for entry in iconJson:
+        if (not isinstance(entry, dict)
+                or not isinstance(entry.get("name"), str) or not entry["name"]
+                or not isinstance(entry.get("hex"), str) or not ICON_HEX_RE.match(entry["hex"])):
+            raise cv.Invalid(
+                f"Icons catalog entry is invalid (need nonempty string 'name' and a "
+                f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
 
 def load_translations(lang: str):

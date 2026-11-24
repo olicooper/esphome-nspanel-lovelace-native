@@ -21,6 +21,11 @@ from esphome.const import (
 CODEOWNERS = ["@olicooper"]
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
 CONFLICTS_WITH = ["psram"]
+# Maximum sleep timeout in seconds. The HMI firmware protocol caps the
+# screensaver timeout at 65s, so values 66..120 (previously accepted for
+# per-card timeouts) are deliberately rejected.
+# https://github.com/joBr99/nspanel-lovelace-ui/blob/22e96f2b3ad0cd3382008eac9b4d6a27982404b8/HMI/README.md?plain=1#L91
+MAX_SLEEP_TIMEOUT = 65
 
 def AUTO_LOAD():
     val = ["text_sensor", "json"]
@@ -373,9 +378,8 @@ SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
     cv.Optional(CONF_CARD_TITLE): cv.string,
     cv.Optional(CONF_CARD_HIDDEN, default=False): cv.boolean,
-    # Timeout range from 0s to 65s. 0s means disable screensaver.
-    # note: Max is limited by HMI firmware: https://github.com/joBr99/nspanel-lovelace-ui/blob/22e96f2b3ad0cd3382008eac9b4d6a27982404b8/HMI/README.md?plain=1#L91
-    cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, 120)
+    # Timeout range 0..MAX_SLEEP_TIMEOUT seconds (0 disables the screensaver)
+    cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, MAX_SLEEP_TIMEOUT)
 })
 
 def add_entity_id(id: str):
@@ -474,8 +478,8 @@ def validate_config(config):
 CONFIG_SCHEMA = cv.All(
     cv.Schema({
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
-        # Timeout range from 0s to 65s. 0s means disable screensaver.
-        cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, 65),
+        # Timeout range 0..MAX_SLEEP_TIMEOUT seconds (0 disables the screensaver)
+        cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, MAX_SLEEP_TIMEOUT),
         cv.Optional(CONF_EXP_VERT_UI, default=False): cv.boolean,
         cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
         cv.Optional(CONF_DEFAULT_CARD): cv.string_strict,

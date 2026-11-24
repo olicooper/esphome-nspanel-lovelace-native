@@ -37,6 +37,10 @@ The NSPanel has on-board PSRAM which this project makes use of automatically, wh
 - Icon values can be an icon name or hex value (e.g. `hex:E549`). A list of icons can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
 - Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value and convert it to a number (e.g. `#ce79` -> `52857`).
 
+### Sleep timeouts
+
+The `sleep_timeout` values (top-level and per-card) are limited to `0`-`65` seconds because the HMI firmware protocol caps the screensaver timeout at 65s. Values `66`-`120` were previously accepted for per-card timeouts but are now rejected. `0` disables the screensaver for that timeout.
+
 
 # Help Needed!
 

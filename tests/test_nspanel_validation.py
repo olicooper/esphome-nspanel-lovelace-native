@@ -146,6 +146,48 @@ def test_entity_id_pseudo_entities_generic_tile() -> None:
         tile("delete.something")  # 'delete' is an exact sentinel
 
 
+def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
+    """Top-level sleep_timeout is 0..65 (HMI protocol maximum)."""
+    def body(timeout: int) -> str:
+        return f"""\
+  sleep_timeout: {timeout}
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    for timeout in (0, 65):
+        result = esphome_config(tmp_path, body(timeout), name=f"timeout-top-{timeout}")
+        assert result.returncode == 0, result.stdout + result.stderr
+    for timeout in (-1, 66, 120):
+        result = esphome_config(tmp_path, body(timeout), name=f"timeout-top-{timeout}")
+        assert result.returncode != 0, (
+            f"top-level sleep_timeout {timeout} should be rejected:\n{result.stdout}"
+        )
+
+
+def test_sleep_timeout_card_bounds(tmp_path: Path) -> None:
+    """Per-card sleep_timeout is also 0..65; 66..120 is deliberately rejected."""
+    def body(timeout: int) -> str:
+        return f"""\
+  screensaver: {{}}
+  cards:
+    - type: cardGrid
+      sleep_timeout: {timeout}
+      entities:
+        - entity_id: light.lamp
+"""
+    for timeout in (0, 65):
+        result = esphome_config(tmp_path, body(timeout), name=f"timeout-card-{timeout}")
+        assert result.returncode == 0, result.stdout + result.stderr
+    for timeout in (-1, 66, 120):
+        result = esphome_config(tmp_path, body(timeout), name=f"timeout-card-{timeout}")
+        assert result.returncode != 0, (
+            f"card sleep_timeout {timeout} should be rejected:\n{result.stdout}"
+        )
+
+
 def test_dangling_navigation_reports_tile_path(tmp_path: Path) -> None:
     """A navigation reference to a missing card id must fail validation with the
     exact tile path (cards.<i>.entities.<j>.entity_id), not crash with IndexError."""

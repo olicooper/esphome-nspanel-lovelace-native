@@ -412,10 +412,23 @@ def validate_config(config):
     model = config[CONF_MODEL]
     if CONF_LANGUAGE not in config[CONF_LOCALE]:
         raise cv.Invalid("A language must be specified in locale")
-    # Build a list of custom card ids
+    # Build a list of custom card ids, rejecting duplicates
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         if CONF_ID in card_config:
-            card_ids[card_config[CONF_ID]] = i
+            card_id = card_config[CONF_ID]
+            if card_id in card_ids:
+                raise cv.Invalid(
+                    f"duplicate id '{card_id}': card ids must be unique",
+                    [CONF_CARDS, i, CONF_ID])
+            card_ids[card_id] = i
+
+    # The screensaver page id shares the page uuid space with card ids
+    if CONF_SCREENSAVER in config and CONF_ID in config[CONF_SCREENSAVER]:
+        screensaver_id = config[CONF_SCREENSAVER][CONF_ID]
+        if screensaver_id in card_ids:
+            raise cv.Invalid(
+                f"duplicate id '{screensaver_id}': screensaver and card ids must be unique",
+                [CONF_SCREENSAVER, CONF_ID])
 
     if CONF_DEFAULT_CARD in config and card_ids.get(config[CONF_DEFAULT_CARD]) is None:
         raise cv.Invalid(f"Cannot find a card with the id '{config[CONF_DEFAULT_CARD]}'", [CONF_DEFAULT_CARD])

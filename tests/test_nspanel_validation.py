@@ -146,6 +146,66 @@ def test_entity_id_pseudo_entities_generic_tile() -> None:
         tile("delete.something")  # 'delete' is an exact sentinel
 
 
+def test_duplicate_card_ids_rejected(tmp_path: Path) -> None:
+    """A duplicate explicit card id must fail at the second id, not silently
+    overwrite the card_ids entry for the first."""
+    body = """\
+  cards:
+    - type: cardGrid
+      id: same
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+    - type: cardGrid
+      id: same
+      entities:
+        - entity_id: light.other
+"""
+    result = esphome_config(tmp_path, body, name="dup-cards")
+    assert result.returncode != 0, f"duplicate card ids should be rejected:\n{result.stdout}"
+    out = result.stdout + result.stderr
+    assert "duplicate id 'same'" in out, out
+    # The error must be attached to the SECOND occurrence of 'id: same'.
+    msg_pos = out.index("duplicate id 'same'")
+    first_id_pos = out.index("id: same")
+    assert msg_pos > first_id_pos, out
+
+
+def test_duplicate_screensaver_card_ids_rejected(tmp_path: Path) -> None:
+    body = """\
+  screensaver:
+    id: shared
+    weather:
+      entity_id: weather.demo
+  cards:
+    - type: cardGrid
+      id: shared
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="dup-screensaver")
+    assert result.returncode != 0, (
+        f"a screensaver and card sharing an id should be rejected:\n{result.stdout}"
+    )
+    assert "duplicate id 'shared'" in result.stdout + result.stderr
+
+
+def test_unknown_default_card_rejected(tmp_path: Path) -> None:
+    body = """\
+  default_card: missing
+  cards:
+    - type: cardGrid
+      id: present
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="default-card")
+    assert result.returncode != 0
+    out = result.stdout + result.stderr
+    assert "Cannot find a card with the id 'missing'" in out, out
+
+
 def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
     """Top-level sleep_timeout is 0..65 (HMI protocol maximum)."""
     def body(timeout: int) -> str:

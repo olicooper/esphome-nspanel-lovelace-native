@@ -59,10 +59,12 @@ NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
     automation.Trigger.template(cg.std_string)
 )
 
-ENTITY_ID_RE = re.compile(r"^(?:(delete)|([\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
-## The list of currently supported entities
+# Real HA entity id format: [domain].[name]. The pseudo-entities 'delete',
+# 'iText.[text]' and 'navigate.[card id]' are handled separately in valid_entity_id.
+ENTITY_ID_RE = re.compile(r"^[\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9]$")
+## The list of currently supported entity domains (exact match)
 ENTITY_TYPES = [
-    'sensor','binary_sensor','light','switch','scene','timer','weather','navigate',
+    'sensor','binary_sensor','light','switch','scene','timer','weather',
     'alarm_control_panel','input_boolean','button','input_button','cover','fan',
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
@@ -253,38 +255,53 @@ def valid_uuid(value):
         f'Value must be 30 characters or less in length and contain only numbers, letters and underscores e.g. "living_room_light_1"'
     )
 
-def valid_entity_id(entity_type_allowlist: list[str] = None):
-    """Validate that a given entity_id is correctly formatted and present in the entity type allowlist."""
+def valid_entity_id(entity_type_allowlist: list[str] | None = None, *,
+                    allow_navigation: bool = False,
+                    allow_text: bool = False,
+                    allow_delete: bool = False):
+    """Validate that a given entity_id is correctly formatted and present in the entity type
+    allowlist. The pseudo-entities 'navigate.[card id]', 'iText.[text]' and 'delete' are only
+    accepted where explicitly allowed (generic card tiles)."""
+    allowed = ENTITY_TYPES if entity_type_allowlist is None else entity_type_allowlist
+
     def validator(value):
         value = cv.string_strict(value)
         if not value:
-            return value
-        if re.match(ENTITY_ID_RE, value):
-            if value == 'delete' or value.startswith('iText.'):
+            raise cv.Invalid("entity_id must not be empty")
+        if value == 'delete':
+            if allow_delete:
                 return value
-            if [t for t in ENTITY_TYPES if value.startswith(t)]:
-                if entity_type_allowlist is None:
-                    return value
-                elif [w for w in entity_type_allowlist if value.startswith(w)]:
-                    return value
-                raise cv.Invalid(
-                    f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_allowlist}"
-                )
             raise cv.Invalid(
-                f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {ENTITY_TYPES}"
+                f'the special "delete" entity is not allowed here. Allowed types are: {allowed}'
             )
         if value.startswith('iText.'):
+            if not allow_text:
+                raise cv.Invalid(
+                    f'iText entities are not allowed here. Allowed types are: {allowed}'
+                )
+            if '~' in value:
+                raise cv.Invalid(
+                    f'entity_id "{value}" must match the format "iText.[text to display]" and '
+                    'not contain the character "~" (tilde)'
+                )
+            return value
+        if not ENTITY_ID_RE.match(value):
             raise cv.Invalid(
-                f'entity_id "{value}" must match the format "iText.[text to display]" and '+
-                'and not contain the character "~" (tilde)'
+                f'entity_id "{value}" must match the format "[entity type].[entity name]" and '
+                'contain only numbers (0-9), letters (A-Z) and underscores (_), '
+                'e.g. "light.living_room_light_1".'
             )
-        elif value.startswith('delete'):
+        domain = value.split('.', 1)[0]
+        if domain == 'navigate':
+            if allow_navigation:
+                return value
             raise cv.Invalid(
-                f'When using the special "delete" entity type, you cannot also specify a value'
+                f'the special "navigate" entity is not allowed here. Allowed types are: {allowed}'
             )
+        if domain in allowed:
+            return value
         raise cv.Invalid(
-            f'entity_id "{value}" must match the format "[entity type].[entity name]" and '+
-            'contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1".'
+            f"entity type '{domain}' is not allowed here. Allowed types are: {allowed}"
         )
     return validator
 
@@ -339,7 +356,7 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
     cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, default=False): cv.boolean,
     cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
-        cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(['weather']),
         cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
     }),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
@@ -347,7 +364,7 @@ SCHEMA_SCREENSAVER = cv.Schema({
 })
 
 SCHEMA_CARD_ENTITY = cv.Schema({
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(allow_navigation=True, allow_text=True, allow_delete=True),
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
     cv.Optional(CONF_ICON): SCHEMA_ICON,
 })
@@ -421,17 +438,20 @@ def validate_config(config):
         if len(entities) > length_limits[1]:
             raise cv.Invalid(f"There must be at most {length_limits[1]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
 
-        for entity_config in entities:
+        for j, entity_config in enumerate(entities):
             entity_id = entity_config.get(CONF_ENTITY_ID)
-            if entity_id.startswith('navigate'):
-                entity_arr = entity_id.split('.', 1)
-                # if len(entity_arr) != 2:
-                #     raise cv.Invalid(f'The entity_id "{entity_id}" format is invalid')
-                if card_ids.get(entity_arr[1]) is None:
-                    raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"', err_path)
+            domain, _, card_id = entity_id.partition('.')
+            if domain == 'navigate':
+                # card_id is empty if the value is a bare 'navigate'; that yields a clean
+                # dangling-reference error below instead of an IndexError.
+                if card_ids.get(card_id) is None:
+                    raise cv.Invalid(
+                        f'navigation entity_id invalid, no card has the id "{card_id}"',
+                        err_path + [j, CONF_ENTITY_ID],
+                    )
             # Add all valid HA entities to global entity list for later processing
-            # if not (entity_id.startswith('iText') or entity_id.startswith('delete')):
-            if not entity_id.startswith('delete'):
+            # (iText pseudo-entities are included; 'delete' is the exact sentinel)
+            if entity_id != 'delete':
                 add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
@@ -582,7 +602,7 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
         entity_class = cg.global_ns.class_(variable_name)
         entity_class.op = "->"
 
-        if entity_config.get(CONF_ENTITY_ID, "delete").startswith('delete'):
+        if entity_config.get(CONF_ENTITY_ID, "delete") == 'delete':
             cg.add(cg.RawExpression(
                 f"auto {variable_name} = "
                 f"{make_shared.template(DeleteItem).__call__(card_class)}"))

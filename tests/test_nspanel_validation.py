@@ -11,9 +11,12 @@ Run inside the approved ESPHome 2026.11.0 runner image.
 """
 
 import importlib
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPONENTS_DIR = REPO_ROOT / "components"
@@ -95,3 +98,72 @@ def test_card_entity_limits_baseline() -> None:
     assert nsl.get_card_entities_length_limits("cardGrid2") == [1, 8]
     assert nsl.get_card_entities_length_limits("cardQR") == [1, 2]
     assert nsl.get_card_entities_length_limits("cardMedia") == [0, 8]
+
+
+def test_entity_id_exact_domain_matching() -> None:
+    """Entity domains must match exactly, not by prefix."""
+    nsl = load_component()
+    unrestricted = nsl.valid_entity_id()
+    assert unrestricted("sensor.room") == "sensor.room"
+    assert unrestricted("binary_sensor.room") == "binary_sensor.room"
+    assert unrestricted("light.room") == "light.room"
+    with pytest.raises(nsl.cv.Invalid):
+        unrestricted("sensor_extra.room")  # prefix of 'sensor' is not 'sensor'
+    light_only = nsl.valid_entity_id(["light"])
+    assert light_only("light.kitchen") == "light.kitchen"
+    with pytest.raises(nsl.cv.Invalid):
+        light_only("lightning.room")  # prefix of 'light' is not 'light'
+    with pytest.raises(nsl.cv.Invalid):
+        light_only("sensor.room")
+
+
+def test_entity_id_pseudo_entities_restricted_fields() -> None:
+    """delete / iText / navigate / blank are only valid in generic tiles."""
+    nsl = load_component()
+    alarm = nsl.valid_entity_id(["alarm_control_panel"])
+    assert alarm("alarm_control_panel.home") == "alarm_control_panel.home"
+    for bad in ("delete", "iText.Label", "navigate.card_id", ""):
+        with pytest.raises(nsl.cv.Invalid):
+            alarm(bad)
+    weather = nsl.valid_entity_id(["weather"])
+    assert weather("weather.home") == "weather.home"
+    with pytest.raises(nsl.cv.Invalid):
+        weather("sensor.room")
+
+
+def test_entity_id_pseudo_entities_generic_tile() -> None:
+    nsl = load_component()
+    tile = nsl.valid_entity_id(allow_navigation=True, allow_text=True, allow_delete=True)
+    assert tile("iText.Label") == "iText.Label"
+    assert tile("delete") == "delete"
+    assert tile("navigate.card_id") == "navigate.card_id"
+    assert tile("light.kitchen") == "light.kitchen"
+    with pytest.raises(nsl.cv.Invalid):
+        tile("iText.Bad~Label")  # tilde exclusion stays intact
+    with pytest.raises(nsl.cv.Invalid):
+        tile("iTextXabc")  # 'iText.' requires the literal dot
+    with pytest.raises(nsl.cv.Invalid):
+        tile("delete.something")  # 'delete' is an exact sentinel
+
+
+def test_dangling_navigation_reports_tile_path(tmp_path: Path) -> None:
+    """A navigation reference to a missing card id must fail validation with the
+    exact tile path (cards.<i>.entities.<j>.entity_id), not crash with IndexError."""
+    body = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: navigate.nonexistent
+"""
+    result = esphome_config(tmp_path, body, name="dangling-nav")
+    assert result.returncode != 0, f"config should be invalid: {result.stdout}"
+    out = result.stdout + result.stderr
+    assert 'no card has the id "nonexistent"' in out, out
+    # ESPHome renders the error under the config tree node named by the
+    # cv.Invalid path: with the exact tile path the message must sit directly
+    # above the offending 'entity_id' line, inside the same tile entry.
+    assert re.search(
+        r"navigation entity_id invalid[^\n]*\n\s*entity_id: navigate\.nonexistent", out
+    ), out

@@ -1,0 +1,87 @@
+# Synthetic codegen fixture for regression tests (tests/test_nspanel_codegen.py).
+# All entities are fictional and no secrets are used. Do not flash this config.
+
+esphome:
+  name: nspanel-codegen
+  comment: "CI codegen fixture"
+  build_path: ./build/ci-codegen
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [nspanel_lovelace]
+
+nspanel_lovelace:
+  id: nspanel
+  sleep_timeout: 10
+  locale:
+    language: en
+  screensaver:
+    time_id: homeassistant_time
+    weather:
+      entity_id: weather.demo_codegen
+      forecast_method: service
+    status_icon_left:
+      entity_id: light.demo_left
+      icon:
+        value: hiking
+        color: 0
+    status_icon_right:
+      entity_id: binary_sensor.demo_right
+      icon: alert-circle-outline
+  cards:
+    - type: cardGrid
+      id: main_card
+      title: Main
+      sleep_timeout: 65
+      entities:
+        - entity_id: light.kitchen
+          icon: hiking
+        - entity_id: navigate.hidden_card
+        - entity_id: delete
+        - entity_id: iText.Hello
+
+    - type: cardGrid
+      id: hidden_card
+      hidden: true
+      entities:
+        - entity_id: sensor.demo_hidden
+
+    - type: cardGrid
+      id: last_card
+      title: Last
+      entities:
+        - entity_id: light.kitchen
+          name: 'Kitchen "Main" \ west'
+          icon: hiking
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'CODEGEN_SSID'
+  password: 'CODEGEN_PASSWORD'
+
+api:
+  services:
+    - service: upload_tft
+      variables:
+        url: string
+      then:
+        - lambda: 'id(nspanel).upload_tft(url);'
+
+uart:
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: Europe/London

@@ -849,17 +849,11 @@ async def to_code(config):
     visible_card_count = len(visible_card_uuids)
     visible_index = 0
 
-    prev_card_uuid = next_card_uuid = None
     navleft_icon_value = get_icon(get_icon_hex("arrow-left-bold"))
     navhome_icon_value = get_icon(get_icon_hex("home"))
     navright_icon_value = get_icon(get_icon_hex("arrow-right-bold"))
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         cg.add(cg.RawStatement("{"))
-        prev_card_uuid = visible_card_uuids[visible_index - 1]
-        if visible_index == (visible_card_count - 1):
-            next_card_uuid = visible_card_uuids[0]
-        elif (visible_index < (visible_card_count - 1)):
-            next_card_uuid = visible_card_uuids[visible_index + 1]
 
         page_info = PAGE_MAP[card_config[CONF_CARD_TYPE]]
         # card_class = None
@@ -921,6 +915,10 @@ async def to_code(config):
                     f"{unique_ptr.template(NavigationItem)}({navleft_statement})"))
                 cg.add(card_class.set_nav_left(cg.global_ns.class_(navleft_variable)))
         else:
+            # This card is in visible_card_uuids, so the list is non-empty and
+            # the modulo lookups are safe (a single visible card self-links).
+            prev_card_uuid = visible_card_uuids[(visible_index - 1) % visible_card_count]
+            next_card_uuid = visible_card_uuids[(visible_index + 1) % visible_card_count]
             visible_index += 1
             navleft_variable = card_variable + "_navleft"
             navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{get_new_uuid()}\", \"{prev_card_uuid}\", {navleft_icon_value})')

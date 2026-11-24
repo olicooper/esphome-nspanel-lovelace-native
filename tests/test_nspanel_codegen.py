@@ -27,6 +27,82 @@ def run_esphome(*args: str) -> subprocess.CompletedProcess:
     )
 
 
+# Minimal synthetic config for temporary codegen scenarios (constructed in
+# tmp_path, not duplicated production YAML). No real entities, no secrets.
+SYNTHETIC_CONFIG = """\
+esphome:
+  name: {name}
+  comment: "synthetic codegen fixture"
+  build_path: ./build/{name}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: {components}
+    components: [nspanel_lovelace]
+
+nspanel_lovelace:
+{nspanel_body}
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'CODEGEN_SSID'
+  password: 'CODEGEN_PASSWORD'
+
+api: {{}}
+
+uart:
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: codegen_time
+    timezone: Europe/London
+"""
+
+
+def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str) -> str:
+    """Write a synthetic config to tmp_path, run codegen only, and return the
+    generated main.cpp source. Uuids are allocated numerically in codegen
+    order, so a screensaver without an explicit id gets uuid "1"."""
+    cfg = tmp_path / f"{name}.yaml"
+    cfg.write_text(SYNTHETIC_CONFIG.format(
+        name=name,
+        components=str(REPO_ROOT / "components"),
+        nspanel_body=nspanel_body,
+    ))
+    result = subprocess.run(
+        ["esphome", "compile", "--only-generate", str(cfg)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    assert result.returncode == 0, (
+        f"esphome compile --only-generate {name}.yaml failed:\n"
+        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}"
+    )
+    main = cfg.parent / ".esphome" / "build" / name / "src" / "main.cpp"
+    assert main.is_file(), f"missing generated {main}"
+    return main.read_text()
+
+
+def assert_no_none_tokens(src: str) -> None:
+    """No Python None token may leak into generated C++ (string literals are
+    legitimate, e.g. the translation value "None", so they are stripped)."""
+    stripped = re.sub(r'"(?:\\.|[^"\\])*"', '""', src)
+    assert re.search(r"\bNone\b", stripped) is None
+
+
 def test_codegen_baseline() -> None:
     result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
     assert result.returncode == 0, (
@@ -80,7 +156,80 @@ def test_codegen_baseline() -> None:
     assert 'set_weather_entity_id("weather.demo_codegen")' in src
     assert "#define USE_NSPANEL_WEATHER_SERVICE" in defines
 
-    # No Python None token may leak into generated C++ (string literals are
-    # legitimate, e.g. the translation value "None", so they are stripped).
-    stripped = re.sub(r'"(?:\\.|[^"\\])*"', '""', src)
-    assert re.search(r"\bNone\b", stripped) is None
+    assert_no_none_tokens(src)
+
+
+def test_codegen_all_hidden_cards(tmp_path: Path) -> None:
+    """Screensaver plus all-hidden cards: codegen must not touch the (empty)
+    visible list; hidden cards are still created and link home to the
+    screensaver."""
+    body = """\
+  screensaver: {}
+  cards:
+    - type: cardGrid
+      hidden: true
+      entities:
+        - entity_id: light.lamp_a
+    - type: cardGrid
+      hidden: true
+      entities:
+        - entity_id: light.lamp_b
+"""
+    src = generate_synthetic(tmp_path, body, "all-hidden")
+    assert src.count("set_hidden(true)") == 2
+    # Both hidden cards link home to the screensaver (uuid "1"); no right nav.
+    assert len(re.findall(r'NavigationItem\("[0-9]+", "1", ', src)) == 2
+    assert "set_nav_right" not in src
+    assert_no_none_tokens(src)
+
+
+def test_codegen_trailing_hidden_card(tmp_path: Path) -> None:
+    """Two visible cards followed by a trailing hidden card: the visible ring
+    wraps between the two visible cards and the hidden card links home."""
+    body = """\
+  screensaver: {}
+  cards:
+    - type: cardGrid
+      id: v1
+      entities:
+        - entity_id: light.lamp_a
+    - type: cardGrid
+      id: v2
+      entities:
+        - entity_id: light.lamp_b
+    - type: cardGrid
+      id: h1
+      hidden: true
+      entities:
+        - entity_id: light.lamp_c
+"""
+    src = generate_synthetic(tmp_path, body, "trailing-hidden")
+    # Page uuids: screensaver="1" (auto-allocated first), cards use their
+    # explicit ids: v1, v2, h1.
+    assert src.count("set_hidden(true)") == 1
+    # Two visible cards wrap around: v1.prev=v2, v1.next=v2, v2.prev=v1, v2.next=v1
+    assert len(re.findall(r'NavigationItem\("[0-9]+", "v2", ', src)) == 2
+    assert len(re.findall(r'NavigationItem\("[0-9]+", "v1", ', src)) == 2
+    # The trailing hidden card links home to the screensaver
+    assert len(re.findall(r'NavigationItem\("[0-9]+", "1", ', src)) == 1
+    assert src.count("set_nav_right") == 2
+    assert_no_none_tokens(src)
+
+
+def test_codegen_single_visible_card(tmp_path: Path) -> None:
+    """A single visible card keeps its existing self-links (prev=next=self)."""
+    body = """\
+  screensaver: {}
+  cards:
+    - type: cardGrid
+      id: only
+      entities:
+        - entity_id: light.lamp_a
+"""
+    src = generate_synthetic(tmp_path, body, "single-visible")
+    # Page uuids: screensaver="1" (auto-allocated first), card uses its
+    # explicit id "only"; both nav items point at the card itself.
+    assert len(re.findall(r'NavigationItem\("[0-9]+", "only", ', src)) == 2
+    assert src.count("set_nav_right") == 1
+    assert "set_hidden" not in src
+    assert_no_none_tokens(src)

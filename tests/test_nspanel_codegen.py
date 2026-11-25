@@ -68,7 +68,7 @@ uart:
 time:
   - platform: homeassistant
     id: codegen_time
-    timezone: Europe/London
+    timezone: America/New_York
 """
 
 

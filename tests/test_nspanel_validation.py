@@ -77,7 +77,7 @@ uart:
 time:
   - platform: homeassistant
     id: validation_time
-    timezone: Europe/London
+    timezone: America/New_York
 """
 
 

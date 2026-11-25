@@ -159,7 +159,8 @@ inline std::vector<uint8_t> xy_to_rgb(double x, double y, float wh) {
 
   r = sqrt((x * x) + (y * y));
   return hsv2rgb(
-      std::fmod((atan2(y, x) * (180 / M_PI)), 360) / 360,
+      // +360 keeps the hue positive like python's % (atan2 is negative below the x axis)
+      std::fmod((atan2(y, x) * (180 / M_PI)) + 360, 360) / 360,
       (r > 1 ? 0 : r),
       1);
 }

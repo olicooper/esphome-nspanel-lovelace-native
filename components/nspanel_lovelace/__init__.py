@@ -19,7 +19,7 @@ from esphome.const import (
     CONF_PLATFORMIO_OPTIONS
 )
 
-CODEOWNERS = ["@olicooper"]
+CODEOWNERS = ["@PhiKapJames"]
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
 CONFLICTS_WITH = ["psram"]
 # Maximum sleep timeout in seconds. The HMI firmware protocol caps the

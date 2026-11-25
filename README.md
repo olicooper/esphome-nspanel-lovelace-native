@@ -51,7 +51,7 @@ The `sleep_timeout` values (top-level and per-card) are limited to `0`-`65` seco
 As much as I love embedded programming, I am unable to dedicate the time required to make this project great without the help of others.
 This is a **beta project** which is not fully functional yet and is subject to change without notice. It has taken a lot of time and effort to get the project to this point and it will take a lot more time to get the project past beta.
 
-There are many UI components missing and the [python build script](components/nspanel_lovelace/__init__.py) is in dire need of refactoring (I butchered it together to get it working but PRs to the ESPHome repo are required to provide more flexibility over code generation).
+There are many UI components missing. The [python build script](components/nspanel_lovelace/__init__.py) has since been hardened — stricter config validation, correct codegen and build-flag handling, with unit tests run against a pinned ESPHome floor (2026.11.0) — but it is still a single ~1000-line module: a full structural refactor (splitting validation, codegen and resource handling) is still planned, and PRs to the ESPHome repo are still required for deeper code-generation flexibility.
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display

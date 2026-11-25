@@ -9,8 +9,7 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
-      - "*example.yaml"
-      - "secrets-example.yaml"
+      - "examples/**"
       - "ci/**"
       - "tests/**"
 
@@ -20,12 +19,18 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
-      - "*example.yaml"
-      - "secrets-example.yaml"
+      - "examples/**"
       - "ci/**"
       - "tests/**"
 
 jobs:
+  helpers:
+    name: Host helper tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - run: tests/host/run.sh
+
   build:
     name: Build (${{ matrix.variant }}, ESPHome ${{ matrix.version }})
     runs-on: ubuntu-latest
@@ -49,7 +54,7 @@ jobs:
       run: esphome version
     - name: Copy test secrets
       run: |
-        cp secrets-example.yaml secrets.yaml
+        cp examples/secrets-example.yaml examples/secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
 
   # Single floor-pinned host-test job: the pytest suite runs once (it does not
@@ -71,14 +76,15 @@ jobs:
   required:
     name: CI required
     if: ${{ always() }}
-    needs: [build, unittest]
+    needs: [build, unittest, helpers]
     runs-on: ubuntu-latest
     steps:
     - name: Require all blocking jobs
       env:
         BUILD_RESULT: ${{ needs.build.result }}
         TEST_RESULT: ${{ needs.unittest.result }}
-      run: test "$BUILD_RESULT" = success && test "$TEST_RESULT" = success
+        HELPERS_RESULT: ${{ needs.helpers.result }}
+      run: test "$BUILD_RESULT" = success && test "$TEST_RESULT" = success && test "$HELPERS_RESULT" = success
 
   # Advisory preview: manual-only, never runs on push/PR, and a pass does
   # NOT make beta a supported version (the floor remains 2026.11.0).

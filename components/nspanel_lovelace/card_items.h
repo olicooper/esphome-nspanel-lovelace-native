@@ -61,7 +61,7 @@ protected:
   static void state_vacuum_fn(StatefulPageItem *me);
   static void state_translate_fn(StatefulPageItem *me);
 
-  void set_on_state_callback_(const char *type) override;
+  void set_on_state_callback_() override;
 
   // output: type~internalName~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;

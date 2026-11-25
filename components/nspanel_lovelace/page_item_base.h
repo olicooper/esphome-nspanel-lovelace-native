@@ -197,8 +197,11 @@ public:
   const std::string &get_entity_id() const { return this->entity_->get_entity_id(); }
   bool is_state(const std::string &state) const { return this->entity_->is_state(state); }
   const std::string &get_state() const { return this->entity_->get_state(); }
-  const std::string &get_attribute(
-      ha_attr_type attr, const std::string &default_value = "") const {
+  const std::string &get_attribute(ha_attr_type attr) const {
+    return this->entity_->get_attribute(attr);
+  }
+  std::string get_attribute(
+      ha_attr_type attr, const std::string &default_value) const {
     return this->entity_->get_attribute(attr, default_value);
   }
   Entity* get_entity() const { return this->entity_.get(); }
@@ -209,7 +212,7 @@ protected:
   std::function<void(StatefulPageItem *)> on_state_callback_;
   const char *render_type_;
 
-  virtual void set_on_state_callback_(const char *type);
+  virtual void set_on_state_callback_();
 
   static void state_on_off_fn(StatefulPageItem *me);
   static void state_binary_sensor_fn(StatefulPageItem *me);

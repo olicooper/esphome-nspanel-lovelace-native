@@ -4,7 +4,11 @@
 
 #include <array>
 #include <cassert>
+#include <cerrno>
 #include <cmath>
+#include <climits>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctype.h>
 #include <esp_heap_caps.h>
@@ -65,12 +69,12 @@ inline const char* value_or_empty(const char* s) {
 
 inline unsigned long value_or_default(const std::string &str, unsigned long default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stoul(str);
+    ? default_value : strtoul(str.c_str(), nullptr, 10);
 }
 
 inline int value_or_default(const std::string &str, int default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stoi(str);
+    ? default_value : static_cast<int>(strtol(str.c_str(), nullptr, 10));
 }
 
 inline unsigned int value_or_default(const std::string &str, unsigned int default_value) {
@@ -79,7 +83,7 @@ inline unsigned int value_or_default(const std::string &str, unsigned int defaul
 
 inline double value_or_default(const std::string &str, double default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
-    ? default_value : std::stod(str);
+    ? default_value : strtod(str.c_str(), nullptr);
 }
 
 inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
@@ -159,7 +163,7 @@ inline std::vector<uint8_t> xy_to_rgb(double x, double y, float wh) {
 
   r = sqrt((x * x) + (y * y));
   return hsv2rgb(
-      std::fmod((atan2(y, x) * (180 / M_PI)), 360) / 360,
+      std::fmod((atan2(y, x) * (180 / M_PI)) + 360, 360) / 360,
       (r > 1 ? 0 : r),
       1);
 }
@@ -191,16 +195,30 @@ inline static constexpr bool str_equal(const char *a, const char *b) {
 
 inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {
   size_t pos_start = 0, pos_end = 0;
-  std::string item;
   uint16_t item_count = 0;
   while ((pos_end = str.find(delimiter, pos_start)) != std::string::npos) {
     if (item_count == max_items) return;
-    item = str.substr(pos_start, pos_end - pos_start);
+    if (pos_end > pos_start)
+      array.emplace_back(str, pos_start, pos_end - pos_start);
     pos_start = pos_end + 1;
-    if (!item.empty()) { array.push_back(item); }
     item_count++;
   }
-  if (!item.empty()) { array.push_back(str.substr(pos_start)); }
+  if (pos_start < str.size())
+    array.emplace_back(str, pos_start);
+}
+
+// Fixed-format fields cannot shift left when a field is empty.
+template<size_t N>
+inline bool split_fixed(char delimiter, const std::string &str, std::array<std::string, N> &fields) {
+  size_t start = 0;
+  for (size_t i = 0; i < N; ++i) {
+    const size_t end = str.find(delimiter, start);
+    if ((end == std::string::npos) != (i + 1 == N)) return false;
+    fields[i] = str.substr(start, end - start);
+    if (fields[i].empty()) return false;
+    if (end != std::string::npos) start = end + 1;
+  }
+  return true;
 }
 
 inline size_t find_nth_of(char delimiter, uint16_t count, const std::string &str) {
@@ -231,7 +249,7 @@ inline std::string convert_python_arr_str(const std::string &str, const char del
       pos_start = str.find(quote, pos_end + 1);
     }
     if (pos_start == std::string::npos) {
-      if (tmp.back() == delimiter) tmp.pop_back();
+      if (!tmp.empty() && tmp.back() == delimiter) tmp.pop_back();
       break;
     }
     pos_end = str.find(quote, (pos_end > pos_start ? pos_end : pos_start) + 1);
@@ -290,6 +308,88 @@ inline bool psram_available() {
 inline size_t psram_used() {
   return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - 
       heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+}
+
+// Non-throwing alternatives to std::stoi/stof/stod. C++ exceptions are disabled
+// on ESP-IDF so the std:: versions abort on empty or non-numeric input.
+// Returns false when the string contains no convertible number, overflows,
+// or contains trailing junk, so callers can distinguish "parsed zero" from
+// "parse failed" instead of acting on a bogus 0.
+[[nodiscard]] inline bool str_to_int(const std::string &s, int &out, int base = 10) {
+  char *end = nullptr;
+  errno = 0;
+  long val = strtol(s.c_str(), &end, base);
+  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  if (val < INT_MIN || val > INT_MAX) return false;
+  out = static_cast<int>(val);
+  return true;
+}
+
+[[nodiscard]] inline bool str_to_float(const std::string &s, float &out) {
+  char *end = nullptr;
+  errno = 0;
+  const float val = strtof(s.c_str(), &end);
+  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  if (!std::isfinite(val)) return false;
+  out = val;
+  return true;
+}
+
+[[nodiscard]] inline bool str_to_double(const std::string &s, double &out) {
+  char *end = nullptr;
+  errno = 0;
+  const double val = strtod(s.c_str(), &end);
+  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  if (!std::isfinite(val)) return false;
+  out = val;
+  return true;
+}
+
+inline std::array<double, 2> mired_range(const std::string &min_value, const std::string &max_value) {
+  int min = 153, max = 500;
+  int parsed = 0;
+  if (str_to_int(min_value, parsed) && parsed > 0 && parsed <= UINT16_MAX) min = parsed;
+  if (str_to_int(max_value, parsed) && parsed > 0 && parsed <= UINT16_MAX) max = parsed;
+  if (min >= max) return {153, 500};
+  return {static_cast<double>(min), static_cast<double>(max)};
+}
+
+// Return the length of one well-formed UTF-8 scalar, or zero on invalid input.
+inline size_t utf8_scalar_size(const std::string &s, size_t pos) {
+  if (pos >= s.size()) return 0;
+  const auto lead = static_cast<unsigned char>(s[pos]);
+  if (lead < 0x80) return 1;
+  if (lead < 0xc2 || lead > 0xf4) return 0;
+  const size_t len = lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+  if (s.size() - pos < len) return 0;
+  const auto second = static_cast<unsigned char>(s[pos + 1]);
+  if ((lead == 0xe0 && second < 0xa0) || (lead == 0xed && second >= 0xa0) ||
+      (lead == 0xf0 && second < 0x90) || (lead == 0xf4 && second >= 0x90)) return 0;
+  for (size_t i = 1; i < len; ++i) {
+    if ((static_cast<unsigned char>(s[pos + i]) & 0xc0) != 0x80) return 0;
+  }
+  return len;
+}
+
+inline bool str_to_percentage(const std::string &s, int &out) {
+  return str_to_int(s, out) && out >= 0 && out <= 100;
+}
+
+inline bool parse_timer_duration(const std::string &value, uint16_t &minutes, uint16_t &seconds,
+                                 bool tft_editor = false) {
+  std::array<std::string, 3> parts;
+  if (!split_fixed(':', value, parts)) return false;
+  int hours, mins, secs;
+  for (const auto &part : parts) {
+    if (part.find_first_not_of("0123456789") != std::string::npos) return false;
+  }
+  if (!str_to_int(parts[0], hours) || !str_to_int(parts[1], mins) || !str_to_int(parts[2], secs) ||
+      secs >= 60 || mins > UINT16_MAX || hours > (UINT16_MAX - mins) / 60) return false;
+  // v4.3.3 sends total minutes with the literal "00:" prefix.
+  if (mins >= 60 && !(tft_editor && parts[0] == "00")) return false;
+  minutes = hours * 60 + mins;
+  seconds = secs;
+  return true;
 }
 
 } // namespace nspanel_lovelace

@@ -21,10 +21,8 @@ esp32:
 
 external_components:
   - source:
-      type: git
-      url: https://github.com/olicooper/esphome-nspanel-lovelace-native
-      ref: dev
-    refresh: 3h
+      type: local
+      path: ../components
     components: [nspanel_lovelace]
 
 nspanel_lovelace:

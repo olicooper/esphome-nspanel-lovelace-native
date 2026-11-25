@@ -11,10 +11,8 @@
 #include <vector>
 
 #include "esphome/core/defines.h"
-// ESPHome 2026.11 no longer pulls alloc_helpers.h in through helpers.h
-#if __has_include("esphome/core/alloc_helpers.h")
+// str_snprintf and friends: not pulled in through helpers.h since ESPHome 2026.11
 #include "esphome/core/alloc_helpers.h"
-#endif
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
@@ -180,11 +178,7 @@ protected:
   void send_nextion_command_(const std::string &command);
 
   void subscribe_homeassistant_state_attr(
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
     void (NSPanelLovelace::*callback)(const std::string &, const std::string &, esphome::StringRef),
-#else
-    void (NSPanelLovelace::*callback)(std::string, std::string, std::string),
-#endif
     const std::string &entity_id, const std::string &attr_name
   ) {
     auto f = std::bind(callback, this, entity_id, attr_name, std::placeholders::_1);
@@ -193,13 +187,15 @@ protected:
   }
 
   bool process_data_();
-  const std::string &try_replace_uuid_with_entity_id_(const std::string &uuid_or_entity_id);
+  const std::string *try_replace_uuid_with_entity_id_(const std::string &internal_id);
   void process_command_(const std::string &message);
   void send_buffered_command_();
   void process_display_command_queue_();
-  void process_button_press_(std::string &entity_id,
+  void process_button_press_(const std::string &entity_id,
     const std::string &button_type,
     const std::string &value = "", bool called_from_timeout = false);
+  std::string get_mode_from_index_(const std::string &entity_id, ha_attr_type attr_type, const std::string &value);
+  StatefulPageItem* get_current_page_item_(const std::string &uuid);
   StatefulPageItem* get_page_item_(const std::string &uuid);
   Entity* get_entity_(const std::string &entity_id);
 
@@ -211,11 +207,10 @@ protected:
   void render_popup_notify_page_(const std::string &internal_id,
     const std::string &heading, const std::string &message, uint16_t timeout = 0U,
     const std::string &btn1_text = "", const std::string &btn2_text = "");
-  void render_popup_page_(const std::string &internal_id);
-  bool render_popup_page_update_(const std::string &internal_id);
-  bool render_popup_page_update_(StatefulPageItem *entity);
+  void render_popup_page_(const std::string &detail, const std::string &internal_id);
+  bool render_popup_page_update_(StatefulPageItem *entity, bool opening = false, bool input_select = false);
   void render_light_detail_update_(StatefulPageItem *entity);
-  void render_timer_detail_update_(StatefulPageItem *entity);
+  bool render_timer_detail_update_(StatefulPageItem *item);
   void render_cover_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(Entity *entity, const std::string &uuid = "");
@@ -250,7 +245,6 @@ protected:
     const std::string& service,
     const std::map<std::string, std::string> &data,
     const std::map<std::string, std::string> &data_template = {});
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026,1,0)
   void on_entity_state_update_(const std::string &entity_id, esphome::StringRef state);
   void on_entity_attribute_update_(
     const std::string &entity_id, const std::string &attr_name, esphome::StringRef attr_value);
@@ -259,16 +253,6 @@ protected:
   void on_weather_temperature_update_(const std::string &entity_id, esphome::StringRef temperature);
   void on_weather_temperature_unit_update_(const std::string &entity_id, esphome::StringRef temperature_unit);
   void on_weather_forecast_update_(const std::string &entity_id, esphome::StringRef forecast_json);
-#else
-  void on_entity_state_update_(std::string entity_id, std::string state);
-  void on_entity_attribute_update_(
-    std::string entity_id, std::string attr_name, std::string attr_value);
-
-  void on_weather_state_update_(std::string entity_id, std::string state);
-  void on_weather_temperature_update_(std::string entity_id, std::string temperature);
-  void on_weather_temperature_unit_update_(std::string entity_id, std::string temperature_unit);
-  void on_weather_forecast_update_(std::string entity_id, std::string forecast_json);
-#endif
   void send_weather_update_command_();
   std::string weather_entity_id_;
   std::string language_;
@@ -283,6 +267,7 @@ protected:
 
   PageManager page_mgr_;
   std::string popup_page_current_uuid_;
+  bool popup_is_input_select_ = false;
   bool force_current_page_update_ = false;
   bool global_vertical_ui_{false};
   std::vector<std::shared_ptr<Entity>> entities_;
@@ -294,6 +279,7 @@ protected:
   CallbackManager<void(std::string)> incoming_msg_callback_;
 
   std::vector<uint8_t> buffer_;
+  uint32_t rx_last_byte_ms_ = 0;
   std::string command_buffer_;
 
 #ifdef USE_NSPANEL_TFT_UPLOAD

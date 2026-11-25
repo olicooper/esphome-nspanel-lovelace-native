@@ -515,7 +515,9 @@ CONFIG_SCHEMA = cv.All(
             has_card_type,
             cv.typed_schema({
                 CARD_ENTITIES: SCHEMA_CARD_BASE.extend({
-                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)
+                    cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY.extend({
+                        cv.Optional(CONF_CARD_ENTITIES_PRECISION): cv.int_range(0, 6),
+                    }))
                 }),
                 CARD_GRID: SCHEMA_CARD_BASE.extend({
                     cv.Required(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY)

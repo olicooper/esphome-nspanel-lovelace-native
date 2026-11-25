@@ -569,42 +569,36 @@ std::string &PowerCard::render(std::string &buffer) {
 
   this->render_nav(buffer);
 
-  const auto &home_id = this->home_entity_->get_entity_id();
+  // const auto &home_id = this->home_entity_->get_entity_id();
 
   uint16_t home_display_color = this->home_is_active_ ? this->home_color_ : COLOR_INACTIVE;
 
   // Center item 1: home icon
   buffer.append(1, SEPARATOR);
-  buffer.append(entity_render_type::text).append(1, SEPARATOR);
-  buffer.append(home_id).append(1, SEPARATOR);
+  buffer.append(entity_render_type::text).append(2, SEPARATOR);
+  // skip: internalName (ignored)
+  // buffer.append(home_id).append(1, SEPARATOR);
   buffer.append(CHAR8_CAST(this->home_icon_)).append(1, SEPARATOR);
   buffer.append(std::to_string(home_display_color)).append(1, SEPARATOR);
   buffer.append(this->get_title().empty() ? "Home" : this->get_title()).append(1, SEPARATOR);
   buffer.append(this->home_value_str_).append(1, SEPARATOR);
-  buffer.append("0");
+  // buffer.append("0");
 
   // Center item 2: value display above home icon (same entity, no label)
   buffer.append(1, SEPARATOR);
-  buffer.append(entity_render_type::text).append(1, SEPARATOR);
-  buffer.append(home_id).append(1, SEPARATOR);
-  buffer.append(CHAR8_CAST(this->home_icon_)).append(1, SEPARATOR);
-  buffer.append(std::to_string(home_display_color)).append(1, SEPARATOR);
-  buffer.append(1, SEPARATOR);  // empty display name
+  buffer.append(entity_render_type::text).append(5, SEPARATOR);
+  // skip: internalName,icon,iconColor,displayName (ignored)
+  // buffer.append(home_id).append(1, SEPARATOR);
+  // buffer.append(CHAR8_CAST(this->home_icon_)).append(1, SEPARATOR);
+  // buffer.append(std::to_string(home_display_color)).append(1, SEPARATOR);
+  // buffer.append(1, SEPARATOR);  // empty display name
   buffer.append(this->home_value_str_).append(1, SEPARATOR);
-  buffer.append("0");
+  // buffer.append("0");
 
   // Up to 6 outer items
   size_t item_count = this->items_.size();
   for (auto& item : this->items_) {
     buffer.append(1, SEPARATOR).append(item->render());
-  }
-  // Pad remaining outer slots with delete placeholders
-  // Format must match PowerCardItem::render_: text~entityId~icon~iconColor~displayName~valueStr~speed
-  // The TFT firmware hides a slot when entityId == "delete"
-  for (size_t i = item_count; i < 6; i++) {
-    buffer.append(1, SEPARATOR);
-    buffer.append(entity_render_type::text).append(1, SEPARATOR)
-          .append(entity_type::delete_).append(5, SEPARATOR).append("0");
   }
 
   return buffer;

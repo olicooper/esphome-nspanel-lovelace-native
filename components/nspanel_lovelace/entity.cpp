@@ -100,7 +100,13 @@ bool Entity::has_attribute(ha_attr_type attr) const {
   return it != attributes_.end();
 }
 
-const std::string &Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
+const std::string &Entity::get_attribute(ha_attr_type attr) const {
+  static const std::string empty_value{};
+  auto it = attributes_.find(attr);
+  return it == attributes_.end() ? empty_value : it->second;
+}
+
+std::string Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
   auto it = attributes_.find(attr);
   return it == attributes_.end() ? default_value : it->second;
 }
@@ -115,14 +121,14 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
 
   if (attr == ha_attr_type::brightness) {
     this->attributes_[attr] = std::to_string(static_cast<int>(round(
-        scale_value(std::stoi(value), {0, 255}, {0, 100}))));
+        scale_value(str_to_int(value), {0, 255}, {0, 100}))));
   } else if (attr == ha_attr_type::color_temp) {
     auto &minstr = this->get_attribute(ha_attr_type::min_mireds);
     auto &maxstr = this->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = minstr.empty() ? 153 : std::stoi(minstr);
-    uint16_t max_mireds = maxstr.empty() ? 500 : std::stoi(maxstr);
+    uint16_t min_mireds = minstr.empty() ? 153 : str_to_int(minstr);
+    uint16_t max_mireds = maxstr.empty() ? 500 : str_to_int(maxstr);
     this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
-        std::stoi(value),
+        str_to_int(value),
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
         {0, 100}))));
   } else if (attr == ha_attr_type::supported_color_modes ||

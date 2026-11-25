@@ -39,12 +39,18 @@ public:
   void set_state(const std::string &state);
 
   bool has_attribute(ha_attr_type attr) const;
-  const std::string &get_attribute(ha_attr_type attr, const std::string &default_value = "") const;
+  // Returns either the entity's own attribute storage or a static empty string,
+  // so the reference is always safe to hold.
+  const std::string &get_attribute(ha_attr_type attr) const;
+  // Returns by value: returning a reference here would dangle when the attribute
+  // is unset and `default_value` is bound to a temporary (e.g. a string literal),
+  // since that temporary only lives until the end of the caller's full-expression.
+  std::string get_attribute(ha_attr_type attr, const std::string &default_value) const;
   void set_attribute(ha_attr_type attr, const std::string &value);
 
 protected:
   std::string entity_id_;
-  const char *type_;
+  const char *type_ = nullptr;
   bool type_overridden_ = false;
   std::string state_;
   std::map<ha_attr_type, std::string> attributes_;

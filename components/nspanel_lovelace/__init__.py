@@ -1,13 +1,11 @@
 from esphome import automation
 import esphome.config_validation as cv
-import esphome.config_helpers as ch
 import esphome.codegen as cg
 import esphome.core as core
 import re
 import logging
-from typing import Callable, Union
+from typing import Union
 from pathlib import Path
-import os, json
 
 from esphome.components import uart, time, esp32
 from esphome.const import (
@@ -17,6 +15,15 @@ from esphome.const import (
     CONF_ESPHOME,
     CONF_BUILD_FLAGS,
     CONF_PLATFORMIO_OPTIONS
+)
+
+from . import resources
+from .resources import (
+    CONF_LOCALE,
+    CONF_LANGUAGE,
+    load_icons,
+    load_translations,
+    resolve_translation_path,
 )
 
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
@@ -33,7 +40,6 @@ def AUTO_LOAD():
 
 _LOGGER = logging.getLogger(__name__)
 
-iconJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
@@ -66,21 +72,6 @@ ENTITY_TYPES = [
     'alarm_control_panel','input_boolean','button','input_button','cover','fan',
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
-]
-REQUIRED_TRANSLATION_KEYS = [
-    "none","unknown","preset_mode","swing_mode","fan_mode","activity","away","boost",
-    "comfort","eco","home","sleep","cool","cooling","dry","drying","fan","heat","heating",
-    "heat_cool","idle","auto","fan_only","on","off","currently","state","action","lock","unlock",
-    "paused","active","activate","press","run","speed","brightness","color","color_temp",
-    "position","start","pause","cancel","finish","arm_home","arm_away","arm_night","arm_vacation",
-    "arm_custom_bypass","armed_home","armed_away","armed_night","armed_vacation","armed_custom_bypass",
-    "arming","disarming","disarmed","pending","triggered","disarm","tilt_position",
-    "above_horizon","below_horizon","not_home","start_cleaning","return_to_base","docked",
-    "turn_on","turn_off","month_january","month_jan","month_february","month_feb","month_march","month_mar",
-    "month_april","month_apr","month_may","month_june","month_jun","month_july","month_jul","month_august",
-    "month_aug","month_september","month_sep","month_october","month_oct","month_november","month_nov",
-    "month_december","month_dec","dow_sunday","dow_sun","dow_monday","dow_mon","dow_tuesday","dow_tue",
-    "dow_wednesday","dow_wed","dow_thursday","dow_thu","dow_friday","dow_fri","dow_saturday","dow_sat"
 ]
 BUILTIN_ICON_MAP: list = [
     ["E003",icon_t.account],["F098",icon_t.air_humidifier],["E027",icon_t.alert_circle],["E5D5",icon_t.alert_circle_outline],
@@ -123,9 +114,7 @@ CONF_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_DEFAULT_CARD = "default_card"
 CONF_EXP_VERT_UI = "experimental_vertical_ui"
 
-CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
-CONF_LANGUAGE = "language"
 
 CONF_SCREENSAVER = "screensaver"
 CONF_MODEL = "model"
@@ -160,31 +149,6 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 CONF_CARD_MEDIA_ENTITY_ID = "media_entity_id"
 
-ICON_HEX_RE = re.compile(r"^[0-9A-Fa-f]{4}$")
-
-def load_icons():
-    """Load the bundled icons.json catalog. The catalog must be a nonempty list
-    of objects with a nonempty string 'name' and a 4-character hex 'hex'."""
-    global iconJson
-    current_directory = os.path.dirname(__file__)
-    iconJsonPath = os.path.join(current_directory, 'icons.json')
-    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load icons from '{iconJsonPath}'")
-    try:
-        with open(iconJsonPath, encoding="utf-8") as read_file:
-            iconJson = json.load(read_file)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise cv.Invalid(f"Failed to load icons catalog from '{iconJsonPath}': {err}")
-    if not isinstance(iconJson, list) or len(iconJson) == 0:
-        raise cv.Invalid(f"Icons catalog is empty: '{iconJsonPath}'")
-    for entry in iconJson:
-        if (not isinstance(entry, dict)
-                or not isinstance(entry.get("name"), str) or not entry["name"]
-                or not isinstance(entry.get("hex"), str) or not ICON_HEX_RE.match(entry["hex"])):
-            raise cv.Invalid(
-                f"Icons catalog entry is invalid (need nonempty string 'name' and a "
-                f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
-    _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
-
 def has_build_define(esphome_config: dict, name: str) -> bool:
     """True when a build flag defines ``name``.
 
@@ -209,54 +173,6 @@ def has_build_define(esphome_config: dict, name: str) -> bool:
                 return True
     return False
 
-def resolve_translation_path(language: str, config_relative: Callable[[str], Path]) -> tuple[Path, bool]:
-    """Resolve a locale language to its translation file.
-
-    Bundled languages (no ".json" suffix) resolve inside the bundled
-    translations/ directory. A ".json" language resolves relative to the
-    top-level configuration directory (config_relative), or unchanged when
-    absolute. When the config-relative path does not exist, the legacy
-    working-directory path is returned instead and the boolean is True
-    (never for absolute paths or bundled languages).
-    """
-    if not language.endswith(".json"):
-        return Path(__file__).resolve().parent / "translations" / f"{language}.json", False
-    if os.path.isabs(language):
-        return Path(language), False
-    config_path = Path(config_relative(language))
-    if config_path.exists():
-        return config_path, False
-    legacy_path = Path(os.path.abspath(language))
-    if legacy_path.exists():
-        return legacy_path, True
-    return config_path, False
-
-def load_translations(path) -> dict:
-    """Load a translation file and validate its shape: a JSON object mapping
-    string keys to string values containing every REQUIRED_TRANSLATION_KEY.
-    Extra string-valued keys are allowed and preserved (insertion order)."""
-    try:
-        with open(path, encoding="utf-8") as read_file:
-            data = json.load(read_file)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise cv.Invalid(f"Failed to load translation file from '{path}': {err}", [CONF_LOCALE, CONF_LANGUAGE])
-    if not isinstance(data, dict):
-        raise cv.Invalid(
-            f"Translation file '{path}' must be a JSON object of string keys to string values",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    missingKeys = [k for k in REQUIRED_TRANSLATION_KEYS if k not in data]
-    if missingKeys:
-        raise cv.Invalid(
-            f"Translation file '{path}' is missing the following required keys: {missingKeys}",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    badKeys = [k for k, v in data.items() if not isinstance(v, str)]
-    if badKeys:
-        raise cv.Invalid(
-            f"Translation file '{path}' has non-string values for the following keys: {badKeys}",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file '{path}' ({len(data)} entries)")
-    return data
-
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:
         return None
@@ -265,11 +181,11 @@ def get_icon_hex(iconLookup: str) -> Union[str, None]:
         iconLookup = iconLookup[4:]
         searchHex = True
     _LOGGER.debug(f"Finding icon: '{iconLookup}'")
-    if iconJson is None:
+    if resources.iconJson is None:
         load_icons()
-    if iconJson is not None:
+    if resources.iconJson is not None:
         key = 'hex' if searchHex else 'name'
-        for attrs in iconJson:
+        for attrs in resources.iconJson:
             if attrs[key] == iconLookup:
                 return attrs['hex'].upper()
     return None
@@ -848,7 +764,7 @@ async def to_code(config):
 
     cgv = []
     for k,v in translationJson.items():
-        if k in REQUIRED_TRANSLATION_KEYS:
+        if k in resources.REQUIRED_TRANSLATION_KEYS:
             if k in cv.RESERVED_IDS:
                 k += '_'
             k = TRANSLATION_ITEM.class_(k)

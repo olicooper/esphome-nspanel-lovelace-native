@@ -14,7 +14,7 @@ namespace esphome {
 namespace nspanel_lovelace {
 
 // NOTE: If keys are added to this list, the REQUIRED_TRANSLATION_KEYS
-//       list in __init__.py will need updating
+//       list in resources.py will need updating
 struct translation_item {
   static constexpr const char* none = "none";
   static constexpr const char* unknown = entity_state::unknown;

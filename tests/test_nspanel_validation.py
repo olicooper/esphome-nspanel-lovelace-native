@@ -112,17 +112,16 @@ def test_card_entity_limits_baseline() -> None:
 def _point_icons_at(nsl, tmp_path: Path, file_name: str = "icons.json"):
     """Point the component's icon catalog lookup at a temp file. Returns the
     file path; restores the module state on test end via _restore_icons."""
-    import os
-    nsl._orig_file = nsl.__file__
-    nsl.__file__ = str(tmp_path / "nspanel_lovelace" / "__init__.py")
+    nsl.resources._orig_file = nsl.resources.__file__
+    nsl.resources.__file__ = str(tmp_path / "nspanel_lovelace" / "resources.py")
     target = tmp_path / "nspanel_lovelace" / file_name
     return target
 
 
 def _restore_icons(nsl):
-    nsl.__file__ = nsl._orig_file
-    del nsl._orig_file
-    nsl.iconJson = None
+    nsl.resources.__file__ = nsl.resources._orig_file
+    del nsl.resources._orig_file
+    nsl.resources.iconJson = None
 
 
 def test_load_icons_missing_catalog(tmp_path: Path) -> None:
@@ -199,7 +198,7 @@ def test_load_icons_valid_two_entries(tmp_path: Path) -> None:
 
 def test_get_icon_hex_real_catalog() -> None:
     nsl = load_component()
-    nsl.iconJson = None
+    nsl.resources.iconJson = None
     nsl.load_icons()  # loads the bundled catalog
     assert nsl.get_icon_hex("hiking") == "ED7E"
     assert nsl.get_icon_hex("hex:ED7E") == "ED7E"

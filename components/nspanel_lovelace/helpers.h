@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -296,12 +297,14 @@ inline size_t psram_used() {
 
 // Non-throwing alternatives to std::stoi/stof/stod. C++ exceptions are disabled
 // on ESP-IDF so the std:: versions abort on empty or non-numeric input.
-// Returns false when the string contains no convertible number, so callers can
-// distinguish "parsed zero" from "parse failed" instead of acting on a bogus 0.
+// Returns false when the string contains no convertible number, overflows,
+// or contains trailing junk, so callers can distinguish "parsed zero" from
+// "parse failed" instead of acting on a bogus 0.
 [[nodiscard]] inline bool str_to_int(const std::string &s, int &out, int base = 10) {
   char *end = nullptr;
   long val = strtol(s.c_str(), &end, base);
-  if (end == s.c_str()) return false;
+  if (end == s.c_str() || *end != '\0') return false;
+  if (val < INT_MIN || val > INT_MAX) return false;
   out = static_cast<int>(val);
   return true;
 }
@@ -309,13 +312,15 @@ inline size_t psram_used() {
 [[nodiscard]] inline bool str_to_float(const std::string &s, float &out) {
   char *end = nullptr;
   out = strtof(s.c_str(), &end);
-  return end != s.c_str() && *end == '\0';
+  if (end == s.c_str() || *end != '\0') return false;
+  return std::isfinite(out);
 }
 
 [[nodiscard]] inline bool str_to_double(const std::string &s, double &out) {
   char *end = nullptr;
   out = strtod(s.c_str(), &end);
-  return end != s.c_str() && *end == '\0';
+  if (end == s.c_str() || *end != '\0') return false;
+  return std::isfinite(out);
 }
 
 } // namespace nspanel_lovelace

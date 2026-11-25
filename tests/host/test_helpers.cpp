@@ -79,8 +79,8 @@ static void test_str_to_number() {
   int parsed = 0;
   check(!str_to_int("", parsed), "str_to_int: empty string fails");
   check(!str_to_int("abc", parsed), "str_to_int: non-numeric fails");
-  check(str_to_int("12abc", parsed) && parsed == 12,
-        "str_to_int: parses the numeric prefix");
+  check(str_to_int("12abc", parsed) == false,
+        "str_to_int: trailing junk fails");
   check(str_to_int("-5", parsed) && parsed == -5,
         "str_to_int: negative value");
   check(str_to_int(" 42", parsed) && parsed == 42,
@@ -101,12 +101,12 @@ static void test_str_to_number() {
   check(str_to_double("2.25", parsed_d) && parsed_d == 2.25,
         "str_to_double: decimal value");
 
-  // strtol saturates at LONG_MAX instead of throwing out_of_range, and the
-  // narrowing cast to int wraps. ESP-IDF's std::stoi would have thrown and then
-  // aborted under -fno-exceptions. Pinned so a later clamp here is visible.
-  check(str_to_int("99999999999999999999", parsed) &&
-            parsed == static_cast<int>(LONG_MAX),
-        "str_to_int: out-of-range saturates instead of aborting");
+  // strtol saturates at LONG_MAX, but our wrapper rejects overflow so callers
+  // never act on a wrapped value. ESP-IDF's std::stoi would have thrown and
+  // aborted under -fno-exceptions. Pinned so a later change to allow overflow
+  // is visible.
+  check(!str_to_int("99999999999999999999", parsed),
+        "str_to_int: overflow fails");
 }
 
 static void test_value_or_default() {

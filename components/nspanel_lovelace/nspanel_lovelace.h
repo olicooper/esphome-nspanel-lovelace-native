@@ -194,7 +194,7 @@ protected:
   void process_button_press_(std::string &entity_id,
     const std::string &button_type,
     const std::string &value = "", bool called_from_timeout = false);
-  bool set_mode_from_index_(const std::string &entity_type,
+  void set_mode_from_index_(const std::string &entity_type,
     const std::string &entity_id, ha_attr_type attr_type,
     ha_action_type action_type, const std::string &data_key,
     const std::string &value);

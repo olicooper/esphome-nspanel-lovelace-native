@@ -11,10 +11,8 @@
 #include <vector>
 
 #include "esphome/core/defines.h"
-// ESPHome 2026.11 no longer pulls alloc_helpers.h in through helpers.h
-#if __has_include("esphome/core/alloc_helpers.h")
+// str_snprintf and friends: not pulled in through helpers.h since ESPHome 2026.11
 #include "esphome/core/alloc_helpers.h"
-#endif
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"

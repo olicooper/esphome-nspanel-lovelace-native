@@ -40,7 +40,7 @@ nspanel_lovelace:
     ##   - Spanish/Español: es.json
     ## NOTE: This feature is in beta so the translation keys and values could change at any time!
     ##       Any custom translation files you create will need to be kept in sync with the the files on the repo
-    ##       https://github.com/olicooper/esphome-nspanel-lovelace-native/tree/dev/components/nspanel_lovelace/translations
+    ##       https://github.com/PhiKapJames/esphome-nspanel-lovelace-native/tree/dev/components/nspanel_lovelace/translations
     # language: en
     # temperature_unit: celcius
   screensaver:

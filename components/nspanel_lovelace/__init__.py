@@ -612,9 +612,10 @@ def generate_icon_config(icon_config, parent_class: cg.MockObj = None, ctx: Code
     if isinstance(attrs["value"], str):
         attrs["value"] = ctx.icon(get_icon_hex(attrs["value"]))
         if isinstance(parent_class, cg.MockObj):
-            # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-            # cg.add(parent_class.set_icon_value(attrs["value"]))
-            cg.add(cg.RawStatement(f'{parent_class.__str__()}->set_icon_value({attrs["value"]});'))
+            # attrs["value"] is a MockObj (icon_t member) or RawExpression
+            # (CUSTOM_ICONS[n]), never a Python str, so the expression API
+            # emits it verbatim without cpp_string_escape quoting.
+            cg.add(parent_class.set_icon_value(attrs["value"]))
     if isinstance(attrs["color"], int):
         if isinstance(parent_class, cg.MockObj):
             cg.add(parent_class.set_icon_color(attrs["color"]))
@@ -657,17 +658,15 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable
     # whether a value exists, not on its type.
     has_icon = attrs["value"] is not None
     has_color = isinstance(attrs["color"], int)
-    # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-    basicstr = f'{make_shared.template(icon_class)}("{ctx.new_uuid()}", {entity_id}'
-    if has_icon and has_color:
-        stmt = f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)'
-    elif has_icon:
-        stmt = f'{basicstr}, {attrs["value"]})'
-    elif has_color:
-        stmt = f'{basicstr}, {default_icon_value}, {attrs["color"]}u)'
-    else:
-        stmt = f'{basicstr}, {default_icon_value})'
-    cg.add(cg.RawExpression(f"auto {variable_name} = {stmt}"))
+    # Constructor arguments go through the expression API: the uuid (str) is
+    # quoted by StringLiteral, while the icon expression (MockObj/RawExpression)
+    # and the 'u'-suffixed color emit verbatim, never quoted. A trailing None
+    # drops the color argument, preserving all four constructor arities.
+    icon_value = attrs["value"] if has_icon else default_icon_value
+    color_expr = cg.RawExpression(f'{attrs["color"]}u') if has_color else None
+    ctor = make_shared.template(icon_class).__call__(
+        ctx.new_uuid(), entity_id, icon_value, color_expr)
+    cg.add(cg.RawExpression(f"auto {variable_name} = {ctor}"))
     variable_class = cg.global_ns.class_(variable_name)
     variable_class.op = '->'
     # The constructor arguments are defaults only: on_entity_type_change()

@@ -497,6 +497,55 @@ def test_codegen_single_visible_card(tmp_path: Path) -> None:
     assert_no_none_tokens(src)
 
 
+def test_tile_icon_setter_emits_expression_verbatim(tmp_path: Path) -> None:
+    """Tile icon setters (generate_icon_config) must emit the icon
+    expression verbatim -- a built-in icon as its namespaced icon_t member
+    and a custom glyph as its CUSTOM_ICONS slot -- with no added quoting or
+    escaping. Pins the exact lines before/after the raw-statement to
+    expression-API change (Task 9)."""
+    body = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp_a
+          icon: alert-circle-outline
+        - entity_id: light.lamp_b
+          icon: hiking
+"""
+    src = generate_synthetic(tmp_path, body, "tile-icon-setter")
+    # Built-in icon: verbatim namespaced icon_t member, no quotes.
+    assert ("nspanel_card_1_item_1->set_icon_value("
+            "nspanel_lovelace::icon_t::alert_circle_outline);") in src
+    # Custom glyph: verbatim CUSTOM_ICONS lookup, no quotes.
+    assert "nspanel_card_1_item_2->set_icon_value(CUSTOM_ICONS[0]);" in src
+    # The custom literal stays the same inside the CUSTOM_ICONS array.
+    assert 'u8"\\uED7E"' in src
+    assert src.count("set_icon_value(") == 2  # no status icon in this config
+    assert_no_none_tokens(src)
+
+
+def test_status_icon_entity_only_uses_default_glyph(tmp_path: Path) -> None:
+    """A status icon with neither icon nor color configured takes the
+    3-arg constructor with the default glyph (no setter at all). Pins the
+    'neither' branch before/after the Task 9 constructor change."""
+    body = """\
+  screensaver:
+    status_icon_left:
+      entity_id: light.lamp_a
+"""
+    src = generate_synthetic(tmp_path, body, "status-entity-only")
+    assert len(re.findall(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, (?:nspanel_lovelace::)?icon_t::alert_circle_outline\)',
+        src,
+    )) == 1
+    assert "set_icon_value(" not in src
+    assert "set_icon_color(" not in src
+    assert_no_none_tokens(src)
+
+
 def load_component():
     """Import the component module under test (once)."""
     if str(REPO_ROOT) not in sys.path:

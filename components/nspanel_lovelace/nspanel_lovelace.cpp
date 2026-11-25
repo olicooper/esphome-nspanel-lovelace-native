@@ -549,6 +549,13 @@ void NSPanelLovelace::process_command_(const std::string &message) {
       this->process_button_press_(tokens.at(2), tokens.at(3));
     }
   } else if (tokens.at(1) == action_type::pageOpenDetail) {
+    // A truncated frame, or one with an empty field that split_str drops, has
+    // fewer than the 4 fields addressed below. .at() aborts the process under
+    // -fno-exceptions, so check the size before indexing.
+    if (tokens.size() < 4) {
+      ESP_LOGW(TAG, "Short pageOpenDetail command ignored: %s", message.c_str());
+      return;
+    }
     this->render_popup_page_(tokens.at(3));
   } else if (tokens.at(1) == action_type::sleepReached) {
     //std::string page = tokens.at(2);

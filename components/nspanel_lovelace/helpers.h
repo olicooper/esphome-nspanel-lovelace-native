@@ -5,6 +5,8 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctype.h>
 #include <esp_heap_caps.h>

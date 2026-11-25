@@ -137,6 +137,8 @@ CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
 CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
 CONF_SCREENSAVER_FORECAST_METHOD = "forecast_method"
+# max weatherUpdate items the HMI can display for each screensaver layout
+SCREENSAVER_TYPE_MAX_ITEMS = {"screensaver": 6, "screensaver2": 15}
 
 CONF_CARDS = "cards"
 CONF_CARD_TYPE = "type"
@@ -144,6 +146,7 @@ CONF_CARD_HIDDEN = "hidden"
 CONF_CARD_TITLE = "title"
 CONF_CARD_ENTITIES = "entities"
 CONF_CARD_ENTITIES_NAME = "name"
+CONF_CARD_ENTITIES_PRECISION = "precision"
 
 CARD_ENTITIES="cardEntities"
 CARD_GRID="cardGrid"
@@ -332,6 +335,12 @@ SCHEMA_STATUS_ICON = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
 
+SCHEMA_CARD_ENTITY = cv.Schema({
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+    cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
+    cv.Optional(CONF_ICON): SCHEMA_ICON,
+})
+
 SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
@@ -344,12 +353,10 @@ SCHEMA_SCREENSAVER = cv.Schema({
     }),
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
-})
-
-SCHEMA_CARD_ENTITY = cv.Schema({
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
-    cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
-    cv.Optional(CONF_ICON): SCHEMA_ICON,
+    cv.Optional(CONF_CARD_TYPE, default="screensaver"): cv.one_of(*SCREENSAVER_TYPE_MAX_ITEMS),
+    cv.Optional(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY.extend({
+        cv.Optional(CONF_CARD_ENTITIES_PRECISION): cv.int_range(0, 6),
+    })),
 })
 
 SCHEMA_CARD_BASE = cv.Schema({
@@ -379,6 +386,13 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
     if (card_type == CARD_MEDIA):
         return [0,8]
     return [0,0]
+
+def get_screensaver_weather_item_count(screensaver_config) -> int:
+    if CONF_SCREENSAVER_WEATHER not in screensaver_config:
+        return 0
+    # screensaver: 1 main weather item + 4 forecast items
+    # screensaver2: only the main weather item, the other slots are free for entities
+    return 5 if screensaver_config[CONF_CARD_TYPE] == "screensaver" else 1
 
 def validate_config(config):
     global card_ids
@@ -442,6 +456,16 @@ def validate_config(config):
             add_entity_id(left.get(CONF_ENTITY_ID))
         if right and CONF_ENTITY_ID in right:
             add_entity_id(right.get(CONF_ENTITY_ID))
+        entities = screensaver_config.get(CONF_CARD_ENTITIES, [])
+        for entity_config in entities:
+            if not entity_config[CONF_ENTITY_ID].startswith('delete'):
+                add_entity_id(entity_config[CONF_ENTITY_ID])
+        screensaver_type = screensaver_config[CONF_CARD_TYPE]
+        item_count = len(entities) + get_screensaver_weather_item_count(screensaver_config)
+        if item_count > SCREENSAVER_TYPE_MAX_ITEMS[screensaver_type]:
+            raise cv.Invalid(
+                f"'{screensaver_type}' can display at most {SCREENSAVER_TYPE_MAX_ITEMS[screensaver_type]} items "
+                f"(weather items included), got {item_count}", [CONF_SCREENSAVER, CONF_CARD_ENTITIES])
 
     return config
 
@@ -521,6 +545,7 @@ NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
 StatusIconItem = nspanel_lovelace_ns.class_("StatusIconItem")
 WeatherItem = nspanel_lovelace_ns.class_("WeatherItem")
 EntitiesCardEntityItem = nspanel_lovelace_ns.class_("EntitiesCardEntityItem")
+ScreensaverEntityItem = nspanel_lovelace_ns.class_("ScreensaverEntityItem")
 GridCardEntityItem = nspanel_lovelace_ns.class_("GridCardEntityItem")
 AlarmButtonItem = nspanel_lovelace_ns.class_("AlarmButtonItem")
 
@@ -595,6 +620,8 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
             f"{make_shared.template(entity_type).__call__(get_new_uuid(), entity_id, display_name)}"))
 
         generate_icon_config(entity_config.get(CONF_ICON, None), entity_class)
+        if CONF_CARD_ENTITIES_PRECISION in entity_config:
+            cg.add(entity_class.set_precision(entity_config[CONF_CARD_ENTITIES_PRECISION]))
 
         cg.add(card_variable.add_item(entity_class))
 
@@ -754,6 +781,9 @@ async def to_code(config):
             f"auto {screensaver_info[0]} = "
             f"{nspanel.create_screensaver.__call__(screensaver_uuid)}"))
 
+        if screensaver_config[CONF_CARD_TYPE] == "screensaver2":
+            cg.add(screensaver_class.set_render_type(PageType.screensaver2))
+
         if CONF_SCREENSAVER_STATUS_ICON_LEFT in screensaver_config:
             left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
             screensaver_left_icon = get_status_icon_statement(
@@ -794,10 +824,15 @@ async def to_code(config):
                         "Please use forecast_method 'service' instead (see the README for the required HA automation template)."
                     )
             screensaver_items = []
-            # 1 main weather item + 4 forecast items
-            for i in range(0,5):
+            for i in range(0, get_screensaver_weather_item_count(screensaver_config)):
                 screensaver_items.append(make_shared.template(screensaver_info[3]).__call__(get_new_uuid()))
             cg.add(screensaver_class.add_item_range(screensaver_items))
+
+        gen_card_entities(
+            screensaver_config.get(CONF_CARD_ENTITIES, []),
+            screensaver_info[2],
+            screensaver_class,
+            ScreensaverEntityItem)
 
         cg.add(cg.RawStatement("}"))
 

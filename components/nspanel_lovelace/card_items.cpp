@@ -8,6 +8,7 @@
 #include "types.h"
 #include <type_traits>
 #include <cstdlib>
+#include "esphome/core/helpers.h"
 
 namespace esphome {
 namespace nspanel_lovelace {
@@ -152,6 +153,15 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
 
 void EntitiesCardEntityItem::state_generic_fn(StatefulPageItem *me) {
   auto me_ = static_cast<EntitiesCardEntityItem*>(me);
+  if (me_->precision_ >= 0) {
+    const auto &state = me_->get_state();
+    char *end = nullptr;
+    float value = strtof(state.c_str(), &end);
+    if (end != state.c_str() && *end == '\0') {
+      me_->value_ = esphome::str_snprintf("%.*f", 16, me_->precision_, value);
+      return;
+    }
+  }
   me_->value_ = get_translation(me_->get_state());
 }
 
@@ -383,6 +393,18 @@ uint16_t EntitiesCardEntityItem::get_render_buffer_reserve_() const {
   // try to guess the required size of the buffer to reduce heap fragmentation
   return CardItem::get_render_buffer_reserve_() +
          this->value_.length() + this->value_postfix_.length() + 2;
+}
+
+/*
+ * =============== ScreensaverEntityItem ===============
+ */
+
+std::string &ScreensaverEntityItem::render_(std::string &buffer) {
+  // skip: type,internalName
+  buffer.append(2, SEPARATOR);
+  PageItem_Icon::render_(buffer).append(1, SEPARATOR);
+  PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
+  return PageItem_Value::render_(buffer);
 }
 
 } // namespace nspanel_lovelace

@@ -69,6 +69,19 @@ nspanel_lovelace:
     #   icon:
     #     value: robot-outline
     #     color: 200
+    ## Screensaver layout: 'screensaver' (default) or 'screensaver2' (alternative layout with more slots)
+    # type: screensaver2
+    ## Custom entities, filled into the layout slots in order after the weather items.
+    ## Use 'entity_id: delete' to leave a slot empty.
+    ##   screensaver:  weather main + 4 forecast items, 1 extra entity switches to the alternative layout (max 6 items)
+    ##   screensaver2: weather main only, then 3 left + 6 bottom + 5 indicator icons (max 15 items)
+    # entities:
+    #   - entity_id: sensor.outside_humidity
+    #     name: Humidity
+    #     icon: water-percent
+    #     precision: 1  # number of decimals for numeric states
+    #   - entity_id: delete
+    #   - entity_id: binary_sensor.front_door
   cards:
     - type: cardGrid
       id: front_room

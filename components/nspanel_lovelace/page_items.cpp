@@ -194,8 +194,9 @@ std::string &AlarmIconItem::render_(std::string &buffer) {
  * =============== DeleteItem ===============
  */
 
-DeleteItem::DeleteItem(page_type page_type) :
-    PageItem(entity_type::delete_) {
+DeleteItem::DeleteItem(page_type type) :
+    // screensaver slots are positional, so an empty slot is rendered blank
+    PageItem(type == page_type::screensaver ? "" : entity_type::delete_) {
   // Currently all page_types that accept delete entities
   // have the same separator quantity
   this->uuid_.append(5, SEPARATOR);

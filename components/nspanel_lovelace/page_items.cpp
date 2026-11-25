@@ -133,7 +133,8 @@ void WeatherItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 void WeatherItem::set_icon_by_weather_condition(const std::string &condition) {
   Icon icon{};
   if (!try_get_value(WEATHER_ICON_MAP, icon, condition)) return;
-  this->icon_color_ = icon.color;
+  if (!this->icon_color_overridden_)
+    this->icon_color_ = icon.color;
   this->icon_value_ = icon.value;
   this->set_render_invalid();
 }

@@ -55,6 +55,7 @@ nspanel_lovelace:
     weather:
       entity_id: weather.forecast_home
       forecast_method: template_sensor # service
+      icon_color: "#FFFFFF"
     entities:
       - entity_id: sensor.outside_temperature
         icon: home-thermometer-outline
@@ -160,7 +161,9 @@ nspanel_lovelace:
           icon: wifi
         - entity_id: iText.password
           name: Password
-          icon: key
+          icon:
+            value: key
+            color: [255, 255, 255]
 
     - type: cardAlarm
       id: alarm_card

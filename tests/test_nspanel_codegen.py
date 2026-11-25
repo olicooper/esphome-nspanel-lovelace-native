@@ -35,6 +35,7 @@ esphome:
   name: {name}
   comment: "synthetic codegen fixture"
   build_path: ./build/{name}
+{esphome_extra}
 
 esp32:
   board: esp32dev
@@ -72,17 +73,19 @@ time:
 
 
 def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
-                       cwd: Path | None = None) -> str:
+                       cwd: Path | None = None, esphome_extra: str = "") -> str:
     """Write a synthetic config to tmp_path, run codegen only, and return the
     generated main.cpp source. Uuids are allocated numerically in codegen
     order, so a screensaver without an explicit id gets uuid "1". cwd runs
     esphome from a different working directory (default: repo root); the
-    build output still lands under the config file's directory."""
+    build output still lands under the config file's directory. esphome_extra
+    adds indented keys to the esphome: section (e.g. build_flags)."""
     cfg = tmp_path / f"{name}.yaml"
     cfg.write_text(SYNTHETIC_CONFIG.format(
         name=name,
         components=str(REPO_ROOT / "components"),
         nspanel_body=nspanel_body,
+        esphome_extra=esphome_extra,
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -150,6 +153,7 @@ def test_translation_legacy_cwd_fallback(tmp_path: Path) -> None:
         name="trans-legacy",
         components=str(REPO_ROOT / "components"),
         nspanel_body=body,
+        esphome_extra="",
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -165,6 +169,59 @@ def test_translation_legacy_cwd_fallback(tmp_path: Path) -> None:
     assert out.count("working-directory") == 1, out
     main = cfg_dir / ".esphome" / "build" / "trans-legacy" / "src" / "main.cpp"
     assert "LEGACY_CWD_VALUE" in main.read_text()
+
+
+def _build_dir(tmp_path: Path, name: str) -> Path:
+    # ESPHome 2026.11.0 builds under <config dir>/.esphome/build/<name>
+    # regardless of the deprecated build_path key.
+    return tmp_path / ".esphome" / "build" / name
+
+
+def test_codegen_test_device_mode_disables_psram(tmp_path: Path) -> None:
+    """esphome.build_flags: [-DTEST_DEVICE_MODE] (the location test.yaml
+    actually uses) must skip the component's PSRAM SDK settings and defines."""
+    generate_synthetic(tmp_path, _TRANSLATION_CARD, "test-device",
+                       esphome_extra="  build_flags:\n    - -DTEST_DEVICE_MODE")
+    build = _build_dir(tmp_path, "test-device")
+    sdk = (build / "sdkconfig.test-device").read_text()
+    assert "CONFIG_SPIRAM_USE_MALLOC=y" not in sdk
+    assert "CONFIG_ESP32_SPIRAM_SUPPORT=y" not in sdk
+    defines = (build / "src" / "esphome" / "core" / "defines.h").read_text()
+    assert "#define USE_PSRAM" not in defines
+
+
+def test_codegen_default_psram_settings(tmp_path: Path) -> None:
+    """Without the test flag, the component's PSRAM settings are unchanged."""
+    generate_synthetic(tmp_path, _TRANSLATION_CARD, "psram-default")
+    build = _build_dir(tmp_path, "psram-default")
+    sdk = (build / "sdkconfig.psram-default").read_text()
+    assert "CONFIG_SPIRAM=y" in sdk
+    assert "CONFIG_SPIRAM_USE_MALLOC=y" in sdk
+    assert "CONFIG_ESP32_SPIRAM_SUPPORT=y" in sdk
+    defines = (build / "src" / "esphome" / "core" / "defines.h").read_text()
+    assert "#define USE_PSRAM" in defines
+
+
+def test_codegen_tft_upload_build_flag(tmp_path: Path) -> None:
+    """-DDISABLE_NSPANEL_TFT_UPLOAD must suppress -DUSE_NSPANEL_TFT_UPLOAD in
+    both flag locations; the default build still emits it."""
+    generate_synthetic(
+        tmp_path, _TRANSLATION_CARD, "tft-off",
+        esphome_extra="  build_flags:\n    - -DDISABLE_NSPANEL_TFT_UPLOAD")
+    cmake = (_build_dir(tmp_path, "tft-off") / "CMakeLists.txt").read_text()
+    assert "-DUSE_NSPANEL_TFT_UPLOAD" not in cmake
+
+    generate_synthetic(
+        tmp_path, _TRANSLATION_CARD, "tft-off-legacy",
+        esphome_extra=("  platformio_options:\n"
+                       "    build_flags:\n"
+                       "      - -DDISABLE_NSPANEL_TFT_UPLOAD"))
+    cmake = (_build_dir(tmp_path, "tft-off-legacy") / "CMakeLists.txt").read_text()
+    assert "-DUSE_NSPANEL_TFT_UPLOAD" not in cmake
+
+    generate_synthetic(tmp_path, _TRANSLATION_CARD, "tft-on")
+    cmake = (_build_dir(tmp_path, "tft-on") / "CMakeLists.txt").read_text()
+    assert "-DUSE_NSPANEL_TFT_UPLOAD" in cmake
 
 
 def assert_no_none_tokens(src: str) -> None:

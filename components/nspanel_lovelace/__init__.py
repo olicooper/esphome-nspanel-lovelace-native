@@ -16,6 +16,7 @@ from esphome.const import (
     CONF_TRIGGER_ID,
     CONF_TIME_ID,
     CONF_ESPHOME,
+    CONF_BUILD_FLAGS,
     CONF_PLATFORMIO_OPTIONS
 )
 
@@ -191,6 +192,31 @@ def load_icons():
                 f"Icons catalog entry is invalid (need nonempty string 'name' and a "
                 f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
+
+def has_build_define(esphome_config: dict, name: str) -> bool:
+    """True when a build-flag entry is exactly ``-D<name>`` or ``-D<name>=...``.
+
+    Checks the modern ``esphome.build_flags`` location and the legacy
+    ``platformio_options.build_flags`` location (list or scalar). A scalar is
+    a single entry (ESPHome's floor behaviour) and entries are matched
+    exactly - no substring matching.
+    """
+    flag = f"-D{name}"
+    def entries(value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [value]
+        return list(value)
+    locations = [esphome_config.get(CONF_BUILD_FLAGS)]
+    pio = esphome_config.get(CONF_PLATFORMIO_OPTIONS)
+    if isinstance(pio, dict):
+        locations.append(pio.get("build_flags"))
+    for loc in locations:
+        for entry in entries(loc):
+            if entry == flag or entry.startswith(flag + "="):
+                return True
+    return False
 
 def resolve_translation_path(language: str, config_relative: Callable[[str], Path]) -> tuple[Path, bool]:
     """Resolve a locale language to its translation file.
@@ -708,10 +734,7 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_
 
 async def to_code(config):
     # note: not using 'psram' dependency because our sdkconfig options conflict
-    is_test_mode = [string for string in
-                    core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS] 
-                    if string.endswith("TEST_DEVICE_MODE")]
-    if is_test_mode:
+    if has_build_define(core.CORE.config[CONF_ESPHOME], "TEST_DEVICE_MODE"):
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
     else:
         # NSPanel has non-standard PSRAM pins
@@ -751,11 +774,8 @@ async def to_code(config):
     await uart.register_uart_device(nspanel, config)
     cg.add_global(nspanel_lovelace_ns.using)
 
-    enable_tft_upload = True
-    if 'build_flags' in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]:
-        if [s for s in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]
-            ['build_flags'] if 'DISABLE_NSPANEL_TFT_UPLOAD' in s]:
-            enable_tft_upload = False
+    enable_tft_upload = not has_build_define(
+        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
 
     # TODO: check that upload_tft() function is not used anywhere
     if enable_tft_upload:

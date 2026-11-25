@@ -2285,7 +2285,7 @@ void NSPanelLovelace::call_ha_service_(
 
 #if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
   auto it = data.find(to_string(ha_attr_type::entity_id));
-  if (it == data.end())
+  if (it != data.end())
     ESP_LOGD(TAG, "Call HA: %s -> %s", service.c_str(), it->second.c_str());
   else
     ESP_LOGD(TAG, "Call HA: %s", service.c_str());

@@ -12,9 +12,11 @@ A special thanks goes to these great projects for making this possible:
 
 ## Fork and ESPHome version policy
 
-This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native). It aims to stay ahead of ESPHome's monthly releases (for example, 2026.11.0, 2026.12.0, and 2027.1.0), targeting compatibility one or two releases ahead when possible. Future-release compatibility is an aim, not a guarantee.
+This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native). It aims to support current ESPHome releases and maintain backward compatibility for one or two previous monthly releases where practical; compatibility with older releases is not maintained. There is no commitment to support future releases ahead of their release.
 
-Backward compatibility with older ESPHome releases is not maintained. The minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
+The current minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
+
+Continuous integration compiles the `basic`, `advanced`, `codegen` and `codegen-no-tft` configurations on the supported floor (`2026.11.0`) and `stable`. A separate floor-pinned job runs the unit and code-generation tests once. The `CI required` check aggregates both jobs; configure it as a required status check in branch protection after it appears in GitHub. A manual (`workflow_dispatch`-only) job compiles the codegen fixture against the official `beta` image as an advisory preview: a passing preview does not make beta a supported version.
 
 # Installation
 
@@ -51,7 +53,7 @@ The `sleep_timeout` values (top-level and per-card) are limited to `0`-`65` seco
 As much as I love embedded programming, I am unable to dedicate the time required to make this project great without the help of others.
 This is a **beta project** which is not fully functional yet and is subject to change without notice. It has taken a lot of time and effort to get the project to this point and it will take a lot more time to get the project past beta.
 
-There are many UI components missing. The [python build script](components/nspanel_lovelace/__init__.py) has since been hardened — stricter config validation, correct codegen and build-flag handling, with unit tests run against a pinned ESPHome floor (2026.11.0) — but it is still a single ~1000-line module: a full structural refactor (splitting validation, codegen and resource handling) is still planned, and PRs to the ESPHome repo are still required for deeper code-generation flexibility.
+There are many UI components missing. The [python build script](components/nspanel_lovelace/__init__.py) has since been hardened — stricter config validation, correct codegen and build-flag handling, with unit tests run against a pinned ESPHome floor (2026.11.0) — and structurally refactored: per-configuration codegen state, separated resource handling ([resources.py](components/nspanel_lovelace/resources.py)) and named codegen helpers, with byte-identical generated output verified. It remains a large single module (~1000 lines), and PRs to the ESPHome repo are still required for deeper code-generation flexibility.
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display

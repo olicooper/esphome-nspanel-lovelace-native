@@ -6,9 +6,11 @@ No hardware and no secrets: the fixture uses only fictional entities and
 hardcoded values. Run inside the approved ESPHome 2026.11.0 runner image.
 """
 
+import importlib
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +18,7 @@ CODEGEN_YAML = REPO_ROOT / "ci" / "codegen.yaml"
 BUILD_DIR = REPO_ROOT / "ci" / ".esphome" / "build" / "ci-codegen"
 MAIN_CPP = BUILD_DIR / "src" / "main.cpp"
 DEFINES_H = BUILD_DIR / "src" / "esphome" / "core" / "defines.h"
+GOLDEN_MAIN_CPP = REPO_ROOT / "tests" / "golden" / "main-codegen.cpp"
 
 
 def run_esphome(*args: str) -> subprocess.CompletedProcess:
@@ -275,6 +278,22 @@ def assert_no_none_tokens(src: str) -> None:
     assert re.search(r"\bNone\b", stripped) is None
 
 
+def normalize_main_cpp(src: str) -> str:
+    """Strip the machine-specific parts of a generated main.cpp so it can be
+    compared against a committed golden file across build directories:
+    drop the ``#line`` directives (they embed absolute config/build paths)
+    and blank the absolute external_components path in the config dump."""
+    out = []
+    for line in src.splitlines(keepends=True):
+        if re.match(r"\s*#line\b", line):
+            continue
+        if re.search(r"\bpath: /", line):
+            out.append(re.sub(r"(path:\s*)/\S+", r"\1<COMPONENTS>", line))
+            continue
+        out.append(line)
+    return "".join(out)
+
+
 def test_codegen_baseline() -> None:
     result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
     assert result.returncode == 0, (
@@ -366,6 +385,30 @@ def test_codegen_baseline() -> None:
     assert "codegen_extra_value" in src
 
     assert_no_none_tokens(src)
+
+
+def test_codegen_matches_golden() -> None:
+    """The generated ci/codegen.yaml main.cpp must be byte-identical (modulo
+    build-directory-specific lines) to the committed golden file. This is the
+    regression guard for the state-isolation and expression-API refactors:
+    any reordering of codegen, a UUID-allocation shift, or a quoting change
+    that the individual pattern asserts miss will fail the whole-file compare.
+    Generates the fixture independently of the baseline test."""
+    result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
+    assert result.returncode == 0, (
+        "esphome compile --only-generate ci/codegen.yaml failed:\n"
+        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}"
+    )
+    assert GOLDEN_MAIN_CPP.is_file(), f"missing golden {GOLDEN_MAIN_CPP}"
+    generated = normalize_main_cpp(MAIN_CPP.read_text())
+    golden = normalize_main_cpp(GOLDEN_MAIN_CPP.read_text())
+    assert generated == golden, (
+        "generated main.cpp no longer matches the golden file. If a "
+        "behavioural change to the generated output is intentional, "
+        "regenerate it (floor image: `esphome compile --only-generate "
+        "ci/codegen.yaml`) and update tests/golden/main-codegen.cpp after "
+        "reviewing the diff."
+    )
 
 
 def test_codegen_all_hidden_cards(tmp_path: Path) -> None:
@@ -493,3 +536,119 @@ def test_codegen_single_visible_card(tmp_path: Path) -> None:
     assert src.count("set_nav_right") == 1
     assert "set_hidden" not in src
     assert_no_none_tokens(src)
+
+
+def test_tile_icon_setter_emits_expression_verbatim(tmp_path: Path) -> None:
+    """Tile icon setters (generate_icon_config) must emit the icon
+    expression verbatim -- a built-in icon as its namespaced icon_t member
+    and a custom glyph as its CUSTOM_ICONS slot -- with no added quoting or
+    escaping. Pins the exact lines before/after the raw-statement to
+    expression-API change (Task 9)."""
+    body = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp_a
+          icon: alert-circle-outline
+        - entity_id: light.lamp_b
+          icon: hiking
+"""
+    src = generate_synthetic(tmp_path, body, "tile-icon-setter")
+    # Built-in icon: verbatim namespaced icon_t member, no quotes.
+    assert ("nspanel_card_1_item_1->set_icon_value("
+            "nspanel_lovelace::icon_t::alert_circle_outline);") in src
+    # Custom glyph: verbatim CUSTOM_ICONS lookup, no quotes.
+    assert "nspanel_card_1_item_2->set_icon_value(CUSTOM_ICONS[0]);" in src
+    # The custom literal stays the same inside the CUSTOM_ICONS array.
+    assert 'u8"\\uED7E"' in src
+    assert src.count("set_icon_value(") == 2  # no status icon in this config
+    assert_no_none_tokens(src)
+
+
+def test_status_icon_entity_only_uses_default_glyph(tmp_path: Path) -> None:
+    """A status icon with neither icon nor color configured takes the
+    3-arg constructor with the default glyph (no setter at all). Pins the
+    'neither' branch before/after the Task 9 constructor change."""
+    body = """\
+  screensaver:
+    status_icon_left:
+      entity_id: light.lamp_a
+"""
+    src = generate_synthetic(tmp_path, body, "status-entity-only")
+    assert len(re.findall(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, (?:nspanel_lovelace::)?icon_t::alert_circle_outline\)',
+        src,
+    )) == 1
+    assert "set_icon_value(" not in src
+    assert "set_icon_color(" not in src
+    assert_no_none_tokens(src)
+
+
+def load_component():
+    """Import the component module under test (once)."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    return importlib.import_module("components.nspanel_lovelace")
+
+
+def _grid_card(eid: str) -> dict:
+    return {"type": "cardGrid", "hidden": False, "sleep_timeout": 10,
+            "entities": [{"entity_id": eid}]}
+
+
+def test_codegen_contexts_are_independent_same_process() -> None:
+    """CodegenContext must be per-call: two contexts built from the same
+    fixture in one process allocate identical entity variable names, start
+    the UUID index at the same value (first generated UUID is "1"), and
+    allocate identical custom-icon slots, with no leftovers from the first
+    context. ESPHome's CORE is reset between the two (the way this version
+    expects); the component module is NOT reloaded, so any module-level
+    counter or dict would leak through."""
+    import esphome.core as core
+
+    nsl = load_component()
+    fixture = {
+        "model": "eu",
+        "locale": {"language": "en"},
+        "screensaver": {"status_icon_left": {"entity_id": "light.lamp_a"}},
+        "cards": [_grid_card("light.kitchen"), _grid_card("sensor.demo")],
+    }
+
+    core.CORE.reset()
+    ctx1 = nsl.CodegenContext(fixture)
+    core.CORE.reset()
+    ctx2 = nsl.CodegenContext(fixture)
+
+    # Identical entity variable names in identical first-use order
+    assert ctx1.entity_ids == {
+        "light.kitchen": "nspanel_e0",
+        "sensor.demo": "nspanel_e1",
+        "light.lamp_a": "nspanel_e2",
+    }
+    assert ctx1.entity_ids == ctx2.entity_ids
+    # First generated UUID is "1" in both contexts
+    assert ctx1.new_uuid() == "1"
+    assert ctx2.new_uuid() == "1"
+    # Custom-icon slots start empty and allocate independently
+    assert ctx1.custom_icons == {} and ctx2.custom_icons == {}
+    assert str(ctx1.icon("ED7E")) == "CUSTOM_ICONS[0]"
+    assert str(ctx2.icon("ED7E")) == "CUSTOM_ICONS[0]"
+
+
+def test_codegen_context_no_leftover_from_previous_config() -> None:
+    """A context built for config B in the same process must contain none of
+    config A's entities, and its entity variables restart at nspanel_e0."""
+    nsl = load_component()
+    config_a = {"model": "eu", "locale": {"language": "en"},
+                "screensaver": {}, "cards": [_grid_card("light.only_in_a")]}
+    config_b = {"model": "eu", "locale": {"language": "en"},
+                "screensaver": {}, "cards": [_grid_card("light.only_in_b")]}
+
+    ctx_a = nsl.CodegenContext(config_a)
+    ctx_b = nsl.CodegenContext(config_b)
+    assert ctx_b.entity_ids == {"light.only_in_b": "nspanel_e0"}
+    assert "light.only_in_a" not in ctx_b.entity_ids
+    assert ctx_a.entity_ids == {"light.only_in_a": "nspanel_e0"}

@@ -10,6 +10,7 @@ on:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
       - "*example.yaml"
+      - "secrets-example.yaml"
       - "ci/**"
       - "tests/**"
 
@@ -18,29 +19,43 @@ on:
       - dev
     paths:
       - "components/nspanel_lovelace/**"
+      - ".github/workflows/build.yaml"
       - "*example.yaml"
+      - "secrets-example.yaml"
       - "ci/**"
       - "tests/**"
 
 jobs:
-  test:
-    name: Build
+  build:
+    name: Build (${{ matrix.variant }}, ESPHome ${{ matrix.version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        version: [stable]
-        variant: [basic, advanced]
+        # 2026.11.0 is the supported floor (cv.require_esphome_version in
+        # the component); stable is the current official release. When
+        # stable resolves to the floor, those legs duplicate each other —
+        # noted, not de-duplicated: the floor stays pinned.
+        # codegen-no-tft is included so the USE_NSPANEL_TFT_UPLOAD-disabled
+        # path is compiled at every blocking version, not just the floor.
+        version: [2026.11.0, stable]
+        variant: [basic, advanced, codegen, codegen-no-tft]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}
     steps:
     - uses: actions/checkout@v6
+    - name: Report ESPHome version
+      run: esphome version
     - name: Copy test secrets
       run: |
         cp secrets-example.yaml secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
 
+  # Single floor-pinned host-test job: the pytest suite runs once (it does not
+  # multiply across the firmware matrix) and needs no secrets -- the synthetic
+  # and codegen fixtures use hardcoded credentials, and firmware compiles are
+  # the build matrix's job (which gates codegen-no-tft at every version).
   unittest:
     name: Test (floor)
     runs-on: ubuntu-latest
@@ -48,14 +63,34 @@ jobs:
       image: ghcr.io/esphome/esphome:2026.11.0
     steps:
     - uses: actions/checkout@v6
-    - name: Copy test secrets
-      run: |
-        cp secrets-example.yaml secrets.yaml
     - name: Install pytest
       run: python -m pip install --quiet pytest
     - name: Run unit and codegen generation tests
       run: python -m pytest -q tests
-    - name: Compile codegen fixture
+
+  required:
+    name: CI required
+    if: ${{ always() }}
+    needs: [build, unittest]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Require all blocking jobs
+      env:
+        BUILD_RESULT: ${{ needs.build.result }}
+        TEST_RESULT: ${{ needs.unittest.result }}
+      run: test "$BUILD_RESULT" = success && test "$TEST_RESULT" = success
+
+  # Advisory preview: manual-only, never runs on push/PR, and a pass does
+  # NOT make beta a supported version (the floor remains 2026.11.0).
+  preview:
+    name: Preview (beta, advisory)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/esphome/esphome:beta
+    steps:
+    - uses: actions/checkout@v6
+    - name: Report ESPHome version
+      run: esphome version
+    - name: Compile codegen fixture (representative variant)
       run: esphome compile ci/codegen.yaml
-    - name: Compile codegen fixture (TFT upload disabled)
-      run: esphome compile ci/codegen-no-tft.yaml

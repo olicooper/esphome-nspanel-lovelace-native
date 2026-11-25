@@ -109,97 +109,77 @@ def test_card_entity_limits_baseline() -> None:
     assert nsl.get_card_entities_length_limits("cardMedia") == [0, 8]
 
 
-def _point_icons_at(nsl, tmp_path: Path, file_name: str = "icons.json"):
-    """Point the component's icon catalog lookup at a temp file. Returns the
-    file path; restores the module state on test end via _restore_icons."""
-    import os
-    nsl._orig_file = nsl.__file__
-    nsl.__file__ = str(tmp_path / "nspanel_lovelace" / "__init__.py")
-    target = tmp_path / "nspanel_lovelace" / file_name
-    return target
+def _point_icons_at(nsl, tmp_path: Path, monkeypatch, file_name: str = "icons.json"):
+    """Point the component's icon catalog lookup at a temp file and reset the
+    catalog to a clean state. Both the path override and the catalog reset are
+    registered with `monkeypatch`, so they are undone on test end even if an
+    assertion below raises (no try/finally, no state leak)."""
+    monkeypatch.setattr(nsl.resources, "__file__",
+                        str(tmp_path / "nspanel_lovelace" / "resources.py"))
+    monkeypatch.setattr(nsl.resources, "iconJson", None)
+    return tmp_path / "nspanel_lovelace" / file_name
 
 
-def _restore_icons(nsl):
-    nsl.__file__ = nsl._orig_file
-    del nsl._orig_file
-    nsl.iconJson = None
-
-
-def test_load_icons_missing_catalog(tmp_path: Path) -> None:
+def test_load_icons_missing_catalog(tmp_path: Path, monkeypatch) -> None:
     nsl = load_component()
-    target = _point_icons_at(nsl, tmp_path)
-    try:
-        with pytest.raises(nsl.cv.Invalid) as exc_info:
-            nsl.load_icons()
-        assert str(target) in str(exc_info.value)
-    finally:
-        _restore_icons(nsl)
+    target = _point_icons_at(nsl, tmp_path, monkeypatch)
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_icons()
+    assert str(target) in str(exc_info.value)
 
 
-def test_load_icons_bad_json(tmp_path: Path) -> None:
+def test_load_icons_bad_json(tmp_path: Path, monkeypatch) -> None:
     nsl = load_component()
-    target = _point_icons_at(nsl, tmp_path)
+    target = _point_icons_at(nsl, tmp_path, monkeypatch)
     target.parent.mkdir(parents=True)
     target.write_text("{not json", encoding="utf-8")
-    try:
-        with pytest.raises(nsl.cv.Invalid) as exc_info:
-            nsl.load_icons()
-        assert str(target) in str(exc_info.value)
-        # The loader must not write anything to the catalog path
-        assert target.read_text(encoding="utf-8") == "{not json"
-    finally:
-        _restore_icons(nsl)
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_icons()
+    assert str(target) in str(exc_info.value)
+    # The loader must not write anything to the catalog path
+    assert target.read_text(encoding="utf-8") == "{not json"
 
 
-def test_load_icons_empty_catalog(tmp_path: Path) -> None:
+def test_load_icons_empty_catalog(tmp_path: Path, monkeypatch) -> None:
     nsl = load_component()
-    target = _point_icons_at(nsl, tmp_path)
+    target = _point_icons_at(nsl, tmp_path, monkeypatch)
     target.parent.mkdir(parents=True)
     target.write_text("[]", encoding="utf-8")
-    try:
-        with pytest.raises(nsl.cv.Invalid) as exc_info:
-            nsl.load_icons()
-        assert str(target) in str(exc_info.value)
-    finally:
-        _restore_icons(nsl)
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_icons()
+    assert str(target) in str(exc_info.value)
 
 
-def test_load_icons_invalid_later_entry(tmp_path: Path) -> None:
+def test_load_icons_invalid_later_entry(tmp_path: Path, monkeypatch) -> None:
     nsl = load_component()
-    target = _point_icons_at(nsl, tmp_path)
+    target = _point_icons_at(nsl, tmp_path, monkeypatch)
     target.parent.mkdir(parents=True)
     target.write_text(
         '[{"name": "ok-icon", "hex": "E001"}, {"name": "bad-icon", "hex": "xy12"}]',
         encoding="utf-8",
     )
-    try:
-        with pytest.raises(nsl.cv.Invalid) as exc_info:
-            nsl.load_icons()
-        assert "bad-icon" in str(exc_info.value)
-        assert str(target) in str(exc_info.value)
-    finally:
-        _restore_icons(nsl)
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_icons()
+    assert "bad-icon" in str(exc_info.value)
+    assert str(target) in str(exc_info.value)
 
 
-def test_load_icons_valid_two_entries(tmp_path: Path) -> None:
+def test_load_icons_valid_two_entries(tmp_path: Path, monkeypatch) -> None:
     nsl = load_component()
-    target = _point_icons_at(nsl, tmp_path)
+    target = _point_icons_at(nsl, tmp_path, monkeypatch)
     target.parent.mkdir(parents=True)
     target.write_text(
         '[{"name": "ok-icon", "hex": "E001"}, {"name": "other-icon", "hex": "E002"}]',
         encoding="utf-8",
     )
-    try:
-        nsl.load_icons()
-        assert nsl.get_icon_hex("ok-icon") == "E001"
-        assert nsl.get_icon_hex("hex:E002") == "E002"
-    finally:
-        _restore_icons(nsl)
+    nsl.load_icons()
+    assert nsl.get_icon_hex("ok-icon") == "E001"
+    assert nsl.get_icon_hex("hex:E002") == "E002"
 
 
 def test_get_icon_hex_real_catalog() -> None:
     nsl = load_component()
-    nsl.iconJson = None
+    nsl.resources.iconJson = None
     nsl.load_icons()  # loads the bundled catalog
     assert nsl.get_icon_hex("hiking") == "ED7E"
     assert nsl.get_icon_hex("hex:ED7E") == "ED7E"
@@ -266,7 +246,9 @@ def test_resolve_translation_path_bundled_and_absolute() -> None:
     nsl = load_component()
     config_relative = lambda s: Path("/cfg") / s
     p, legacy = nsl.resolve_translation_path("de", config_relative)
-    assert p == Path(nsl.__file__).resolve().parent / "translations" / "de.json"
+    # resolve_translation_path resolves the bundled directory relative to
+    # resources.__file__ (the leaf data module), not the package __init__.
+    assert p == Path(nsl.resources.__file__).resolve().parent / "translations" / "de.json"
     assert legacy is False
     p, legacy = nsl.resolve_translation_path("/abs/custom.json", config_relative)
     assert p == Path("/abs/custom.json") and legacy is False
@@ -472,6 +454,24 @@ def test_unknown_default_card_rejected(tmp_path: Path) -> None:
     assert "Cannot find a card with the id 'missing'" in out, out
 
 
+def test_unknown_card_type_rejected(tmp_path: Path) -> None:
+    """An unknown card type such as lowercase 'cardgrid' fails validation."""
+    body = """\
+  cards:
+    - type: cardgrid
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="unknown-type")
+    assert result.returncode != 0, (
+        f"unknown card type should be rejected:\n{result.stdout}"
+    )
+    out = result.stdout + result.stderr
+    assert "Unknown value 'cardgrid'" in out, out
+    # The schema must still offer the known keys as a suggestion.
+    assert "cardGrid" in out, out
+
+
 def test_status_icon_requires_entity_id(tmp_path: Path) -> None:
     """A provided status icon block must fail validation without an entity_id,
     not crash codegen."""
@@ -531,6 +531,50 @@ def test_sleep_timeout_card_bounds(tmp_path: Path) -> None:
         assert result.returncode != 0, (
             f"card sleep_timeout {timeout} should be rejected:\n{result.stdout}"
         )
+
+
+def _validated_body_config(cards, default_card=None, screensaver=None) -> dict:
+    """A post-schema nspanel_lovelace config dict (defaults applied the way
+    CONFIG_SCHEMA would), so validate_config can be exercised in-process:
+    a subprocess (esphome config) cannot expose module state that persists
+    across validations within one process."""
+    config = {
+        "model": "eu",
+        "locale": {"language": "en"},
+        "cards": cards,
+    }
+    if screensaver is not None:
+        config["screensaver"] = screensaver
+    if default_card is not None:
+        config["default_card"] = default_card
+    return config
+
+
+def test_stale_card_id_rejected_in_same_process() -> None:
+    """Card ids must not persist between validations in one process: after
+    validating config A (card id 'a_card'), config B (different cards,
+    default_card: a_card) must reject the stale reference. Only an
+    in-process repeat validation can prove this."""
+    import esphome.core as core
+    from esphome.const import KEY_CORE, KEY_TARGET_FRAMEWORK
+
+    nsl = load_component()
+    core.CORE.reset()
+    core.CORE.data[KEY_CORE] = {KEY_TARGET_FRAMEWORK: "esp-idf"}
+
+    config_a = _validated_body_config(cards=[
+        {"type": "cardGrid", "id": "a_card", "hidden": False, "sleep_timeout": 10,
+         "entities": [{"entity_id": "light.a"}]},
+    ], screensaver={})
+    nsl.validate_config(config_a)  # must pass
+
+    config_b = _validated_body_config(cards=[
+        {"type": "cardGrid", "id": "b_card", "hidden": False, "sleep_timeout": 10,
+         "entities": [{"entity_id": "light.b"}]},
+    ], default_card="a_card", screensaver={})
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.validate_config(config_b)
+    assert "a_card" in str(exc_info.value)
 
 
 def test_dangling_navigation_reports_tile_path(tmp_path: Path) -> None:

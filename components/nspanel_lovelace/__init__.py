@@ -1,13 +1,11 @@
 from esphome import automation
 import esphome.config_validation as cv
-import esphome.config_helpers as ch
 import esphome.codegen as cg
 import esphome.core as core
 import re
 import logging
-from typing import Callable, Union
+from typing import Union
 from pathlib import Path
-import os, json
 
 from esphome.components import uart, time, esp32
 from esphome.const import (
@@ -17,6 +15,15 @@ from esphome.const import (
     CONF_ESPHOME,
     CONF_BUILD_FLAGS,
     CONF_PLATFORMIO_OPTIONS
+)
+
+from . import resources
+from .resources import (
+    CONF_LOCALE,
+    CONF_LANGUAGE,
+    load_icons,
+    load_translations,
+    resolve_translation_path,
 )
 
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
@@ -33,19 +40,12 @@ def AUTO_LOAD():
 
 _LOGGER = logging.getLogger(__name__)
 
-card_ids: dict[str] = {}
-entity_ids: dict[str] = {}
-entity_id_index = 0
-uuid_index = 0
-iconJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
 NSPanelLovelace = nspanel_lovelace_ns.class_("NSPanelLovelace", cg.Component, uart.UARTDevice)
 TRANSLATION_ITEM = nspanel_lovelace_ns.enum("translation_item", True)
 icon_t = nspanel_lovelace_ns.enum("icon_t", True)
-custom_icons: dict[str, list] = {}
-custom_icons_index = 0
 
 ALARM_ARM_ACTION = nspanel_lovelace_ns.enum("alarm_arm_action", True)
 ALARM_ARM_OPTIONS = ['arm_home','arm_away','arm_night','arm_vacation','arm_custom_bypass']
@@ -72,21 +72,6 @@ ENTITY_TYPES = [
     'alarm_control_panel','input_boolean','button','input_button','cover','fan',
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
-]
-REQUIRED_TRANSLATION_KEYS = [
-    "none","unknown","preset_mode","swing_mode","fan_mode","activity","away","boost",
-    "comfort","eco","home","sleep","cool","cooling","dry","drying","fan","heat","heating",
-    "heat_cool","idle","auto","fan_only","on","off","currently","state","action","lock","unlock",
-    "paused","active","activate","press","run","speed","brightness","color","color_temp",
-    "position","start","pause","cancel","finish","arm_home","arm_away","arm_night","arm_vacation",
-    "arm_custom_bypass","armed_home","armed_away","armed_night","armed_vacation","armed_custom_bypass",
-    "arming","disarming","disarmed","pending","triggered","disarm","tilt_position",
-    "above_horizon","below_horizon","not_home","start_cleaning","return_to_base","docked",
-    "turn_on","turn_off","month_january","month_jan","month_february","month_feb","month_march","month_mar",
-    "month_april","month_apr","month_may","month_june","month_jun","month_july","month_jul","month_august",
-    "month_aug","month_september","month_sep","month_october","month_oct","month_november","month_nov",
-    "month_december","month_dec","dow_sunday","dow_sun","dow_monday","dow_mon","dow_tuesday","dow_tue",
-    "dow_wednesday","dow_wed","dow_thursday","dow_thu","dow_friday","dow_fri","dow_saturday","dow_sat"
 ]
 BUILTIN_ICON_MAP: list = [
     ["E003",icon_t.account],["F098",icon_t.air_humidifier],["E027",icon_t.alert_circle],["E5D5",icon_t.alert_circle_outline],
@@ -129,9 +114,7 @@ CONF_SLEEP_TIMEOUT = "sleep_timeout"
 CONF_DEFAULT_CARD = "default_card"
 CONF_EXP_VERT_UI = "experimental_vertical_ui"
 
-CONF_LOCALE = "locale"
 CONF_TEMPERATURE_UNIT = "temperature_unit"
-CONF_LANGUAGE = "language"
 
 CONF_SCREENSAVER = "screensaver"
 CONF_MODEL = "model"
@@ -166,31 +149,6 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 CONF_CARD_MEDIA_ENTITY_ID = "media_entity_id"
 
-ICON_HEX_RE = re.compile(r"^[0-9A-Fa-f]{4}$")
-
-def load_icons():
-    """Load the bundled icons.json catalog. The catalog must be a nonempty list
-    of objects with a nonempty string 'name' and a 4-character hex 'hex'."""
-    global iconJson
-    current_directory = os.path.dirname(__file__)
-    iconJsonPath = os.path.join(current_directory, 'icons.json')
-    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load icons from '{iconJsonPath}'")
-    try:
-        with open(iconJsonPath, encoding="utf-8") as read_file:
-            iconJson = json.load(read_file)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise cv.Invalid(f"Failed to load icons catalog from '{iconJsonPath}': {err}")
-    if not isinstance(iconJson, list) or len(iconJson) == 0:
-        raise cv.Invalid(f"Icons catalog is empty: '{iconJsonPath}'")
-    for entry in iconJson:
-        if (not isinstance(entry, dict)
-                or not isinstance(entry.get("name"), str) or not entry["name"]
-                or not isinstance(entry.get("hex"), str) or not ICON_HEX_RE.match(entry["hex"])):
-            raise cv.Invalid(
-                f"Icons catalog entry is invalid (need nonempty string 'name' and a "
-                f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
-    _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
-
 def has_build_define(esphome_config: dict, name: str) -> bool:
     """True when a build flag defines ``name``.
 
@@ -215,68 +173,6 @@ def has_build_define(esphome_config: dict, name: str) -> bool:
                 return True
     return False
 
-def resolve_translation_path(language: str, config_relative: Callable[[str], Path]) -> tuple[Path, bool]:
-    """Resolve a locale language to its translation file.
-
-    Bundled languages (no ".json" suffix) resolve inside the bundled
-    translations/ directory. A ".json" language resolves relative to the
-    top-level configuration directory (config_relative), or unchanged when
-    absolute. When the config-relative path does not exist, the legacy
-    working-directory path is returned instead and the boolean is True
-    (never for absolute paths or bundled languages).
-    """
-    if not language.endswith(".json"):
-        return Path(__file__).resolve().parent / "translations" / f"{language}.json", False
-    if os.path.isabs(language):
-        return Path(language), False
-    config_path = Path(config_relative(language))
-    if config_path.exists():
-        return config_path, False
-    legacy_path = Path(os.path.abspath(language))
-    if legacy_path.exists():
-        return legacy_path, True
-    return config_path, False
-
-def load_translations(path) -> dict:
-    """Load a translation file and validate its shape: a JSON object mapping
-    string keys to string values containing every REQUIRED_TRANSLATION_KEY.
-    Extra string-valued keys are allowed and preserved (insertion order)."""
-    try:
-        with open(path, encoding="utf-8") as read_file:
-            data = json.load(read_file)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
-        raise cv.Invalid(f"Failed to load translation file from '{path}': {err}", [CONF_LOCALE, CONF_LANGUAGE])
-    if not isinstance(data, dict):
-        raise cv.Invalid(
-            f"Translation file '{path}' must be a JSON object of string keys to string values",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    missingKeys = [k for k in REQUIRED_TRANSLATION_KEYS if k not in data]
-    if missingKeys:
-        raise cv.Invalid(
-            f"Translation file '{path}' is missing the following required keys: {missingKeys}",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    badKeys = [k for k, v in data.items() if not isinstance(v, str)]
-    if badKeys:
-        raise cv.Invalid(
-            f"Translation file '{path}' has non-string values for the following keys: {badKeys}",
-            [CONF_LOCALE, CONF_LANGUAGE])
-    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file '{path}' ({len(data)} entries)")
-    return data
-
-def get_icon(iconHexStr) -> Union[cg.MockObj, None]:
-    global custom_icons, custom_icons_index
-    if not isinstance(iconHexStr, str):
-        return None
-    for v in BUILTIN_ICON_MAP:
-        if iconHexStr == v[0]:
-            return v[1]
-
-    found_icon = custom_icons.get(iconHexStr, None)
-    if found_icon is None:
-        custom_icons[iconHexStr] = [custom_icons_index, cg.RawExpression(r'u8"\u{0}"'.format(iconHexStr))]
-        custom_icons_index += 1
-    return cg.RawExpression(f"CUSTOM_ICONS[{custom_icons[iconHexStr][0]}]")
-
 def get_icon_hex(iconLookup: str) -> Union[str, None]:
     if not iconLookup or len(iconLookup) == 0:
         return None
@@ -285,11 +181,11 @@ def get_icon_hex(iconLookup: str) -> Union[str, None]:
         iconLookup = iconLookup[4:]
         searchHex = True
     _LOGGER.debug(f"Finding icon: '{iconLookup}'")
-    if iconJson is None:
+    if resources.iconJson is None:
         load_icons()
-    if iconJson is not None:
+    if resources.iconJson is not None:
         key = 'hex' if searchHex else 'name'
-        for attrs in iconJson:
+        for attrs in resources.iconJson:
             if attrs[key] == iconLookup:
                 return attrs['hex'].upper()
     return None
@@ -451,12 +347,6 @@ SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, MAX_SLEEP_TIMEOUT)
 })
 
-def add_entity_id(id: str):
-    global entity_ids, entity_id_index
-    if (entity_ids.get(id) is None):
-        entity_ids[id] = f"nspanel_e{entity_id_index}"
-        entity_id_index += 1
-
 def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[int]:
     if (card_type == CARD_ENTITIES):
         return [1,4] if model in ['eu','us-l'] else [1,6]
@@ -471,7 +361,6 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
     return [0,0]
 
 def validate_config(config):
-    global card_ids
     if core.CORE.using_arduino:
         raise cv.Invalid(
             "nspanel_lovelace requires the ESP-IDF framework (framework: type: esp-idf). "
@@ -493,7 +382,9 @@ def validate_config(config):
             f"configuration directory; using the legacy working-directory path "
             f"'{translation_path}'. Place the file next to the configuration instead.")
     load_translations(translation_path)
-    # Build a list of custom card ids, rejecting duplicates
+    # Build a local list of custom card ids (validation state never leaves
+    # this function), rejecting duplicates
+    card_ids: dict[str, int] = {}
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         if CONF_ID in card_config:
             card_id = card_config[CONF_ID]
@@ -547,25 +438,6 @@ def validate_config(config):
                         f'navigation entity_id invalid, no card has the id "{card_id}"',
                         err_path + [j, CONF_ENTITY_ID],
                     )
-            # Add all valid HA entities to global entity list for later processing
-            # (iText pseudo-entities are included; 'delete' is the exact sentinel)
-            if entity_id != 'delete':
-                add_entity_id(entity_id)
-        if CONF_CARD_ALARM_ENTITY_ID in card_config:
-            add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
-        if CONF_CARD_THERMO_ENTITY_ID in card_config:
-            add_entity_id(card_config.get(CONF_CARD_THERMO_ENTITY_ID))
-        if CONF_CARD_MEDIA_ENTITY_ID in card_config:
-            add_entity_id(card_config.get(CONF_CARD_MEDIA_ENTITY_ID))
-
-    if CONF_SCREENSAVER in config:
-        screensaver_config = config.get(CONF_SCREENSAVER)
-        left = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_LEFT, None)
-        right = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_RIGHT, None)
-        if left and CONF_ENTITY_ID in left:
-            add_entity_id(left.get(CONF_ENTITY_ID))
-        if right and CONF_ENTITY_ID in right:
-            add_entity_id(right.get(CONF_ENTITY_ID))
 
     return config
 
@@ -616,8 +488,7 @@ CONFIG_SCHEMA = cv.All(
                     cv.Optional(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
                     cv.Required(CONF_CARD_MEDIA_ENTITY_ID): valid_entity_id(['media_player'])
                 }),
-            },
-            default_type=CARD_GRID))
+            }))
         ),
     })
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -633,7 +504,6 @@ GlobalConfig.op = "::"
 Screensaver = nspanel_lovelace_ns.class_("Screensaver")
 EntitiesCard = nspanel_lovelace_ns.class_("EntitiesCard")
 GridCard = nspanel_lovelace_ns.class_("GridCard")
-# GridCard2 = nspanel_lovelace_ns.class_("GridCard2")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
 AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
 ThermoCard = nspanel_lovelace_ns.class_("ThermoCard")
@@ -661,17 +531,74 @@ PAGE_MAP = {
     CARD_MEDIA: ["nspanel_card_", MediaCard, PageType.cardMedia, GridCardEntityItem],
 }
 
-def get_new_uuid(prefix: str = ""):
-    global uuid_index
-    uuid_index += 1
-    return prefix + str(uuid_index)
+def collect_entity_ids(config: dict) -> dict[str, str]:
+    """Build the ordered entity -> variable map for one validated config, at
+    codegen time. Preserves the historical loop order: card tiles in card
+    order (exact 'delete' excluded), then each card's alarm/thermo/media
+    entity, then the screensaver's left and right status icons. navigate and
+    iText pseudo-entities are registered like any other tile; first use
+    wins; variables are named nspanel_e0, nspanel_e1, ..."""
+    entity_ids: dict[str, str] = {}
+    index = 0
 
-def get_entity_id(entity_id):
-    # if entity_id in [None, "", "delete"] or entity_id.startswith("iText"):
-    #     return entity_id
-    return cg.MockObj(entity_ids[entity_id])
+    def add(entity_id):
+        nonlocal index
+        if entity_id is not None and entity_id not in entity_ids:
+            entity_ids[entity_id] = f"nspanel_e{index}"
+            index += 1
 
-def generate_icon_config(icon_config, parent_class: cg.MockObj = None) -> Union[None, dict]:
+    for card_config in config.get(CONF_CARDS, []):
+        for entity_config in card_config.get(CONF_CARD_ENTITIES, []):
+            entity_id = entity_config.get(CONF_ENTITY_ID)
+            if entity_id != 'delete':
+                add(entity_id)
+        if CONF_CARD_ALARM_ENTITY_ID in card_config:
+            add(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
+        if CONF_CARD_THERMO_ENTITY_ID in card_config:
+            add(card_config.get(CONF_CARD_THERMO_ENTITY_ID))
+        if CONF_CARD_MEDIA_ENTITY_ID in card_config:
+            add(card_config.get(CONF_CARD_MEDIA_ENTITY_ID))
+    if CONF_SCREENSAVER in config:
+        screensaver_config = config.get(CONF_SCREENSAVER)
+        left = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_LEFT, None)
+        right = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_RIGHT, None)
+        if left and CONF_ENTITY_ID in left:
+            add(left.get(CONF_ENTITY_ID))
+        if right and CONF_ENTITY_ID in right:
+            add(right.get(CONF_ENTITY_ID))
+    return entity_ids
+
+class CodegenContext:
+    """Per-call codegen state: the entity variable map, the UUID index and
+    the custom-icon slots, one instance per to_code() call. Nothing here is
+    shared between configurations in the same process."""
+
+    def __init__(self, config: dict):
+        self.entity_ids = collect_entity_ids(config)
+        self.uuid_index = 0
+        self.custom_icons: dict[str, list] = {}  # hex -> [slot, expression]
+
+    def new_uuid(self, prefix: str = "") -> str:
+        self.uuid_index += 1
+        return prefix + str(self.uuid_index)
+
+    def entity(self, entity_id) -> cg.MockObj:
+        return cg.MockObj(self.entity_ids[entity_id])
+
+    def icon(self, iconHexStr) -> Union[cg.MockObj, None]:
+        if not isinstance(iconHexStr, str):
+            return None
+        for v in BUILTIN_ICON_MAP:
+            if iconHexStr == v[0]:
+                return v[1]
+        found_icon = self.custom_icons.get(iconHexStr, None)
+        if found_icon is None:
+            self.custom_icons[iconHexStr] = [
+                len(self.custom_icons),
+                cg.RawExpression(r'u8"\u{0}"'.format(iconHexStr))]
+        return cg.RawExpression(f"CUSTOM_ICONS[{self.custom_icons[iconHexStr][0]}]")
+
+def generate_icon_config(icon_config, ctx: CodegenContext, parent_class: cg.MockObj = None) -> Union[None, dict]:
     attrs = {
         "value": None,
         "color": None,
@@ -683,18 +610,19 @@ def generate_icon_config(icon_config, parent_class: cg.MockObj = None) -> Union[
         elif isinstance(icon_config, str):
             attrs["value"] = icon_config
     if isinstance(attrs["value"], str):
-        attrs["value"] = get_icon(get_icon_hex(attrs["value"]))
+        attrs["value"] = ctx.icon(get_icon_hex(attrs["value"]))
         if isinstance(parent_class, cg.MockObj):
-            # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-            # cg.add(parent_class.set_icon_value(attrs["value"]))
-            cg.add(cg.RawStatement(f'{parent_class.__str__()}->set_icon_value({attrs["value"]});'))
+            # attrs["value"] is a MockObj (icon_t member) or RawExpression
+            # (CUSTOM_ICONS[n]), never a Python str, so the expression API
+            # emits it verbatim without cpp_string_escape quoting.
+            cg.add(parent_class.set_icon_value(attrs["value"]))
     if isinstance(attrs["color"], int):
         if isinstance(parent_class, cg.MockObj):
             cg.add(parent_class.set_icon_color(attrs["color"]))
     if parent_class is None:
         return attrs
 
-def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass):
+def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass, ctx: CodegenContext):
     for i, entity_config in enumerate(entities_config):
         variable_name = card_variable.__str__() + "_item_" + str(i + 1)
         entity_class = cg.global_ns.class_(variable_name)
@@ -707,7 +635,7 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
             cg.add(card_variable.add_item(entity_class))
             continue
 
-        entity_id = get_entity_id(entity_config.get(CONF_ENTITY_ID))
+        entity_id = ctx.entity(entity_config.get(CONF_ENTITY_ID))
         display_name = entity_config.get(CONF_CARD_ENTITIES_NAME, None)
         # if display_name != None:
         #     entity_class = cg.new_Pvariable(variable_name, entity_config[CONF_CARD_ENTITIES_ID], entity_config[CONF_CARD_ENTITIES_NAME])
@@ -715,32 +643,30 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
         #     entity_class = cg.new_Pvariable(variable_name, entity_config[CONF_CARD_ENTITIES_ID])
         cg.add(cg.RawExpression(
             f"auto {variable_name} = "
-            f"{make_shared.template(entity_type).__call__(get_new_uuid(), entity_id, display_name)}"))
+            f"{make_shared.template(entity_type).__call__(ctx.new_uuid(), entity_id, display_name)}"))
 
-        generate_icon_config(entity_config.get(CONF_ICON, None), entity_class)
+        generate_icon_config(entity_config.get(CONF_ICON, None), ctx, parent_class=entity_class)
 
         cg.add(card_variable.add_item(entity_class))
 
-def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable_name: str, default_icon_value: str = 'alert-circle-outline') -> cg.MockObjClass:
-    entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
-    default_icon_value = get_icon(get_icon_hex(default_icon_value))
-    attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
+def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable_name: str, ctx: CodegenContext, default_icon_value: str = 'alert-circle-outline') -> cg.MockObjClass:
+    entity_id = ctx.entity(icon_config.get(CONF_ENTITY_ID))
+    default_icon_value = ctx.icon(get_icon_hex(default_icon_value))
+    attrs = generate_icon_config(icon_config.get(CONF_ICON, {}), ctx)
     # generate_icon_config converts a configured icon string to an expression
     # (icon_t:: enum or CUSTOM_ICONS[n]), so "configured" must be tested on
     # whether a value exists, not on its type.
     has_icon = attrs["value"] is not None
     has_color = isinstance(attrs["color"], int)
-    # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
-    if has_icon and has_color:
-        stmt = f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)'
-    elif has_icon:
-        stmt = f'{basicstr}, {attrs["value"]})'
-    elif has_color:
-        stmt = f'{basicstr}, {default_icon_value}, {attrs["color"]}u)'
-    else:
-        stmt = f'{basicstr}, {default_icon_value})'
-    cg.add(cg.RawExpression(f"auto {variable_name} = {stmt}"))
+    # Constructor arguments go through the expression API: the uuid (str) is
+    # quoted by StringLiteral, while the icon expression (MockObj/RawExpression)
+    # and the 'u'-suffixed color emit verbatim, never quoted. A trailing None
+    # drops the color argument, preserving all four constructor arities.
+    icon_value = attrs["value"] if has_icon else default_icon_value
+    color_expr = cg.RawExpression(f'{attrs["color"]}u') if has_color else None
+    ctor = make_shared.template(icon_class).__call__(
+        ctx.new_uuid(), entity_id, icon_value, color_expr)
+    cg.add(cg.RawExpression(f"auto {variable_name} = {ctor}"))
     variable_class = cg.global_ns.class_(variable_name)
     variable_class.op = '->'
     # The constructor arguments are defaults only: on_entity_type_change()
@@ -749,12 +675,12 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable
     # which set the *_overridden_ flags those callbacks respect, otherwise
     # the configured values are silently discarded at runtime.
     if has_icon:
-        cg.add(cg.RawStatement(f'{variable_name}->set_icon_value({attrs["value"]});'))
+        cg.add(variable_class.set_icon_value(attrs["value"]))
     if has_color:
         cg.add(variable_class.set_icon_color(attrs["color"]))
     return variable_class
 
-async def to_code(config):
+def configure_platform():
     # note: not using 'psram' dependency because our sdkconfig options conflict
     if has_build_define(core.CORE.config[CONF_ESPHOME], "TEST_DEVICE_MODE"):
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
@@ -790,35 +716,8 @@ async def to_code(config):
     cg.add_define("USE_API_HOMEASSISTANT_STATES")
     cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
-    nspanel = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(nspanel, config)
-    await uart.register_uart_device(nspanel, config)
-    cg.add_global(nspanel_lovelace_ns.using)
 
-    enable_tft_upload = not has_build_define(
-        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
-
-    # TODO: check that upload_tft() function is not used anywhere
-    if enable_tft_upload:
-        # FIXME when using add_define, the code wont build because of
-        #       an undefined reference to 'upload_tft' during linking
-        # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
-        # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
-        cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
-
-        esp32.include_builtin_idf_component("esp_http_client")
-        esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
-        esp32.add_idf_sdkconfig_option(
-            "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
-        )
-
-    if CONF_SCREENSAVER in config:
-        cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
-
-    if CONF_EXP_VERT_UI in config:
-        cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
-
-    locale_config = config[CONF_LOCALE]
+def emit_translations(nspanel, locale_config):
     language = locale_config[CONF_LANGUAGE]
     # Already validated in validate_config; the file is small enough to read again.
     translation_path, _ = resolve_translation_path(language, core.CORE.relative_config_path)
@@ -832,7 +731,7 @@ async def to_code(config):
 
     cgv = []
     for k,v in translationJson.items():
-        if k in REQUIRED_TRANSLATION_KEYS:
+        if k in resources.REQUIRED_TRANSLATION_KEYS:
             if k in cv.RESERVED_IDS:
                 k += '_'
             k = TRANSLATION_ITEM.class_(k)
@@ -845,13 +744,7 @@ async def to_code(config):
     if CONF_TEMPERATURE_UNIT in locale_config:
         cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
 
-    for conf in config.get(CONF_INCOMING_MSG, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
-        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
-
-    for key, value in entity_ids.items():
-        cg.add(cg.RawExpression(f"auto {value} = {nspanel.create_entity(key)}"))
-
+async def emit_screensaver(nspanel, config, ctx) -> Union[str, None]:
     screensaver_config = config.get(CONF_SCREENSAVER, None)
     screensaver_uuid = None
     if screensaver_config is None:
@@ -859,7 +752,7 @@ async def to_code(config):
     else:
         cg.add(cg.RawStatement("{"))
 
-        screensaver_uuid = screensaver_config[CONF_ID] if CONF_ID in screensaver_config else get_new_uuid()
+        screensaver_uuid = screensaver_config[CONF_ID] if CONF_ID in screensaver_config else ctx.new_uuid()
 
         if CONF_TIME_ID in screensaver_config:
             time_ = await cg.get_variable(screensaver_config[CONF_TIME_ID])
@@ -885,7 +778,7 @@ async def to_code(config):
             left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
             iconleft_variable = screensaver_info[0] + "_iconleft"
             iconleft_variable_class = get_status_icon_statement(
-                left_icon_config, StatusIconItem, iconleft_variable)
+                left_icon_config, StatusIconItem, iconleft_variable, ctx)
             if left_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconleft_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_left(iconleft_variable_class))
@@ -894,7 +787,7 @@ async def to_code(config):
             right_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_RIGHT]
             iconright_variable = screensaver_info[0] + "_iconright"
             iconright_variable_class = get_status_icon_statement(
-                right_icon_config, StatusIconItem, iconright_variable)
+                right_icon_config, StatusIconItem, iconright_variable, ctx)
             if right_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconright_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_right(iconright_variable_class))
@@ -915,26 +808,28 @@ async def to_code(config):
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0,5):
-                screensaver_items.append(make_shared.template(screensaver_info[3]).__call__(get_new_uuid()))
+                screensaver_items.append(make_shared.template(screensaver_info[3]).__call__(ctx.new_uuid()))
             cg.add(screensaver_class.add_item_range(screensaver_items))
 
         cg.add(cg.RawStatement("}"))
+    return screensaver_uuid
 
+def emit_cards(nspanel, config, ctx, screensaver_uuid) -> None:
     card_uuids = []
     visible_card_uuids = []
     for card_config in config.get(CONF_CARDS, []):
         if CONF_ID in card_config:
             card_uuids.append(card_config[CONF_ID])
         else:
-            card_uuids.append(get_new_uuid())
+            card_uuids.append(ctx.new_uuid())
         if card_config[CONF_CARD_HIDDEN] == False:
             visible_card_uuids.append(card_uuids[-1])
     visible_card_count = len(visible_card_uuids)
     visible_index = 0
 
-    navleft_icon_value = get_icon(get_icon_hex("arrow-left-bold"))
-    navhome_icon_value = get_icon(get_icon_hex("home"))
-    navright_icon_value = get_icon(get_icon_hex("arrow-right-bold"))
+    navleft_icon_value = ctx.icon(get_icon_hex("arrow-left-bold"))
+    navhome_icon_value = ctx.icon(get_icon_hex("home"))
+    navright_icon_value = ctx.icon(get_icon_hex("arrow-right-bold"))
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         cg.add(cg.RawStatement("{"))
 
@@ -974,7 +869,7 @@ async def to_code(config):
                 entity_id_key = CONF_CARD_MEDIA_ENTITY_ID
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
-                f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], get_entity_id(card_config[entity_id_key]), title, sleep_timeout)}"))
+                f"{nspanel.create_page.template(page_info[1]).__call__(card_uuids[i], ctx.entity(card_config[entity_id_key]), title, sleep_timeout)}"))
         else:
             cg.add(cg.RawExpression(
                 f"auto {card_variable} = "
@@ -992,7 +887,7 @@ async def to_code(config):
                 home_uuid = visible_card_uuids[0] if visible_card_count > 0 else None
             if home_uuid != None:
                 navleft_variable = card_variable + "_navhome"
-                navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{get_new_uuid()}\", \"{home_uuid}\", {navhome_icon_value})')
+                navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{ctx.new_uuid()}\", \"{home_uuid}\", {navhome_icon_value})')
                 cg.add(cg.RawExpression(
                     f"auto {navleft_variable} = "
                     f"{unique_ptr.template(NavigationItem)}({navleft_statement})"))
@@ -1004,15 +899,13 @@ async def to_code(config):
             next_card_uuid = visible_card_uuids[(visible_index + 1) % visible_card_count]
             visible_index += 1
             navleft_variable = card_variable + "_navleft"
-            navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{get_new_uuid()}\", \"{prev_card_uuid}\", {navleft_icon_value})')
+            navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{ctx.new_uuid()}\", \"{prev_card_uuid}\", {navleft_icon_value})')
             cg.add(cg.RawExpression(
                 f"auto {navleft_variable} = "
-                # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-                # f"{unique_ptr.template(NavigationItem).__call__(NavigationItem.new(get_new_uuid(), prev_card_uuid, navleft_icon_value))}"))
                 f"{unique_ptr.template(NavigationItem)}({navleft_statement})"))
             cg.add(card_class.set_nav_left(cg.global_ns.class_(navleft_variable)))
             navright_variable = card_variable + "_navright"
-            navright_statement = cg.RawStatement(f'new {NavigationItem}(\"{get_new_uuid()}\", \"{next_card_uuid}\", {navright_icon_value})')
+            navright_statement = cg.RawStatement(f'new {NavigationItem}(\"{ctx.new_uuid()}\", \"{next_card_uuid}\", {navright_icon_value})')
             cg.add(cg.RawExpression(
                 f"auto {navright_variable} = "
                 f"{unique_ptr.template(NavigationItem)}({navright_statement})"))
@@ -1030,20 +923,65 @@ async def to_code(config):
             card_config.get(CONF_CARD_ENTITIES, []), 
             page_info[2], 
             card_class, 
-            page_info[3])
+            page_info[3],
+            ctx)
 
         cg.add(cg.RawStatement("}"))
 
-    if CONF_DEFAULT_CARD in config:
-        # index = card_ids.get(config[CONF_DEFAULT_CARD])
-        # if isinstance(index, int):
-        if config[CONF_DEFAULT_CARD] in card_ids:
-            # Note: can only be called after all the default page has been created
-            cg.add(nspanel.set_default_page(config[CONF_DEFAULT_CARD]))
+async def to_code(config):
+    # One context per call: entity variables, UUIDs and custom-icon slots
+    # are allocated for this configuration only (no module-level state).
+    ctx = CodegenContext(config)
+    configure_platform()
 
-    global custom_icons
+    nspanel = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(nspanel, config)
+    await uart.register_uart_device(nspanel, config)
+    cg.add_global(nspanel_lovelace_ns.using)
+
+    enable_tft_upload = not has_build_define(
+        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
+
+    # TODO: check that upload_tft() function is not used anywhere
+    if enable_tft_upload:
+        # FIXME when using add_define, the code wont build because of
+        #       an undefined reference to 'upload_tft' during linking
+        # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
+        # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
+        cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
+
+        esp32.include_builtin_idf_component("esp_http_client")
+        esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
+        esp32.add_idf_sdkconfig_option(
+            "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
+        )
+
+    if CONF_SCREENSAVER in config:
+        cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
+
+    if CONF_EXP_VERT_UI in config:
+        cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
+
+    emit_translations(nspanel, config[CONF_LOCALE])
+
+    for conf in config.get(CONF_INCOMING_MSG, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
+        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
+
+    for key, value in ctx.entity_ids.items():
+        cg.add(cg.RawExpression(f"auto {value} = {nspanel.create_entity(key)}"))
+
+    screensaver_uuid = await emit_screensaver(nspanel, config, ctx)
+
+    emit_cards(nspanel, config, ctx, screensaver_uuid)
+
+    if CONF_DEFAULT_CARD in config:
+        # Validated in validate_config; can only be called after all the
+        # pages have been created.
+        cg.add(nspanel.set_default_page(config[CONF_DEFAULT_CARD]))
+
     icon_arr: list[str] = []
-    for k,v in custom_icons.items():
+    for k,v in ctx.custom_icons.items():
         icon_arr.append(v[1])
     cg.add_define("CUSTOM_ICONS_SIZE", len(icon_arr))
     cg.add_global(cg.RawStatement(
@@ -1051,53 +989,3 @@ async def to_code(config):
         f"CUSTOM_ICONS {{{cg.ArrayInitializer(*icon_arr)}}};"))
 
     cg.add_define("USE_NSPANEL_LOVELACE")
-
-
-## see: https://esphome.io/components/wifi
-# c++
-#   void add_sta(const WiFiAP &ap);
-
-# wifi_ns = cg.esphome_ns.namespace("wifi")
-# ManualIP = wifi_ns.struct("ManualIP")
-# WiFiAP = wifi_ns.struct("WiFiAP")
-# def wifi_network(config, ap, static_ip):
-#     if CONF_SSID in config:
-#         cg.add(ap.set_ssid(config[CONF_SSID]))
-#     if CONF_PASSWORD in config:
-#         cg.add(ap.set_password(config[CONF_PASSWORD]))
-#     if static_ip is not None:
-#         cg.add(ap.set_manual_ip(manual_ip(static_ip)))
-# def manual_ip(config):
-#     if config is None:
-#         return None
-#     return cg.StructInitializer(
-#         ManualIP,
-#         ("static_ip", safe_ip(config[CONF_STATIC_IP])),
-#         ("gateway", safe_ip(config[CONF_GATEWAY])),
-#         ("subnet", safe_ip(config[CONF_SUBNET])),
-#         ("dns1", safe_ip(config.get(CONF_DNS1))),
-#         ("dns2", safe_ip(config.get(CONF_DNS2))),
-#     )
-## in to_code()
-# def add_sta(ap, network):
-#     ip_config = network.get(CONF_MANUAL_IP, config.get(CONF_MANUAL_IP))
-#     cg.add(var.add_sta(wifi_network(network, ap, ip_config)))
-# for network in config.get(CONF_NETWORKS, []):
-#     cg.with_local_variable(network[CONF_ID], WiFiAP(), add_sta, network)
-
-# def add_card(card, card):
-#     ip_config = network.get(CONF_MANUAL_IP, config.get(CONF_MANUAL_IP))
-#     cg.add(var.add_card(wifi_network(network, card, ip_config)))
-
-## other examples:
-# cv.validate_id_name
-
-# if value in cv.RESERVED_IDS:
-#     raise vol.Invalid(f"ID '{value}' is reserved internally and cannot be used")
-
-# config[CONF_NETWORKS] = cv.ensure_list(WIFI_NETWORK_STA)(network)
-
-# if CORE.using_arduino:
-#     cg.add_library("WiFi", None)
-# else:
-#     if CORE.is_esp32:

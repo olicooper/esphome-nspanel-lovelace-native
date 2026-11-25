@@ -23,19 +23,25 @@ on:
       - "tests/**"
 
 jobs:
-  test:
-    name: Build
+  build:
+    name: Build (${{ matrix.variant }}, ESPHome ${{ matrix.version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        version: [stable]
-        variant: [basic, advanced]
+        # 2026.11.0 is the supported floor (cv.require_esphome_version in
+        # the component); stable is the current official release. When
+        # stable resolves to the floor, those legs duplicate each other —
+        # noted, not de-duplicated: the floor stays pinned.
+        version: [2026.11.0, stable]
+        variant: [basic, advanced, codegen]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}
     steps:
     - uses: actions/checkout@v6
+    - name: Report ESPHome version
+      run: esphome version
     - name: Copy test secrets
       run: |
         cp secrets-example.yaml secrets.yaml
@@ -55,7 +61,23 @@ jobs:
       run: python -m pip install --quiet pytest
     - name: Run unit and codegen generation tests
       run: python -m pytest -q tests
-    - name: Compile codegen fixture
-      run: esphome compile ci/codegen.yaml
+    # The build matrix covers basic/advanced/codegen; this floor-pinned job
+    # additionally compiles the no-TFT variant, which the 3-variant matrix
+    # excludes so it still gates the USE_NSPANEL_TFT_UPLOAD-disabled path.
     - name: Compile codegen fixture (TFT upload disabled)
       run: esphome compile ci/codegen-no-tft.yaml
+
+  # Advisory preview: manual-only, never runs on push/PR, and a pass does
+  # NOT make beta a supported version (the floor remains 2026.11.0).
+  preview:
+    name: Preview (beta, advisory)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/esphome/esphome:beta
+    steps:
+    - uses: actions/checkout@v6
+    - name: Report ESPHome version
+      run: esphome version
+    - name: Compile codegen fixture (representative variant)
+      run: esphome compile ci/codegen.yaml

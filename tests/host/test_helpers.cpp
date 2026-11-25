@@ -75,25 +75,37 @@ static void test_split_str() {
 
 static void test_str_to_number() {
   // ESP-IDF builds with -fno-exceptions, so std::stoi/stof/stod abort on these
-  // inputs; the replacements must return 0 like strtol/strtof/strtod do.
-  check(str_to_int("") == 0, "str_to_int: empty string returns 0");
-  check(str_to_int("abc") == 0, "str_to_int: non-numeric returns 0");
-  check(str_to_int("12abc") == 12, "str_to_int: parses the numeric prefix");
-  check(str_to_int("-5") == -5, "str_to_int: negative value");
-  check(str_to_int(" 42") == 42, "str_to_int: leading whitespace");
-  check(str_to_int("ff", 16) == 255, "str_to_int: explicit base");
+  // inputs; the replacements must return false instead of aborting.
+  int parsed = 0;
+  check(!str_to_int("", parsed), "str_to_int: empty string fails");
+  check(!str_to_int("abc", parsed), "str_to_int: non-numeric fails");
+  check(str_to_int("12abc", parsed) && parsed == 12,
+        "str_to_int: parses the numeric prefix");
+  check(str_to_int("-5", parsed) && parsed == -5,
+        "str_to_int: negative value");
+  check(str_to_int(" 42", parsed) && parsed == 42,
+        "str_to_int: leading whitespace");
+  check(str_to_int("ff", parsed, 16) && parsed == 255,
+        "str_to_int: explicit base");
 
-  check(str_to_float("") == 0.0f, "str_to_float: empty string returns 0");
-  check(str_to_float("nope") == 0.0f, "str_to_float: non-numeric returns 0");
-  check(str_to_float("0.5") == 0.5f, "str_to_float: decimal value");
+  float parsed_f = 0.0f;
+  check(!str_to_float("", parsed_f), "str_to_float: empty string fails");
+  check(!str_to_float("nope", parsed_f),
+        "str_to_float: non-numeric fails");
+  check(str_to_float("0.5", parsed_f) && parsed_f == 0.5f,
+        "str_to_float: decimal value");
 
-  check(str_to_double("") == 0.0, "str_to_double: empty string returns 0");
-  check(str_to_double("2.25") == 2.25, "str_to_double: decimal value");
+  double parsed_d = 0.0;
+  check(!str_to_double("", parsed_d),
+        "str_to_double: empty string fails");
+  check(str_to_double("2.25", parsed_d) && parsed_d == 2.25,
+        "str_to_double: decimal value");
 
   // strtol saturates at LONG_MAX instead of throwing out_of_range, and the
   // narrowing cast to int wraps. ESP-IDF's std::stoi would have thrown and then
   // aborted under -fno-exceptions. Pinned so a later clamp here is visible.
-  check(str_to_int("99999999999999999999") == static_cast<int>(LONG_MAX),
+  check(str_to_int("99999999999999999999", parsed) &&
+            parsed == static_cast<int>(LONG_MAX),
         "str_to_int: out-of-range saturates instead of aborting");
 }
 

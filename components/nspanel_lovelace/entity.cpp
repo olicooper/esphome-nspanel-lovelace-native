@@ -120,15 +120,27 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
   if (this->attributes_[attr] == value) return;
 
   if (attr == ha_attr_type::brightness) {
+    int brightness_val = 0;
+    if (!str_to_int(value, brightness_val)) return;
     this->attributes_[attr] = std::to_string(static_cast<int>(round(
-        scale_value(str_to_int(value), {0, 255}, {0, 100}))));
+        scale_value(brightness_val, {0, 255}, {0, 100}))));
   } else if (attr == ha_attr_type::color_temp) {
     auto &minstr = this->get_attribute(ha_attr_type::min_mireds);
     auto &maxstr = this->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = minstr.empty() ? 153 : str_to_int(minstr);
-    uint16_t max_mireds = maxstr.empty() ? 500 : str_to_int(maxstr);
+    uint16_t min_mireds = 153;
+    if (!minstr.empty()) {
+      int parsed = 0;
+      if (str_to_int(minstr, parsed)) min_mireds = static_cast<uint16_t>(parsed);
+    }
+    uint16_t max_mireds = 500;
+    if (!maxstr.empty()) {
+      int parsed = 0;
+      if (str_to_int(maxstr, parsed)) max_mireds = static_cast<uint16_t>(parsed);
+    }
+    int temp_val = 0;
+    if (!str_to_int(value, temp_val)) return;
     this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
-        str_to_int(value),
+        temp_val,
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
         {0, 100}))));
   } else if (attr == ha_attr_type::supported_color_modes ||

@@ -303,6 +303,25 @@ def test_unknown_default_card_rejected(tmp_path: Path) -> None:
     assert "Cannot find a card with the id 'missing'" in out, out
 
 
+def test_status_icon_requires_entity_id(tmp_path: Path) -> None:
+    """A provided status icon block must fail validation without an entity_id,
+    not crash codegen."""
+    body = """\
+  screensaver:
+    status_icon_left:
+      icon: hiking
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="status-icon-no-entity")
+    assert result.returncode != 0, f"status icon without entity_id should be rejected:\n{result.stdout}"
+    out = result.stdout + result.stderr
+    assert "entity_id" in out, out
+
+
 def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
     """Top-level sleep_timeout is 0..65 (HMI protocol maximum)."""
     def body(timeout: int) -> str:

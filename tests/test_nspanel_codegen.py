@@ -135,11 +135,12 @@ def test_codegen_baseline() -> None:
         src,
     ), "named tile must generate the escaped display name"
 
-    # Both 'hiking' tiles share one CUSTOM_ICONS slot (ED7E) and reference
-    # it twice; built-in icons stay on the enum path.
+    # All 'hiking' tiles (two card tiles + the left status icon) share one
+    # CUSTOM_ICONS slot (ED7E) and reference it three times; built-in icons
+    # stay on the enum path.
     assert src.count('u8"\\uED7E"') == 1
     assert "#define CUSTOM_ICONS_SIZE 1" in defines
-    assert src.count("CUSTOM_ICONS[0]") == 2
+    assert src.count("CUSTOM_ICONS[0]") == 3
 
     # The hidden card is marked hidden exactly once.
     assert src.count("set_hidden(true)") == 1
@@ -151,6 +152,22 @@ def test_codegen_baseline() -> None:
     # The hidden card is not part of the visible ring but links home to the
     # screensaver (uuid "1", allocated first).
     assert re.search(r'new nspanel_lovelace::NavigationItem\("[0-9]+", "1", ', src)
+
+    # Status icons: the left icon configures a custom glyph (hiking ->
+    # CUSTOM_ICONS[0]) with explicit color 0 -> 4-arg constructor; the right
+    # icon configures the built-in alert-circle-outline enum (no color) ->
+    # 3-arg constructor; alt_font is preserved.
+    assert len(re.findall(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, CUSTOM_ICONS\[0\], 0u\)',
+        src,
+    )) == 1
+    assert len(re.findall(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, (?:nspanel_lovelace::)?icon_t::alert_circle_outline\)',
+        src,
+    )) == 1
+    assert "set_alt_font(true)" in src
 
     # Weather uses the raw entity string, not create_entity.
     assert 'set_weather_entity_id("weather.demo_codegen")' in src
@@ -180,6 +197,25 @@ def test_codegen_all_hidden_cards(tmp_path: Path) -> None:
     # Both hidden cards link home to the screensaver (uuid "1"); no right nav.
     assert len(re.findall(r'NavigationItem\("[0-9]+", "1", ', src)) == 2
     assert "set_nav_right" not in src
+    assert_no_none_tokens(src)
+
+
+def test_codegen_status_icon_color_only(tmp_path: Path) -> None:
+    """A status icon that sets only a color (no icon) takes the default glyph
+    with the configured color (4-arg constructor)."""
+    body = """\
+  screensaver:
+    status_icon_left:
+      entity_id: light.lamp_a
+      icon:
+        color: 300
+"""
+    src = generate_synthetic(tmp_path, body, "status-color-only")
+    assert len(re.findall(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, (?:nspanel_lovelace::)?icon_t::alert_circle_outline, 300u\)',
+        src,
+    )) == 1
     assert_no_none_tokens(src)
 
 

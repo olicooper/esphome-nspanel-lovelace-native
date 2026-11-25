@@ -32,6 +32,7 @@ nspanel_lovelace:
       icon:
         value: hiking
         color: 0
+      alt_font: true
     status_icon_right:
       entity_id: binary_sensor.demo_right
       icon: alert-circle-outline

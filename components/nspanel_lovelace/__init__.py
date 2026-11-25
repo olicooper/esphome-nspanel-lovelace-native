@@ -352,7 +352,9 @@ SCHEMA_ICON = cv.Any(
 )
 
 SCHEMA_STATUS_ICON = cv.Schema({
-    cv.Optional(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
+    # The StatusIconItem constructors all require an entity, so a provided
+    # status icon block without an entity_id is a config error, not a codegen one.
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
     cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
@@ -650,11 +652,16 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_
     # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
     # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
     basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
-    if isinstance(attrs["value"], str) and isinstance(attrs["color"], int):
+    # generate_icon_config converts a configured icon string to an expression
+    # (icon_t:: enum or CUSTOM_ICONS[n]), so "configured" must be tested on
+    # whether a value exists, not on its type.
+    has_icon = attrs["value"] is not None
+    has_color = isinstance(attrs["color"], int)
+    if has_icon and has_color:
         return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
-    elif isinstance(attrs["value"], str):
+    elif has_icon:
         return cg.RawStatement(f'{basicstr}, {attrs["value"]})')
-    elif isinstance(attrs["color"], int):
+    elif has_color:
         return cg.RawStatement(f'{basicstr}, {default_icon_value}, {attrs["color"]}u)')
     else:
         return cg.RawStatement(f'{basicstr}, {default_icon_value})')

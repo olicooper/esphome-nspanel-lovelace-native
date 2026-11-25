@@ -11,16 +11,26 @@ on:
       - ".github/workflows/build.yaml"
       - "*example.yaml"
       - "ci/*.yaml"
+      - "tests/**"
 
   pull_request:
     branches:
       - dev
     paths:
       - "components/nspanel_lovelace/**"
+      - ".github/workflows/build.yaml"
       - "*example.yaml"
       - "ci/*.yaml"
+      - "tests/**"
 
 jobs:
+  helpers:
+    name: Host helper tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - run: tests/host/run.sh
+
   test:
     name: Build
     runs-on: ubuntu-latest

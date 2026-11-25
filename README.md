@@ -16,6 +16,12 @@ This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https:/
 
 Backward compatibility with older ESPHome releases is not maintained. The minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
 
+Because the minimum version is enforced by `cv.require_esphome_version`, the code carries no `ESPHOME_VERSION_CODE` guards for older releases; version-specific compatibility code is removed when the minimum moves up.
+
+## Tests
+
+`tests/host/run.sh` builds and runs the host-side helper tests (string and number parsing) with the same `-fno-exceptions` flags ESP-IDF uses, so they need no device. Both example configurations are compiled against the minimum supported ESPHome version by the Build workflow.
+
 # Installation
 
 The installation of ESPHome on the ESP32 follows the standard ESPHome build method e.g. `esphome run --device COM6 basic-example.yaml`. It is possible to do OTA updates with the ESPHome CLI after the initial upload.

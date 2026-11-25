@@ -141,13 +141,15 @@ CARD_QR="cardQR"
 CARD_ALARM="cardAlarm"
 CARD_THERMO="cardThermo"
 CARD_MEDIA="cardMedia"
-CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_GRID2, CARD_QR, CARD_ALARM, CARD_THERMO, CARD_MEDIA]
+CARD_POWER="cardPower"
+CARD_TYPE_OPTIONS = [CARD_ENTITIES, CARD_GRID, CARD_GRID2, CARD_QR, CARD_ALARM, CARD_THERMO, CARD_MEDIA, CARD_POWER]
 
 CONF_CARD_QR_TEXT = "qr_text"
 CONF_CARD_ALARM_ENTITY_ID = "alarm_entity_id"
 CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 CONF_CARD_MEDIA_ENTITY_ID = "media_entity_id"
+CONF_CARD_POWER_HOME_ENTITY_ID = "home_entity_id"
 
 def has_build_define(esphome_config: dict, name: str) -> bool:
     """True when a build flag defines ``name``.
@@ -358,6 +360,8 @@ def get_card_entities_length_limits(card_type: str, model: str = 'eu') -> list[i
         return [1,2]
     if (card_type == CARD_MEDIA):
         return [0,8]
+    if (card_type == CARD_POWER):
+        return [0,6]
     return [0,0]
 
 def validate_config(config):
@@ -488,6 +492,10 @@ CONFIG_SCHEMA = cv.All(
                     cv.Optional(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
                     cv.Required(CONF_CARD_MEDIA_ENTITY_ID): valid_entity_id(['media_player'])
                 }),
+                CARD_POWER: SCHEMA_CARD_BASE.extend({
+                    cv.Required(CONF_CARD_POWER_HOME_ENTITY_ID): valid_entity_id(['sensor']),
+                    cv.Optional(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
+                }),
             }))
         ),
     })
@@ -508,6 +516,8 @@ QRCard = nspanel_lovelace_ns.class_("QRCard")
 AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
 ThermoCard = nspanel_lovelace_ns.class_("ThermoCard")
 MediaCard = nspanel_lovelace_ns.class_("MediaCard")
+PowerCard = nspanel_lovelace_ns.class_("PowerCard")
+PowerCardItem = nspanel_lovelace_ns.class_("PowerCardItem")
 
 DeleteItem = nspanel_lovelace_ns.class_("DeleteItem")
 NavigationItem = nspanel_lovelace_ns.class_("NavigationItem")
@@ -529,12 +539,13 @@ PAGE_MAP = {
     CARD_ALARM: ["nspanel_card_", AlarmCard, PageType.cardAlarm, AlarmButtonItem],
     CARD_THERMO: ["nspanel_card_", ThermoCard, PageType.cardThermo, None],
     CARD_MEDIA: ["nspanel_card_", MediaCard, PageType.cardMedia, GridCardEntityItem],
+    CARD_POWER: ["nspanel_card_", PowerCard, PageType.cardPower, PowerCardItem],
 }
 
 def collect_entity_ids(config: dict) -> dict[str, str]:
     """Build the ordered entity -> variable map for one validated config, at
     codegen time. Preserves the historical loop order: card tiles in card
-    order (exact 'delete' excluded), then each card's alarm/thermo/media
+    order (exact 'delete' excluded), then each card's alarm/thermo/media/power
     entity, then the screensaver's left and right status icons. navigate and
     iText pseudo-entities are registered like any other tile; first use
     wins; variables are named nspanel_e0, nspanel_e1, ..."""
@@ -558,6 +569,8 @@ def collect_entity_ids(config: dict) -> dict[str, str]:
             add(card_config.get(CONF_CARD_THERMO_ENTITY_ID))
         if CONF_CARD_MEDIA_ENTITY_ID in card_config:
             add(card_config.get(CONF_CARD_MEDIA_ENTITY_ID))
+        if CONF_CARD_POWER_HOME_ENTITY_ID in card_config:
+            add(card_config.get(CONF_CARD_POWER_HOME_ENTITY_ID))
     if CONF_SCREENSAVER in config:
         screensaver_config = config.get(CONF_SCREENSAVER)
         left = screensaver_config.get(CONF_SCREENSAVER_STATUS_ICON_LEFT, None)
@@ -860,11 +873,13 @@ def emit_cards(nspanel, config, ctx, screensaver_uuid) -> None:
         #     cg.add(card_class.set_sleep_timeout(sleep_timeout))
         #     cg.add(cg.RawExpression(f"{card_variable}->set_sleep_timeout({sleep_timeout})"))
 
-        if card_config[CONF_CARD_TYPE] in [CARD_ALARM, CARD_THERMO, CARD_MEDIA]:
+        if card_config[CONF_CARD_TYPE] in [CARD_ALARM, CARD_THERMO, CARD_MEDIA, CARD_POWER]:
             if (card_config[CONF_CARD_TYPE] == CARD_ALARM):
                 entity_id_key = CONF_CARD_ALARM_ENTITY_ID
             elif (card_config[CONF_CARD_TYPE] == CARD_THERMO):
                 entity_id_key = CONF_CARD_THERMO_ENTITY_ID
+            elif (card_config[CONF_CARD_TYPE] == CARD_POWER):
+                entity_id_key = CONF_CARD_POWER_HOME_ENTITY_ID
             else:
                 entity_id_key = CONF_CARD_MEDIA_ENTITY_ID
             cg.add(cg.RawExpression(

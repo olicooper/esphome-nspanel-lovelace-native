@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "esphome/core/defines.h"
 
 #include <array>
 #include <cassert>
@@ -56,10 +57,10 @@ inline void replace_all(
   s.swap(buf);
 }
 
-inline void replace_all(std::string &s, const char oldChar, const char newChar) {
-  size_t pos = std::string::npos;
-  while ((pos = s.find(oldChar, pos + 1)) != std::string::npos) {
-    s.at(pos) = newChar;
+template<typename StringT>
+inline void replace_all(StringT &s, const char oldChar, const char newChar) {
+  for (size_t pos = 0; (pos = s.find(oldChar, pos)) != StringT::npos; ++pos) {
+    s[pos] = newChar;
   }
 }
 
@@ -67,21 +68,25 @@ inline const char* value_or_empty(const char* s) {
   return s == nullptr ? "" : s; 
 }
 
-inline unsigned long value_or_default(const std::string &str, unsigned long default_value) {
+template<typename StringT>
+inline unsigned long value_or_default(const StringT &str, unsigned long default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
     ? default_value : strtoul(str.c_str(), nullptr, 10);
 }
 
-inline int value_or_default(const std::string &str, int default_value) {
+template<typename StringT>
+inline int value_or_default(const StringT &str, int default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
     ? default_value : static_cast<int>(strtol(str.c_str(), nullptr, 10));
 }
 
-inline unsigned int value_or_default(const std::string &str, unsigned int default_value) {
-  return value_or_default(str, static_cast<unsigned long>(default_value));
+template<typename StringT>
+inline unsigned int value_or_default(const StringT &str, unsigned int default_value) {
+  return static_cast<unsigned int>(value_or_default(str, static_cast<unsigned long>(default_value)));
 }
 
-inline double value_or_default(const std::string &str, double default_value) {
+template<typename StringT>
+inline double value_or_default(const StringT &str, double default_value) {
   return str.empty() || (str[0] != '-' && str[0] != '+' && !isdigit(str[0]))
     ? default_value : strtod(str.c_str(), nullptr);
 }
@@ -181,8 +186,9 @@ inline bool contains_value(const std::vector<std::string> &array, const char *va
   return false;
 }
 
-inline bool contains_value(const std::string &str, const char *value) {
-  return str.find(value, 0) != std::string::npos;
+template<typename StringT>
+inline bool contains_value(const StringT &str, const char *value) {
+  return str.find(value, 0) != StringT::npos;
 }
 
 inline bool char_printable(const char value) {
@@ -193,30 +199,35 @@ inline static constexpr bool str_equal(const char *a, const char *b) {
   return a == b || (a != nullptr && b != nullptr && std::strcmp(a, b) == 0);
 }
 
-inline void split_str(char delimiter, const std::string &str, std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {
+template<typename StringT = std::string>
+inline void split_str(char delimiter, const StringT &str,
+    std::vector<std::string> &array, uint16_t max_items = UINT16_MAX) {
   size_t pos_start = 0, pos_end = 0;
   uint16_t item_count = 0;
-  while ((pos_end = str.find(delimiter, pos_start)) != std::string::npos) {
+  while ((pos_end = str.find(delimiter, pos_start)) != StringT::npos) {
     if (item_count == max_items) return;
     if (pos_end > pos_start)
-      array.emplace_back(str, pos_start, pos_end - pos_start);
+      array.emplace_back(str.data() + pos_start, pos_end - pos_start);
     pos_start = pos_end + 1;
     item_count++;
   }
   if (pos_start < str.size())
-    array.emplace_back(str, pos_start);
+    array.emplace_back(str.data() + pos_start, str.size() - pos_start);
 }
 
 // Fixed-format fields cannot shift left when a field is empty.
-template<size_t N>
-inline bool split_fixed(char delimiter, const std::string &str, std::array<std::string, N> &fields) {
+template<size_t N, typename StringT = std::string>
+inline bool split_fixed(char delimiter, const StringT &str, std::array<std::string, N> &fields) {
   size_t start = 0;
   for (size_t i = 0; i < N; ++i) {
     const size_t end = str.find(delimiter, start);
-    if ((end == std::string::npos) != (i + 1 == N)) return false;
-    fields[i] = str.substr(start, end - start);
+    if ((end == StringT::npos) != (i + 1 == N)) return false;
+    // Last field (no trailing delimiter) has end == npos; clamp its length to
+    // the remainder instead of letting npos - start wrap into an out-of-range read.
+    const size_t count = (end == StringT::npos) ? (str.size() - start) : (end - start);
+    fields[i].assign(str.data() + start, count);
     if (fields[i].empty()) return false;
-    if (end != std::string::npos) start = end + 1;
+    if (end != StringT::npos) start = end + 1;
   }
   return true;
 }
@@ -306,7 +317,7 @@ inline bool psram_available() {
 }
 
 inline size_t psram_used() {
-  return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - 
+  return heap_caps_get_total_size(MALLOC_CAP_SPIRAM) -
       heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 }
 
@@ -315,37 +326,46 @@ inline size_t psram_used() {
 // Returns false when the string contains no convertible number, overflows,
 // or contains trailing junk, so callers can distinguish "parsed zero" from
 // "parse failed" instead of acting on a bogus 0.
-[[nodiscard]] inline bool str_to_int(const std::string &s, int &out, int base = 10) {
+template<typename StringT = std::string>
+[[nodiscard]] inline bool str_to_int(const StringT &s, int &out, int base = 10) {
+  // Normalize to std::string so this accepts std::string, psram_string and
+  // char[N] literals uniformly, and keeps .size()-based embedded-NUL rejection.
+  std::string tmp(s);
   char *end = nullptr;
   errno = 0;
-  long val = strtol(s.c_str(), &end, base);
-  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  long val = strtol(tmp.c_str(), &end, base);
+  if (errno == ERANGE || end == tmp.c_str() || end != tmp.c_str() + tmp.size()) return false;
   if (val < INT_MIN || val > INT_MAX) return false;
   out = static_cast<int>(val);
   return true;
 }
 
-[[nodiscard]] inline bool str_to_float(const std::string &s, float &out) {
+template<typename StringT = std::string>
+[[nodiscard]] inline bool str_to_float(const StringT &s, float &out) {
+  std::string tmp(s);
   char *end = nullptr;
   errno = 0;
-  const float val = strtof(s.c_str(), &end);
-  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  const float val = strtof(tmp.c_str(), &end);
+  if (errno == ERANGE || end == tmp.c_str() || end != tmp.c_str() + tmp.size()) return false;
   if (!std::isfinite(val)) return false;
   out = val;
   return true;
 }
 
-[[nodiscard]] inline bool str_to_double(const std::string &s, double &out) {
+template<typename StringT = std::string>
+[[nodiscard]] inline bool str_to_double(const StringT &s, double &out) {
+  std::string tmp(s);
   char *end = nullptr;
   errno = 0;
-  const double val = strtod(s.c_str(), &end);
-  if (errno == ERANGE || end == s.c_str() || end != s.c_str() + s.size()) return false;
+  const double val = strtod(tmp.c_str(), &end);
+  if (errno == ERANGE || end == tmp.c_str() || end != tmp.c_str() + tmp.size()) return false;
   if (!std::isfinite(val)) return false;
   out = val;
   return true;
 }
 
-inline std::array<double, 2> mired_range(const std::string &min_value, const std::string &max_value) {
+template<typename StringT = std::string>
+inline std::array<double, 2> mired_range(const StringT &min_value, const StringT &max_value) {
   int min = 153, max = 500;
   int parsed = 0;
   if (str_to_int(min_value, parsed) && parsed > 0 && parsed <= UINT16_MAX) min = parsed;
@@ -371,14 +391,17 @@ inline size_t utf8_scalar_size(const std::string &s, size_t pos) {
   return len;
 }
 
-inline bool str_to_percentage(const std::string &s, int &out) {
+template<typename StringT = std::string>
+inline bool str_to_percentage(const StringT &s, int &out) {
   return str_to_int(s, out) && out >= 0 && out <= 100;
 }
 
-inline bool parse_timer_duration(const std::string &value, uint16_t &minutes, uint16_t &seconds,
+template<typename StringT = std::string>
+inline bool parse_timer_duration(const StringT &value, uint16_t &minutes, uint16_t &seconds,
                                  bool tft_editor = false) {
+  std::string tmp(value);
   std::array<std::string, 3> parts;
-  if (!split_fixed(':', value, parts)) return false;
+  if (!split_fixed(':', tmp, parts)) return false;
   int hours, mins, secs;
   for (const auto &part : parts) {
     if (part.find_first_not_of("0123456789") != std::string::npos) return false;
@@ -391,6 +414,32 @@ inline bool parse_timer_duration(const std::string &value, uint16_t &minutes, ui
   seconds = secs;
   return true;
 }
+
+#ifdef USE_PSRAM
+template<typename T>
+class PSRAMAllocator {
+public:
+  using value_type = T;
+  PSRAMAllocator() = default;
+  template<class U> PSRAMAllocator(const PSRAMAllocator<U>&) noexcept {}
+  T* allocate(size_t n) {
+    T* ptr = reinterpret_cast<T*>(
+      heap_caps_malloc(n * sizeof(T), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (ptr == nullptr)
+      ptr = reinterpret_cast<T*>(malloc(n * sizeof(T)));
+    return ptr;
+  }
+  void deallocate(T* p, size_t) noexcept { heap_caps_free(p); }
+  template<class U> bool operator==(const PSRAMAllocator<U>&) const noexcept { return true; }
+  template<class U> bool operator!=(const PSRAMAllocator<U>&) const noexcept { return false; }
+};
+// Prefer PSRAM for attribute storage, falling back to internal RAM
+using psram_string = std::basic_string<char, std::char_traits<char>, PSRAMAllocator<char>>;
+template<typename T> using psram_vector = std::vector<T, PSRAMAllocator<T>>;
+#else
+using psram_string = std::string;
+template<typename T> using psram_vector = std::vector<T>;
+#endif
 
 } // namespace nspanel_lovelace
 } // namespace esphome

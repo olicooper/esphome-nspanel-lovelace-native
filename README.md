@@ -18,7 +18,12 @@ The installation of ESPHome on the ESP32 follows the standard ESPHome build meth
 
 For the GUI, this project relies on the HMI TFT firmware from the [ESPHome NSPanel Lovelace UI](https://github.com/sairon/esphome-nspanel-lovelace-ui) project. 
 The firmware version reported by the screen needs to be `52` or `53` for it to be compatible with this project.
-If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L60)) exposed by the device in HomeAssistant.
+If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L64)) exposed by the device in HomeAssistant.
+
+When uploading a TFT:
+- Serve the file from a server that supports HTTP Range requests, which the uploader uses for every block. Home Assistant's `/local` folder (`config/www`) does.
+- An upload takes a few minutes. When it finishes, the display restarts by itself and the ESP reboots once the display has started. Don't cut the power before then.
+- The [basic example](basic-example.yaml) retries a failed upload up to 3 times. If an upload is interrupted, the display stays blank until it is flashed again; turning it off and on with the `Screen Power` switch and uploading again recovers it.
 
 # Configuration
 

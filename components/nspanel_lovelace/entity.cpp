@@ -96,41 +96,30 @@ void Entity::set_state(const std::string &state) {
 }
 
 bool Entity::has_attribute(ha_attr_type attr) const {
-  auto it = attributes_.find(attr);
-  return it != attributes_.end();
-}
-
-const std::string &Entity::get_attribute(ha_attr_type attr) const {
-  static const std::string empty_value{};
-  auto it = attributes_.find(attr);
-  return it == attributes_.end() ? empty_value : it->second;
-}
-
-std::string Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
-  auto it = attributes_.find(attr);
-  return it == attributes_.end() ? default_value : it->second;
+  return !attributes_[static_cast<size_t>(attr)].empty();
 }
 
 void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
+  auto &slot = attributes_[static_cast<size_t>(attr)];
   if (value.empty() || value == "None" || value == "none") {
-    attributes_.erase(attr);
-    this->notify_attribute_change(attr, "");
+    slot.clear();
+    this->notify_attribute_change(attr, slot);
     return;
   }
-  if (this->attributes_[attr] == value) return;
+  if (slot == value.c_str()) return;
 
   if (attr == ha_attr_type::brightness) {
-    this->attributes_[attr] = std::to_string(static_cast<int>(round(
-        scale_value(str_to_int(value), {0, 255}, {0, 100}))));
+    slot.assign(std::to_string(static_cast<int>(round(
+        scale_value(str_to_int(value), {0, 255}, {0, 100})))));
   } else if (attr == ha_attr_type::color_temp) {
-    auto &minstr = this->get_attribute(ha_attr_type::min_mireds);
-    auto &maxstr = this->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = minstr.empty() ? 153 : str_to_int(minstr);
-    uint16_t max_mireds = maxstr.empty() ? 500 : str_to_int(maxstr);
-    this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
+    auto minstr = this->get_attribute(ha_attr_type::min_mireds);
+    auto maxstr = this->get_attribute(ha_attr_type::max_mireds);
+    uint16_t min_mireds = minstr.empty() ? 153 : static_cast<uint16_t>(str_to_int(minstr));
+    uint16_t max_mireds = maxstr.empty() ? 500 : static_cast<uint16_t>(str_to_int(maxstr));
+    slot.assign(std::to_string(static_cast<int>(round(scale_value(
         str_to_int(value),
         {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
-        {0, 100}))));
+        {0, 100})))));
   } else if (attr == ha_attr_type::supported_color_modes ||
       attr == ha_attr_type::effect_list ||
       attr == ha_attr_type::preset_modes ||
@@ -142,22 +131,23 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
       attr == ha_attr_type::source_list ||
       attr == ha_attr_type::options) {
     // todo: remove this when esphome starts sending properly formatted array strings
-    this->attributes_[attr] = convert_python_arr_str(value);
-    
-    // only store the first 14 effects as additonal ones will never be rendered
+    auto converted = convert_python_arr_str(value);
+
+    // only store the first 14 effects as additional ones will never be rendered
     if (attr == ha_attr_type::effect_list) {
-      auto split_pos = find_nth_of(',', 15, this->attributes_[attr]);
+      auto split_pos = find_nth_of(',', 15, converted);
       if (split_pos != std::string::npos) {
-        this->attributes_[attr] = this->attributes_[attr].substr(0, split_pos);
+        converted = converted.substr(0, split_pos);
       }
     }
-    this->attributes_[attr].shrink_to_fit();
+    slot.assign(converted.c_str(), converted.size());
+    slot.shrink_to_fit();
   } else {
-    this->attributes_[attr] = value;
+    slot.assign(value.c_str(), value.size());
   }
 
   if (this->enable_notifications_) {
-    this->notify_attribute_change(attr, this->attributes_[attr]);
+    this->notify_attribute_change(attr, slot);
   }
 }
 
@@ -173,7 +163,7 @@ void Entity::notify_state_change(const std::string &state) {
   }
 }
 
-void Entity::notify_attribute_change(ha_attr_type attr, const std::string &value) {
+void Entity::notify_attribute_change(ha_attr_type attr, const psram_string &value) {
   for (auto iter = this->targets_.begin(); iter != this->targets_.end(); ++iter) {
     (*iter)->on_entity_attribute_change(attr, value);
   }

@@ -233,7 +233,7 @@ void StatefulPageItem::on_entity_state_change(const std::string &state) {
   }
 }
 
-void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
   // this class only needs to react to the following attributes
   if (attr == ha_attr_type::device_class) {
     if (!this->icon_value_overridden_) {
@@ -317,9 +317,9 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
     uint8_t r = 253, g = 216, b = 53; // Default HA yellow: #FDD835
     
     if (me->is_type(entity_type::light)) {
-      std::string color_mode = me->get_attribute(ha_attr_type::color_mode);
-      std::string temp_str = me->get_attribute(ha_attr_type::color_temp);
-      std::string rgb_str = me->get_attribute(ha_attr_type::rgb_color);
+      psram_string color_mode = me->get_attribute(ha_attr_type::color_mode);
+      psram_string temp_str = me->get_attribute(ha_attr_type::color_temp);
+      psram_string rgb_str = me->get_attribute(ha_attr_type::rgb_color);
       
       // If color mode is color temperature, or it's a CCT-only light
       if (color_mode == "color_temp" || (rgb_str.empty() && !temp_str.empty())) {
@@ -351,7 +351,7 @@ void StatefulPageItem::state_on_off_fn(StatefulPageItem *me) {
         }
       }
       
-      std::string bright_str = me->get_attribute(ha_attr_type::brightness);
+      psram_string bright_str = me->get_attribute(ha_attr_type::brightness);
       if (!bright_str.empty()) {
         char *endptr = nullptr;
         long brightness = std::strtol(bright_str.c_str(), &endptr, 10);

@@ -152,7 +152,7 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
   this->status_icon_->set_icon_value(icon.value);
 }
 
-void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
   if (attr == ha_attr_type::code_arm_required) {
     this->set_show_keypad(value != entity_state::off);
   }
@@ -269,9 +269,9 @@ std::string &ThermoCard::render(std::string &buffer) {
   buffer.append(Configuration::get_temperature_unit_str());
   buffer.append(1, SEPARATOR);
 
-  std::string dest_temp_str = 
+  auto dest_temp_str =
     this->thermo_entity_->get_attribute(ha_attr_type::temperature);
-  std::string dest_temp2_str;
+  psram_string dest_temp2_str;
 
   if (dest_temp_str.empty()) {
     dest_temp_str = this->thermo_entity_->get_attribute(
@@ -517,7 +517,7 @@ void PowerCard::on_entity_state_change(const std::string &state) {
   this->set_items_render_invalid();
 }
 
-void PowerCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void PowerCard::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
   if (attr == ha_attr_type::unit_of_measurement) {
     this->home_ha_unit_ = value;
     this->update_home_value_();

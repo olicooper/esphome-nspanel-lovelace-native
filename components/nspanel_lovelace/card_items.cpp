@@ -106,11 +106,11 @@ EntitiesCardEntityItem::EntitiesCardEntityItem(
 void EntitiesCardEntityItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void EntitiesCardEntityItem::on_entity_attribute_change(
-    ha_attr_type attr, const std::string &value) {
+    ha_attr_type attr, const psram_string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
 
   if (attr == ha_attr_type::unit_of_measurement) {
-    this->set_value_postfix(value);
+    this->set_value_postfix(std::string(value.c_str(), value.size()));
     return;
   }
 
@@ -308,7 +308,7 @@ void EntitiesCardEntityItem::state_weather_fn(StatefulPageItem *me) {
     ha_attr_type::temperature, "0");
   auto temperature_unit = me_->get_attribute(
     ha_attr_type::temperature_unit,
-    Configuration::get_temperature_unit_str());
+    Configuration::get_temperature_unit_str().c_str());
   
   me_->value_.assign(temperature).append(temperature_unit);
 }
@@ -437,7 +437,7 @@ PowerCardItem::PowerCardItem(
 void PowerCardItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 
 void PowerCardItem::on_entity_attribute_change(
-    ha_attr_type attr, const std::string &value) {
+    ha_attr_type attr, const psram_string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
   if (attr == ha_attr_type::unit_of_measurement) {
     this->ha_unit_ = value;

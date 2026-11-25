@@ -1024,8 +1024,8 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
       contains_value(supported_modes, ha_attr_color_mode::rgbw) ||
       contains_value(supported_modes, ha_attr_color_mode::rgbww));
 
-  std::string color_mode = entity->get_attribute(ha_attr_type::color_mode);
-  std::string color_temp = generic_type::disable;
+  auto &color_mode = entity->get_attribute(ha_attr_type::color_mode);
+  psram_string color_temp = generic_type::disable;
   if (contains_value(supported_modes, ha_attr_color_mode::color_temp)) {
     if (color_mode == ha_attr_color_mode::color_temp) {
       color_temp = entity->get_attribute(ha_attr_type::color_temp, generic_type::disable);
@@ -1073,7 +1073,7 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
 
   if (idle) {
     this->cancel_interval(entity_type::timer);
-    std::string time_remaining_str;
+    psram_string time_remaining_str;
     if (state == entity_state::paused) {
       time_remaining_str = item->get_attribute(ha_attr_type::remaining);
     } else {
@@ -1239,8 +1239,8 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
   if(item == nullptr) return;
 
   auto state = item->get_state();
-  std::string options;
-  if (item->is_type(entity_type::input_select) || 
+  psram_string options;
+  if (item->is_type(entity_type::input_select) ||
       item->is_type(entity_type::select)) {
     options = item->get_attribute(ha_attr_type::options);
   }
@@ -1249,7 +1249,7 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
   }
   else if (item->is_type(entity_type::media_player)) {
     options = item->get_attribute(ha_attr_type::source_list);
-    state = item->get_attribute(ha_attr_type::source);
+    state = item->get_attribute(ha_attr_type::source).c_str();
   }
   if (!options.empty()) replace_all(options, ',', '?');
 
@@ -1937,7 +1937,7 @@ void NSPanelLovelace::process_button_press_(
       ha_action_type::shuffle_set,
       {{
         {to_string(ha_attr_type::entity_id), entity_id},
-        {to_string(ha_attr_type::shuffle), shuffle}
+        {to_string(ha_attr_type::shuffle), std::string(shuffle)}
       }});
   } else if (button_type == button_type::volumeSlider) {
     auto volume = esphome::str_snprintf("%.2f", 7, str_to_int(value) * 0.01f);

@@ -65,7 +65,25 @@ api:
       variables:
         url: string
       then:
-        - lambda: 'id(nspanel).upload_tft(url);'
+        - script.execute:
+            id: tft_upload_with_retry
+            url: !lambda 'return url;'
+
+script:
+  - id: tft_upload_with_retry
+    parameters:
+      url: string
+    then:
+      - repeat:
+          count: 3
+          then:
+            - switch.turn_on: screen_power
+            - delay: 2s
+            # a successful upload reboots the device, so this only continues on failure
+            - lambda: |-
+                if (!id(nspanel).upload_tft(url))
+                  ESP_LOGW("tft_upload", "TFT upload attempt failed");
+            - delay: 3s
 
 ota:
   platform: esphome

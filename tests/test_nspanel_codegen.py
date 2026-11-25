@@ -224,6 +224,47 @@ def test_codegen_tft_upload_build_flag(tmp_path: Path) -> None:
     assert "-DUSE_NSPANEL_TFT_UPLOAD" in cmake
 
 
+def test_codegen_weather_template_sensor_default(tmp_path: Path) -> None:
+    """forecast_method 'template_sensor' (the default) emits no service
+    defines, and its deprecation warning must not promise a removal
+    version (the 2026.6 promise is stale - 2026.11.0 is the floor)."""
+    body = """\
+  screensaver:
+    weather:
+      entity_id: weather.demo
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    cfg = tmp_path / "weather-legacy.yaml"
+    cfg.write_text(SYNTHETIC_CONFIG.format(
+        name="weather-legacy",
+        components=str(REPO_ROOT / "components"),
+        nspanel_body=body,
+        esphome_extra="",
+    ))
+    result = subprocess.run(
+        ["esphome", "compile", "--only-generate", str(cfg)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    assert result.returncode == 0, (
+        f"template_sensor weather should still build:\n"
+        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}")
+    defines = (_build_dir(tmp_path, "weather-legacy")
+               / "src" / "esphome" / "core" / "defines.h").read_text()
+    assert "#define USE_NSPANEL_WEATHER_SERVICE" not in defines
+    assert "#define USE_API_CUSTOM_SERVICES" not in defines
+    out = result.stdout + result.stderr
+    assert "forecast_method 'template_sensor' is deprecated" in out, out
+    assert "will be removed" not in out, out
+
+
 def assert_no_none_tokens(src: str) -> None:
     """No Python None token may leak into generated C++ (string literals are
     legitimate, e.g. the translation value "None", so they are stripped)."""
@@ -297,9 +338,16 @@ def test_codegen_baseline() -> None:
     )) == 1
     assert "set_alt_font(true)" in src
 
-    # Weather uses the raw entity string, not create_entity.
+    # Weather uses the raw entity string, not create_entity; the fixture's
+    # forecast_method 'service' emits both service defines.
     assert 'set_weather_entity_id("weather.demo_codegen")' in src
     assert "#define USE_NSPANEL_WEATHER_SERVICE" in defines
+    assert "#define USE_API_CUSTOM_SERVICES" in defines
+
+    # The api states/services defines are emitted unconditionally (the
+    # pre-2025.8 version guard is gone; the floor is 2026.11.0).
+    assert "#define USE_API_HOMEASSISTANT_STATES" in defines
+    assert "#define USE_API_HOMEASSISTANT_SERVICES" in defines
 
     # The fixture locale is a custom JSON file: the firmware language is
     # "unknown" and the translation map carries the changed string value and

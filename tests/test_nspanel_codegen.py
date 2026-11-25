@@ -6,9 +6,11 @@ No hardware and no secrets: the fixture uses only fictional entities and
 hardcoded values. Run inside the approved ESPHome 2026.11.0 runner image.
 """
 
+import importlib
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -493,3 +495,70 @@ def test_codegen_single_visible_card(tmp_path: Path) -> None:
     assert src.count("set_nav_right") == 1
     assert "set_hidden" not in src
     assert_no_none_tokens(src)
+
+
+def load_component():
+    """Import the component module under test (once)."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    return importlib.import_module("components.nspanel_lovelace")
+
+
+def _grid_card(eid: str) -> dict:
+    return {"type": "cardGrid", "hidden": False, "sleep_timeout": 10,
+            "entities": [{"entity_id": eid}]}
+
+
+def test_codegen_contexts_are_independent_same_process() -> None:
+    """CodegenContext must be per-call: two contexts built from the same
+    fixture in one process allocate identical entity variable names, start
+    the UUID index at the same value (first generated UUID is "1"), and
+    allocate identical custom-icon slots, with no leftovers from the first
+    context. ESPHome's CORE is reset between the two (the way this version
+    expects); the component module is NOT reloaded, so any module-level
+    counter or dict would leak through."""
+    import esphome.core as core
+
+    nsl = load_component()
+    fixture = {
+        "model": "eu",
+        "locale": {"language": "en"},
+        "screensaver": {"status_icon_left": {"entity_id": "light.lamp_a"}},
+        "cards": [_grid_card("light.kitchen"), _grid_card("sensor.demo")],
+    }
+
+    core.CORE.reset()
+    ctx1 = nsl.CodegenContext(fixture)
+    core.CORE.reset()
+    ctx2 = nsl.CodegenContext(fixture)
+
+    # Identical entity variable names in identical first-use order
+    assert ctx1.entity_ids == {
+        "light.kitchen": "nspanel_e0",
+        "sensor.demo": "nspanel_e1",
+        "light.lamp_a": "nspanel_e2",
+    }
+    assert ctx1.entity_ids == ctx2.entity_ids
+    # First generated UUID is "1" in both contexts
+    assert ctx1.new_uuid() == "1"
+    assert ctx2.new_uuid() == "1"
+    # Custom-icon slots start empty and allocate independently
+    assert ctx1.custom_icons == {} and ctx2.custom_icons == {}
+    assert str(ctx1.icon("ED7E")) == "CUSTOM_ICONS[0]"
+    assert str(ctx2.icon("ED7E")) == "CUSTOM_ICONS[0]"
+
+
+def test_codegen_context_no_leftover_from_previous_config() -> None:
+    """A context built for config B in the same process must contain none of
+    config A's entities, and its entity variables restart at nspanel_e0."""
+    nsl = load_component()
+    config_a = {"model": "eu", "locale": {"language": "en"},
+                "screensaver": {}, "cards": [_grid_card("light.only_in_a")]}
+    config_b = {"model": "eu", "locale": {"language": "en"},
+                "screensaver": {}, "cards": [_grid_card("light.only_in_b")]}
+
+    ctx_a = nsl.CodegenContext(config_a)
+    ctx_b = nsl.CodegenContext(config_b)
+    assert ctx_b.entity_ids == {"light.only_in_b": "nspanel_e0"}
+    assert "light.only_in_a" not in ctx_b.entity_ids
+    assert ctx_a.entity_ids == {"light.only_in_a": "nspanel_e0"}

@@ -533,6 +533,50 @@ def test_sleep_timeout_card_bounds(tmp_path: Path) -> None:
         )
 
 
+def _validated_body_config(cards, default_card=None, screensaver=None) -> dict:
+    """A post-schema nspanel_lovelace config dict (defaults applied the way
+    CONFIG_SCHEMA would), so validate_config can be exercised in-process:
+    a subprocess (esphome config) cannot expose module state that persists
+    across validations within one process."""
+    config = {
+        "model": "eu",
+        "locale": {"language": "en"},
+        "cards": cards,
+    }
+    if screensaver is not None:
+        config["screensaver"] = screensaver
+    if default_card is not None:
+        config["default_card"] = default_card
+    return config
+
+
+def test_stale_card_id_rejected_in_same_process() -> None:
+    """Card ids must not persist between validations in one process: after
+    validating config A (card id 'a_card'), config B (different cards,
+    default_card: a_card) must reject the stale reference. Only an
+    in-process repeat validation can prove this."""
+    import esphome.core as core
+    from esphome.const import KEY_CORE, KEY_TARGET_FRAMEWORK
+
+    nsl = load_component()
+    core.CORE.reset()
+    core.CORE.data[KEY_CORE] = {KEY_TARGET_FRAMEWORK: "esp-idf"}
+
+    config_a = _validated_body_config(cards=[
+        {"type": "cardGrid", "id": "a_card", "hidden": False, "sleep_timeout": 10,
+         "entities": [{"entity_id": "light.a"}]},
+    ], screensaver={})
+    nsl.validate_config(config_a)  # must pass
+
+    config_b = _validated_body_config(cards=[
+        {"type": "cardGrid", "id": "b_card", "hidden": False, "sleep_timeout": 10,
+         "entities": [{"entity_id": "light.b"}]},
+    ], default_card="a_card", screensaver={})
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.validate_config(config_b)
+    assert "a_card" in str(exc_info.value)
+
+
 def test_dangling_navigation_reports_tile_path(tmp_path: Path) -> None:
     """A navigation reference to a missing card id must fail validation with the
     exact tile path (cards.<i>.entities.<j>.entity_id), not crash with IndexError."""

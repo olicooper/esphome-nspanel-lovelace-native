@@ -10,6 +10,7 @@ on:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
       - "*example.yaml"
+      - "secrets-example.yaml"
       - "ci/**"
       - "tests/**"
 
@@ -19,12 +20,16 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - "*example.yaml"
+      - "secrets-example.yaml"
       - "ci/**"
       - "tests/**"
 
 jobs:
   build:
-    name: Build (${{ matrix.variant }}, ESPHome ${{ matrix.version }})
+    # The check context is the stable name "Build" (matching the pre-matrix
+    # job) so any required status checks keep matching; the per-leg variant
+    # and version are reported in the job log, not the context name.
+    name: Build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,8 +39,10 @@ jobs:
         # the component); stable is the current official release. When
         # stable resolves to the floor, those legs duplicate each other —
         # noted, not de-duplicated: the floor stays pinned.
+        # codegen-no-tft is included so the USE_NSPANEL_TFT_UPLOAD-disabled
+        # path is compiled at every blocking version, not just the floor.
         version: [2026.11.0, stable]
-        variant: [basic, advanced, codegen]
+        variant: [basic, advanced, codegen, codegen-no-tft]
     container:
       image: ghcr.io/esphome/esphome:${{ matrix.version }}
     steps:
@@ -47,6 +54,10 @@ jobs:
         cp secrets-example.yaml secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
 
+  # Single floor-pinned host-test job: the pytest suite runs once (it does not
+  # multiply across the firmware matrix) and needs no secrets -- the synthetic
+  # and codegen fixtures use hardcoded credentials, and firmware compiles are
+  # the build matrix's job (which gates codegen-no-tft at every version).
   unittest:
     name: Test (floor)
     runs-on: ubuntu-latest
@@ -54,18 +65,10 @@ jobs:
       image: ghcr.io/esphome/esphome:2026.11.0
     steps:
     - uses: actions/checkout@v6
-    - name: Copy test secrets
-      run: |
-        cp secrets-example.yaml secrets.yaml
     - name: Install pytest
       run: python -m pip install --quiet pytest
     - name: Run unit and codegen generation tests
       run: python -m pytest -q tests
-    # The build matrix covers basic/advanced/codegen; this floor-pinned job
-    # additionally compiles the no-TFT variant, which the 3-variant matrix
-    # excludes so it still gates the USE_NSPANEL_TFT_UPLOAD-disabled path.
-    - name: Compile codegen fixture (TFT upload disabled)
-      run: esphome compile ci/codegen-no-tft.yaml
 
   # Advisory preview: manual-only, never runs on push/PR, and a pass does
   # NOT make beta a supported version (the floor remains 2026.11.0).

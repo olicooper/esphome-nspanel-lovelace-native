@@ -598,7 +598,7 @@ class CodegenContext:
                 cg.RawExpression(r'u8"\u{0}"'.format(iconHexStr))]
         return cg.RawExpression(f"CUSTOM_ICONS[{self.custom_icons[iconHexStr][0]}]")
 
-def generate_icon_config(icon_config, parent_class: cg.MockObj = None, ctx: CodegenContext = None) -> Union[None, dict]:
+def generate_icon_config(icon_config, ctx: CodegenContext, parent_class: cg.MockObj = None) -> Union[None, dict]:
     attrs = {
         "value": None,
         "color": None,
@@ -645,14 +645,14 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
             f"auto {variable_name} = "
             f"{make_shared.template(entity_type).__call__(ctx.new_uuid(), entity_id, display_name)}"))
 
-        generate_icon_config(entity_config.get(CONF_ICON, None), entity_class, ctx)
+        generate_icon_config(entity_config.get(CONF_ICON, None), ctx, parent_class=entity_class)
 
         cg.add(card_variable.add_item(entity_class))
 
 def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable_name: str, ctx: CodegenContext, default_icon_value: str = 'alert-circle-outline') -> cg.MockObjClass:
     entity_id = ctx.entity(icon_config.get(CONF_ENTITY_ID))
     default_icon_value = ctx.icon(get_icon_hex(default_icon_value))
-    attrs = generate_icon_config(icon_config.get(CONF_ICON, {}), None, ctx)
+    attrs = generate_icon_config(icon_config.get(CONF_ICON, {}), ctx)
     # generate_icon_config converts a configured icon string to an expression
     # (icon_t:: enum or CUSTOM_ICONS[n]), so "configured" must be tested on
     # whether a value exists, not on its type.
@@ -675,12 +675,12 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable
     # which set the *_overridden_ flags those callbacks respect, otherwise
     # the configured values are silently discarded at runtime.
     if has_icon:
-        cg.add(cg.RawStatement(f'{variable_name}->set_icon_value({attrs["value"]});'))
+        cg.add(variable_class.set_icon_value(attrs["value"]))
     if has_color:
         cg.add(variable_class.set_icon_color(attrs["color"]))
     return variable_class
 
-def configure_platform(config):
+def configure_platform():
     # note: not using 'psram' dependency because our sdkconfig options conflict
     if has_build_define(core.CORE.config[CONF_ESPHOME], "TEST_DEVICE_MODE"):
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
@@ -902,8 +902,6 @@ def emit_cards(nspanel, config, ctx, screensaver_uuid) -> None:
             navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{ctx.new_uuid()}\", \"{prev_card_uuid}\", {navleft_icon_value})')
             cg.add(cg.RawExpression(
                 f"auto {navleft_variable} = "
-                # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-                # f"{unique_ptr.template(NavigationItem).__call__(NavigationItem.new(get_new_uuid(), prev_card_uuid, navleft_icon_value))}"))
                 f"{unique_ptr.template(NavigationItem)}({navleft_statement})"))
             cg.add(card_class.set_nav_left(cg.global_ns.class_(navleft_variable)))
             navright_variable = card_variable + "_navright"
@@ -934,7 +932,7 @@ async def to_code(config):
     # One context per call: entity variables, UUIDs and custom-icon slots
     # are allocated for this configuration only (no module-level state).
     ctx = CodegenContext(config)
-    configure_platform(config)
+    configure_platform()
 
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)

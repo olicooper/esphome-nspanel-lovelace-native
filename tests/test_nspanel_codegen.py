@@ -18,6 +18,7 @@ CODEGEN_YAML = REPO_ROOT / "ci" / "codegen.yaml"
 BUILD_DIR = REPO_ROOT / "ci" / ".esphome" / "build" / "ci-codegen"
 MAIN_CPP = BUILD_DIR / "src" / "main.cpp"
 DEFINES_H = BUILD_DIR / "src" / "esphome" / "core" / "defines.h"
+GOLDEN_MAIN_CPP = REPO_ROOT / "tests" / "golden" / "main-codegen.cpp"
 
 
 def run_esphome(*args: str) -> subprocess.CompletedProcess:
@@ -277,6 +278,22 @@ def assert_no_none_tokens(src: str) -> None:
     assert re.search(r"\bNone\b", stripped) is None
 
 
+def normalize_main_cpp(src: str) -> str:
+    """Strip the machine-specific parts of a generated main.cpp so it can be
+    compared against a committed golden file across build directories:
+    drop the ``#line`` directives (they embed absolute config/build paths)
+    and blank the absolute external_components path in the config dump."""
+    out = []
+    for line in src.splitlines(keepends=True):
+        if re.match(r"\s*#line\b", line):
+            continue
+        if re.search(r"\bpath: /", line):
+            out.append(re.sub(r"(path:\s*)/\S+", r"\1<COMPONENTS>", line))
+            continue
+        out.append(line)
+    return "".join(out)
+
+
 def test_codegen_baseline() -> None:
     result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
     assert result.returncode == 0, (
@@ -368,6 +385,31 @@ def test_codegen_baseline() -> None:
     assert "codegen_extra_value" in src
 
     assert_no_none_tokens(src)
+
+
+def test_codegen_matches_golden() -> None:
+    """The generated ci/codegen.yaml main.cpp must be byte-identical (modulo
+    build-directory-specific lines) to the committed golden file. This is the
+    regression guard for the state-isolation and expression-API refactors:
+    any reordering of codegen, a UUID-allocation shift, or a quoting change
+    that the individual pattern asserts miss will fail the whole-file compare.
+    Reuses the baseline's generation (same fixture, same --only-generate run
+    is idempotent); does not add a second codegen invocation."""
+    result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
+    assert result.returncode == 0, (
+        "esphome compile --only-generate ci/codegen.yaml failed:\n"
+        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}"
+    )
+    assert GOLDEN_MAIN_CPP.is_file(), f"missing golden {GOLDEN_MAIN_CPP}"
+    generated = normalize_main_cpp(MAIN_CPP.read_text())
+    golden = normalize_main_cpp(GOLDEN_MAIN_CPP.read_text())
+    assert generated == golden, (
+        "generated main.cpp no longer matches the golden file. If a "
+        "behavioural change to the generated output is intentional, "
+        "regenerate it (floor image: `esphome compile --only-generate "
+        "ci/codegen.yaml`) and update tests/golden/main-codegen.cpp after "
+        "reviewing the diff."
+    )
 
 
 def test_codegen_all_hidden_cards(tmp_path: Path) -> None:

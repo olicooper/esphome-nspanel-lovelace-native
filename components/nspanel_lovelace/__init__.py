@@ -5,7 +5,8 @@ import esphome.codegen as cg
 import esphome.core as core
 import re
 import logging
-from typing import Union
+from typing import Callable, Union
+from pathlib import Path
 import os, json
 
 from esphome.components import uart, time, esp32
@@ -38,7 +39,6 @@ entity_ids: dict[str] = {}
 entity_id_index = 0
 uuid_index = 0
 iconJson = None
-translationJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
@@ -192,25 +192,53 @@ def load_icons():
                 f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
 
-def load_translations(lang: str):
-    global translationJson
-    current_directory = os.path.dirname(__file__)
-    jsonPath = os.path.abspath(lang)
-    if not lang.endswith('.json'):
-        jsonPath = os.path.join(current_directory, "translations", f"{lang}.json")
-    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load translation from '{jsonPath}'")
+def resolve_translation_path(language: str, config_relative: Callable[[str], Path]) -> tuple[Path, bool]:
+    """Resolve a locale language to its translation file.
+
+    Bundled languages (no ".json" suffix) resolve inside the bundled
+    translations/ directory. A ".json" language resolves relative to the
+    top-level configuration directory (config_relative), or unchanged when
+    absolute. When the config-relative path does not exist, the legacy
+    working-directory path is returned instead and the boolean is True
+    (never for absolute paths or bundled languages).
+    """
+    if not language.endswith(".json"):
+        return Path(__file__).resolve().parent / "translations" / f"{language}.json", False
+    if os.path.isabs(language):
+        return Path(language), False
+    config_path = Path(config_relative(language))
+    if config_path.exists():
+        return config_path, False
+    legacy_path = Path(os.path.abspath(language))
+    if legacy_path.exists():
+        return legacy_path, True
+    return config_path, False
+
+def load_translations(path) -> dict:
+    """Load a translation file and validate its shape: a JSON object mapping
+    string keys to string values containing every REQUIRED_TRANSLATION_KEY.
+    Extra string-valued keys are allowed and preserved (insertion order)."""
     try:
-        with open(jsonPath, encoding="utf-8") as read_file:
-            translationJson = json.load(read_file)
-    except (UnicodeDecodeError, OSError):
-        raise cv.Invalid(f"Failed to load translation file from '{jsonPath}', does it exist?")
-    missingKeys = []
-    for k in REQUIRED_TRANSLATION_KEYS:
-        if k not in translationJson:
-            missingKeys.append(k)
-    if len(missingKeys) > 0:
-        raise cv.Invalid(f"Translation file missing the following required keys: {missingKeys}")
-    _LOGGER.info(f"[nspanel_lovelace] Loaded '{lang}' translation file")
+        with open(path, encoding="utf-8") as read_file:
+            data = json.load(read_file)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise cv.Invalid(f"Failed to load translation file from '{path}': {err}", [CONF_LOCALE, CONF_LANGUAGE])
+    if not isinstance(data, dict):
+        raise cv.Invalid(
+            f"Translation file '{path}' must be a JSON object of string keys to string values",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    missingKeys = [k for k in REQUIRED_TRANSLATION_KEYS if k not in data]
+    if missingKeys:
+        raise cv.Invalid(
+            f"Translation file '{path}' is missing the following required keys: {missingKeys}",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    badKeys = [k for k, v in data.items() if not isinstance(v, str)]
+    if badKeys:
+        raise cv.Invalid(
+            f"Translation file '{path}' has non-string values for the following keys: {badKeys}",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file '{path}' ({len(data)} entries)")
+    return data
 
 def get_icon(iconHexStr) -> Union[cg.MockObj, None]:
     global custom_icons, custom_icons_index
@@ -415,8 +443,20 @@ def validate_config(config):
             "that can't be configured under Arduino."
         )
     model = config[CONF_MODEL]
-    if CONF_LANGUAGE not in config[CONF_LOCALE]:
-        raise cv.Invalid("A language must be specified in locale")
+    # The locale schema defaults language to 'en', so an explicit empty value
+    # is the only bad case. Validate the translation file early so a missing
+    # file, bad JSON or missing keys fail config validation (at
+    # locale.language), not codegen.
+    language = config[CONF_LOCALE][CONF_LANGUAGE]
+    if not language:
+        raise cv.Invalid("A language must be specified in locale", [CONF_LOCALE, CONF_LANGUAGE])
+    translation_path, legacy = resolve_translation_path(language, core.CORE.relative_config_path)
+    if legacy:
+        _LOGGER.warning(
+            f"[nspanel_lovelace] translation file '{language}' not found relative to the "
+            f"configuration directory; using the legacy working-directory path "
+            f"'{translation_path}'. Place the file next to the configuration instead.")
+    load_translations(translation_path)
     # Build a list of custom card ids, rejecting duplicates
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         if CONF_ID in card_config:
@@ -740,14 +780,16 @@ async def to_code(config):
         cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
 
     locale_config = config[CONF_LOCALE]
-    global translationJson
-    load_translations(locale_config[CONF_LANGUAGE])
-    
-    # file specified, translation unknown
-    if '.' in locale_config[CONF_LANGUAGE] or len(locale_config[CONF_LANGUAGE]) == 0:
+    language = locale_config[CONF_LANGUAGE]
+    # Already validated in validate_config; the file is small enough to read again.
+    translation_path, _ = resolve_translation_path(language, core.CORE.relative_config_path)
+    translationJson = load_translations(translation_path)
+
+    # A custom JSON file has no matching built-in language name
+    if '.' in language:
         cg.add(nspanel.set_language("unknown"))
     else:
-        cg.add(nspanel.set_language(locale_config[CONF_LANGUAGE]))
+        cg.add(nspanel.set_language(language))
 
     cgv = []
     for k,v in translationJson.items():

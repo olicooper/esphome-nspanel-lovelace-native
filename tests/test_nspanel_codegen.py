@@ -6,6 +6,7 @@ No hardware and no secrets: the fixture uses only fictional entities and
 hardcoded values. Run inside the approved ESPHome 2026.11.0 runner image.
 """
 
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -70,10 +71,13 @@ time:
 """
 
 
-def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str) -> str:
+def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
+                       cwd: Path | None = None) -> str:
     """Write a synthetic config to tmp_path, run codegen only, and return the
     generated main.cpp source. Uuids are allocated numerically in codegen
-    order, so a screensaver without an explicit id gets uuid "1"."""
+    order, so a screensaver without an explicit id gets uuid "1". cwd runs
+    esphome from a different working directory (default: repo root); the
+    build output still lands under the config file's directory."""
     cfg = tmp_path / f"{name}.yaml"
     cfg.write_text(SYNTHETIC_CONFIG.format(
         name=name,
@@ -82,7 +86,7 @@ def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str) -> str:
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
-        cwd=REPO_ROOT,
+        cwd=cwd or REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=900,
@@ -94,6 +98,73 @@ def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str) -> str:
     main = cfg.parent / ".esphome" / "build" / name / "src" / "main.cpp"
     assert main.is_file(), f"missing generated {main}"
     return main.read_text()
+
+
+def _full_translation(**overrides) -> dict:
+    """A complete translation dict (all required keys), with overrides."""
+    en = json.loads((REPO_ROOT / "components" / "nspanel_lovelace"
+                     / "translations" / "en.json").read_text(encoding="utf-8"))
+    en.update(overrides)
+    return en
+
+
+_TRANSLATION_CARD = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+
+
+def test_translation_config_relative_wins(tmp_path: Path) -> None:
+    """A translation file present in both the config dir and the working dir:
+    the config-relative file wins (the CWD copy is deliberately missing a
+    required key, so using it would fail the build)."""
+    work = tmp_path / "work"
+    cfg_dir = work / "cfgdir"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "shared.json").write_text(
+        json.dumps(_full_translation(none="CFG_RELATIVE_WINS")), encoding="utf-8")
+    bad = _full_translation()
+    del bad["none"]
+    (work / "shared.json").write_text(json.dumps(bad), encoding="utf-8")
+    body = "  locale:\n    language: shared.json\n" + _TRANSLATION_CARD
+    src = generate_synthetic(cfg_dir, body, "trans-wins", cwd=work)
+    assert "CFG_RELATIVE_WINS" in src
+    assert_no_none_tokens(src)
+
+
+def test_translation_legacy_cwd_fallback(tmp_path: Path) -> None:
+    """A translation file that exists only in the working dir (legacy layout)
+    still loads, with a one-time working-directory warning."""
+    work = tmp_path / "work"
+    cfg_dir = work / "cfgdir"
+    cfg_dir.mkdir(parents=True)
+    (work / "legacy.json").write_text(
+        json.dumps(_full_translation(none="LEGACY_CWD_VALUE")), encoding="utf-8")
+    body = "  locale:\n    language: legacy.json\n" + _TRANSLATION_CARD
+    cfg = cfg_dir / "trans-legacy.yaml"
+    cfg.write_text(SYNTHETIC_CONFIG.format(
+        name="trans-legacy",
+        components=str(REPO_ROOT / "components"),
+        nspanel_body=body,
+    ))
+    result = subprocess.run(
+        ["esphome", "compile", "--only-generate", str(cfg)],
+        cwd=work,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    assert result.returncode == 0, (
+        f"legacy CWD translation should still build:\n"
+        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}")
+    out = result.stdout + result.stderr
+    assert out.count("working-directory") == 1, out
+    main = cfg_dir / ".esphome" / "build" / "trans-legacy" / "src" / "main.cpp"
+    assert "LEGACY_CWD_VALUE" in main.read_text()
 
 
 def assert_no_none_tokens(src: str) -> None:
@@ -172,6 +243,13 @@ def test_codegen_baseline() -> None:
     # Weather uses the raw entity string, not create_entity.
     assert 'set_weather_entity_id("weather.demo_codegen")' in src
     assert "#define USE_NSPANEL_WEATHER_SERVICE" in defines
+
+    # The fixture locale is a custom JSON file: the firmware language is
+    # "unknown" and the translation map carries the changed string value and
+    # the extra key.
+    assert 'set_language("unknown")' in src
+    assert "none_codegen_custom" in src
+    assert "codegen_extra_value" in src
 
     assert_no_none_tokens(src)
 

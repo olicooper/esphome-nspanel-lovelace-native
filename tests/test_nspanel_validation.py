@@ -11,6 +11,7 @@ Run inside the approved ESPHome 2026.11.0 runner image.
 """
 
 import importlib
+import json
 import re
 import subprocess
 import sys
@@ -20,6 +21,14 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPONENTS_DIR = REPO_ROOT / "components"
+BUNDLED_EN = COMPONENTS_DIR / "nspanel_lovelace" / "translations" / "en.json"
+
+
+def _full_translation(**overrides) -> dict:
+    """A complete translation dict (all required keys), with overrides."""
+    data = json.loads(BUNDLED_EN.read_text(encoding="utf-8"))
+    data.update(overrides)
+    return data
 
 
 def load_component():
@@ -195,6 +204,139 @@ def test_get_icon_hex_real_catalog() -> None:
     assert nsl.get_icon_hex("hiking") == "ED7E"
     assert nsl.get_icon_hex("hex:ED7E") == "ED7E"
     assert nsl.get_icon_hex("no-such-icon-xyz") is None
+
+
+def test_load_translations_valid() -> None:
+    nsl = load_component()
+    data = nsl.load_translations(BUNDLED_EN)
+    assert data == json.loads(BUNDLED_EN.read_text(encoding="utf-8"))
+    assert all(isinstance(v, str) for v in data.values())
+
+
+def test_load_translations_missing_file(tmp_path: Path) -> None:
+    nsl = load_component()
+    missing = tmp_path / "nope.json"
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_translations(missing)
+    assert str(missing) in str(exc_info.value)
+    assert list(exc_info.value.path) == ["locale", "language"]
+
+
+def test_load_translations_invalid_json(tmp_path: Path) -> None:
+    nsl = load_component()
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_translations(bad)
+    assert str(bad) in str(exc_info.value)
+
+
+def test_load_translations_list_not_object(tmp_path: Path) -> None:
+    nsl = load_component()
+    lst = tmp_path / "list.json"
+    lst.write_text("[]", encoding="utf-8")
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_translations(lst)
+    assert "object" in str(exc_info.value)
+
+
+def test_load_translations_missing_required_key(tmp_path: Path) -> None:
+    nsl = load_component()
+    data = _full_translation()
+    del data["none"]
+    f = tmp_path / "missing-key.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_translations(f)
+    assert "'none'" in str(exc_info.value)
+
+
+def test_load_translations_nonstring_values(tmp_path: Path) -> None:
+    nsl = load_component()
+    data = _full_translation(none=123, extra_key=["not", "a", "string"])
+    f = tmp_path / "bad-values.json"
+    f.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(nsl.cv.Invalid) as exc_info:
+        nsl.load_translations(f)
+    msg = str(exc_info.value)
+    assert "none" in msg and "extra_key" in msg
+
+
+def test_resolve_translation_path_bundled_and_absolute() -> None:
+    nsl = load_component()
+    config_relative = lambda s: Path("/cfg") / s
+    p, legacy = nsl.resolve_translation_path("de", config_relative)
+    assert p == Path(nsl.__file__).resolve().parent / "translations" / "de.json"
+    assert legacy is False
+    p, legacy = nsl.resolve_translation_path("/abs/custom.json", config_relative)
+    assert p == Path("/abs/custom.json") and legacy is False
+
+
+def test_resolve_translation_path_config_relative_and_legacy(
+    tmp_path: Path, monkeypatch
+) -> None:
+    nsl = load_component()
+    cwd_file = tmp_path / "shared.json"
+    cwd_file.write_text(json.dumps(_full_translation()), encoding="utf-8")
+    config_dir = tmp_path / "cfg"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)  # legacy CWD target
+    config_relative = lambda s: config_dir / s
+    # Config-relative target absent -> legacy CWD path is used
+    p, legacy = nsl.resolve_translation_path("shared.json", config_relative)
+    assert legacy is True and p == cwd_file
+    # Config-relative wins when both exist
+    (config_dir / "shared.json").write_text(
+        json.dumps(_full_translation()), encoding="utf-8")
+    p, legacy = nsl.resolve_translation_path("shared.json", config_relative)
+    assert legacy is False and p == config_dir / "shared.json"
+
+
+def _translation_body(language: str) -> str:
+    return f"""\
+  locale:
+    language: {language}
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+
+
+def test_translation_missing_file_fails_validation(tmp_path: Path) -> None:
+    """A missing translation file must fail `esphome config` (not compile)
+    with the locale.language path."""
+    result = esphome_config(tmp_path, _translation_body("missing_custom.json"),
+                           name="trans-missing")
+    assert result.returncode != 0, f"missing translation should be invalid: {result.stdout}"
+    out = result.stdout + result.stderr
+    assert "Failed to load translation" in out, out
+    # The error must sit at the locale.language node in the config tree:
+    # ESPHome renders it directly above the offending key line.
+    assert re.search(
+        r"Failed to load translation[^\n]*\n\s+language: missing_custom\.json", out
+    ), out
+
+
+def test_translation_invalid_json_fails_validation(tmp_path: Path) -> None:
+    (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
+    result = esphome_config(tmp_path, _translation_body("bad.json"), name="trans-bad")
+    assert result.returncode != 0, f"invalid JSON translation should be invalid: {result.stdout}"
+    assert "Failed to load translation" in result.stdout + result.stderr
+
+
+def test_translation_absolute_path_still_works(tmp_path: Path) -> None:
+    custom = tmp_path / "absolute.json"
+    custom.write_text(json.dumps(_full_translation(none="ABS_VALUE")), encoding="utf-8")
+    result = esphome_config(tmp_path, _translation_body(f"{custom}"), name="trans-abs")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_empty_language_fails_validation(tmp_path: Path) -> None:
+    result = esphome_config(tmp_path, _translation_body("''"), name="trans-empty")
+    assert result.returncode != 0, f"empty language should be invalid: {result.stdout}"
+    assert "language" in result.stdout + result.stderr
 
 
 def test_entity_id_exact_domain_matching() -> None:

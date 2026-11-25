@@ -21,7 +21,9 @@ nspanel_lovelace:
   id: nspanel
   sleep_timeout: 10
   locale:
-    language: en
+    # Custom translation file, relative to this config's directory: the
+    # firmware language is "unknown" and the map carries the custom strings.
+    language: fixtures/translation.json
   screensaver:
     time_id: homeassistant_time
     weather:

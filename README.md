@@ -41,6 +41,10 @@ The NSPanel has on-board PSRAM which this project makes use of automatically, wh
 
 The `sleep_timeout` values (top-level and per-card) are limited to `0`-`65` seconds because the HMI firmware protocol caps the screensaver timeout at 65s. Values `66`-`120` were previously accepted for per-card timeouts but are now rejected. `0` disables the screensaver for that timeout.
 
+### Custom translations
+
+`locale.language` is either a bundled language code (e.g. `en`, `de`) or a custom translation file. Custom files are resolved **relative to the directory of the top-level YAML configuration** (e.g. `language: translations/custom.json` next to the config), or as an absolute path. If the file is not found there, the legacy working-directory path is still tried and a warning is logged — place the file next to the configuration instead. The file must be a JSON object of string keys to string values containing all the bundled translation keys (see `components/nspanel_lovelace/translations/en.json`); extra keys are allowed. Translation problems are reported at `locale.language` during `esphome config`, before compilation.
+
 
 # Help Needed!
 

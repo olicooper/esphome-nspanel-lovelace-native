@@ -10,7 +10,6 @@ import os, json
 
 from esphome.components import uart, time, esp32
 from esphome.const import (
-    __version__ as ESPHOME_VERSION,
     CONF_ID,
     CONF_TRIGGER_ID,
     CONF_TIME_ID,
@@ -654,10 +653,9 @@ async def to_code(config):
         cg.add_define("ARDUINOJSON_SLOT_ID_SIZE", 2)
         cg.add_define("ARDUINOJSON_ENABLE_STD_STRING", 1)
 
-    ## Explicitly enable services and states in ESPHome v2025.8.0+
-    if cv.Version.parse(ESPHOME_VERSION) >= cv.Version(2025,8,0):
-        cg.add_define("USE_API_HOMEASSISTANT_STATES")
-        cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
+    ## Explicitly enable services and states
+    cg.add_define("USE_API_HOMEASSISTANT_STATES")
+    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)
@@ -678,9 +676,7 @@ async def to_code(config):
         # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
         cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
 
-        ## todo: Remove this condition by esphome version 2026.6.x
-        if hasattr(esp32, "include_builtin_idf_component"):
-            esp32.include_builtin_idf_component("esp_http_client")
+        esp32.include_builtin_idf_component("esp_http_client")
         esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
         esp32.add_idf_sdkconfig_option(
             "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True

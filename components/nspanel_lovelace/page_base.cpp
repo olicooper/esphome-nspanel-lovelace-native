@@ -70,6 +70,7 @@ void Page::add_item(const std::shared_ptr<PageItem> &item) {
     }
   }
   this->items_.push_back(item);
+  item->set_parent_page(this);
   this->on_item_added_(item);
 }
 

@@ -488,8 +488,7 @@ CONFIG_SCHEMA = cv.All(
                     cv.Optional(CONF_CARD_ENTITIES): cv.ensure_list(SCHEMA_CARD_ENTITY),
                     cv.Required(CONF_CARD_MEDIA_ENTITY_ID): valid_entity_id(['media_player'])
                 }),
-            },
-            default_type=CARD_GRID))
+            }))
         ),
     })
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -505,7 +504,6 @@ GlobalConfig.op = "::"
 Screensaver = nspanel_lovelace_ns.class_("Screensaver")
 EntitiesCard = nspanel_lovelace_ns.class_("EntitiesCard")
 GridCard = nspanel_lovelace_ns.class_("GridCard")
-# GridCard2 = nspanel_lovelace_ns.class_("GridCard2")
 QRCard = nspanel_lovelace_ns.class_("QRCard")
 AlarmCard = nspanel_lovelace_ns.class_("AlarmCard")
 ThermoCard = nspanel_lovelace_ns.class_("ThermoCard")
@@ -683,10 +681,7 @@ def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable
         cg.add(variable_class.set_icon_color(attrs["color"]))
     return variable_class
 
-async def to_code(config):
-    # One context per call: entity variables, UUIDs and custom-icon slots
-    # are allocated for this configuration only (no module-level state).
-    ctx = CodegenContext(config)
+def configure_platform(config):
     # note: not using 'psram' dependency because our sdkconfig options conflict
     if has_build_define(core.CORE.config[CONF_ESPHOME], "TEST_DEVICE_MODE"):
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
@@ -722,35 +717,8 @@ async def to_code(config):
     cg.add_define("USE_API_HOMEASSISTANT_STATES")
     cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
-    nspanel = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(nspanel, config)
-    await uart.register_uart_device(nspanel, config)
-    cg.add_global(nspanel_lovelace_ns.using)
 
-    enable_tft_upload = not has_build_define(
-        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
-
-    # TODO: check that upload_tft() function is not used anywhere
-    if enable_tft_upload:
-        # FIXME when using add_define, the code wont build because of
-        #       an undefined reference to 'upload_tft' during linking
-        # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
-        # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
-        cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
-
-        esp32.include_builtin_idf_component("esp_http_client")
-        esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
-        esp32.add_idf_sdkconfig_option(
-            "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
-        )
-
-    if CONF_SCREENSAVER in config:
-        cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
-
-    if CONF_EXP_VERT_UI in config:
-        cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
-
-    locale_config = config[CONF_LOCALE]
+def emit_translations(nspanel, locale_config):
     language = locale_config[CONF_LANGUAGE]
     # Already validated in validate_config; the file is small enough to read again.
     translation_path, _ = resolve_translation_path(language, core.CORE.relative_config_path)
@@ -777,13 +745,7 @@ async def to_code(config):
     if CONF_TEMPERATURE_UNIT in locale_config:
         cg.add(GlobalConfig.set_temperature_unit(TEMPERATURE_UNIT_OPTION_MAP[locale_config[CONF_TEMPERATURE_UNIT]]))
 
-    for conf in config.get(CONF_INCOMING_MSG, []):
-        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
-        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
-
-    for key, value in ctx.entity_ids.items():
-        cg.add(cg.RawExpression(f"auto {value} = {nspanel.create_entity(key)}"))
-
+async def emit_screensaver(nspanel, config, ctx) -> Union[str, None]:
     screensaver_config = config.get(CONF_SCREENSAVER, None)
     screensaver_uuid = None
     if screensaver_config is None:
@@ -851,7 +813,9 @@ async def to_code(config):
             cg.add(screensaver_class.add_item_range(screensaver_items))
 
         cg.add(cg.RawStatement("}"))
+    return screensaver_uuid
 
+def emit_cards(nspanel, config, ctx, screensaver_uuid) -> None:
     card_uuids = []
     visible_card_uuids = []
     for card_config in config.get(CONF_CARDS, []):
@@ -967,6 +931,53 @@ async def to_code(config):
 
         cg.add(cg.RawStatement("}"))
 
+async def to_code(config):
+    # One context per call: entity variables, UUIDs and custom-icon slots
+    # are allocated for this configuration only (no module-level state).
+    ctx = CodegenContext(config)
+    configure_platform(config)
+
+    nspanel = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(nspanel, config)
+    await uart.register_uart_device(nspanel, config)
+    cg.add_global(nspanel_lovelace_ns.using)
+
+    enable_tft_upload = not has_build_define(
+        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
+
+    # TODO: check that upload_tft() function is not used anywhere
+    if enable_tft_upload:
+        # FIXME when using add_define, the code wont build because of
+        #       an undefined reference to 'upload_tft' during linking
+        # cg.add_define("USE_NSPANEL_TFT_UPLOAD")
+        # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
+        cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
+
+        esp32.include_builtin_idf_component("esp_http_client")
+        esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
+        esp32.add_idf_sdkconfig_option(
+            "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
+        )
+
+    if CONF_SCREENSAVER in config:
+        cg.add(nspanel.set_display_timeout(config[CONF_SLEEP_TIMEOUT]))
+
+    if CONF_EXP_VERT_UI in config:
+        cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
+
+    emit_translations(nspanel, config[CONF_LOCALE])
+
+    for conf in config.get(CONF_INCOMING_MSG, []):
+        trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)
+        await automation.build_automation(trigger, [(cg.std_string, "x")], conf)
+
+    for key, value in ctx.entity_ids.items():
+        cg.add(cg.RawExpression(f"auto {value} = {nspanel.create_entity(key)}"))
+
+    screensaver_uuid = await emit_screensaver(nspanel, config, ctx)
+
+    emit_cards(nspanel, config, ctx, screensaver_uuid)
+
     if CONF_DEFAULT_CARD in config:
         # Validated in validate_config; can only be called after all the
         # pages have been created.
@@ -981,53 +992,3 @@ async def to_code(config):
         f"CUSTOM_ICONS {{{cg.ArrayInitializer(*icon_arr)}}};"))
 
     cg.add_define("USE_NSPANEL_LOVELACE")
-
-
-## see: https://esphome.io/components/wifi
-# c++
-#   void add_sta(const WiFiAP &ap);
-
-# wifi_ns = cg.esphome_ns.namespace("wifi")
-# ManualIP = wifi_ns.struct("ManualIP")
-# WiFiAP = wifi_ns.struct("WiFiAP")
-# def wifi_network(config, ap, static_ip):
-#     if CONF_SSID in config:
-#         cg.add(ap.set_ssid(config[CONF_SSID]))
-#     if CONF_PASSWORD in config:
-#         cg.add(ap.set_password(config[CONF_PASSWORD]))
-#     if static_ip is not None:
-#         cg.add(ap.set_manual_ip(manual_ip(static_ip)))
-# def manual_ip(config):
-#     if config is None:
-#         return None
-#     return cg.StructInitializer(
-#         ManualIP,
-#         ("static_ip", safe_ip(config[CONF_STATIC_IP])),
-#         ("gateway", safe_ip(config[CONF_GATEWAY])),
-#         ("subnet", safe_ip(config[CONF_SUBNET])),
-#         ("dns1", safe_ip(config.get(CONF_DNS1))),
-#         ("dns2", safe_ip(config.get(CONF_DNS2))),
-#     )
-## in to_code()
-# def add_sta(ap, network):
-#     ip_config = network.get(CONF_MANUAL_IP, config.get(CONF_MANUAL_IP))
-#     cg.add(var.add_sta(wifi_network(network, ap, ip_config)))
-# for network in config.get(CONF_NETWORKS, []):
-#     cg.with_local_variable(network[CONF_ID], WiFiAP(), add_sta, network)
-
-# def add_card(card, card):
-#     ip_config = network.get(CONF_MANUAL_IP, config.get(CONF_MANUAL_IP))
-#     cg.add(var.add_card(wifi_network(network, card, ip_config)))
-
-## other examples:
-# cv.validate_id_name
-
-# if value in cv.RESERVED_IDS:
-#     raise vol.Invalid(f"ID '{value}' is reserved internally and cannot be used")
-
-# config[CONF_NETWORKS] = cv.ensure_list(WIFI_NETWORK_STA)(network)
-
-# if CORE.using_arduino:
-#     cg.add_library("WiFi", None)
-# else:
-#     if CORE.is_esp32:

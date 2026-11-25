@@ -5,22 +5,27 @@ import esphome.codegen as cg
 import esphome.core as core
 import re
 import logging
-from typing import Union
+from typing import Callable, Union
+from pathlib import Path
 import os, json
 
 from esphome.components import uart, time, esp32
 from esphome.const import (
-    __version__ as ESPHOME_VERSION,
     CONF_ID,
     CONF_TRIGGER_ID,
     CONF_TIME_ID,
     CONF_ESPHOME,
+    CONF_BUILD_FLAGS,
     CONF_PLATFORMIO_OPTIONS
 )
 
-CODEOWNERS = ["@olicooper"]
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
 CONFLICTS_WITH = ["psram"]
+# Maximum sleep timeout in seconds. The HMI firmware protocol caps the
+# screensaver timeout at 65s, so values 66..120 (previously accepted for
+# per-card timeouts) are deliberately rejected.
+# https://github.com/joBr99/nspanel-lovelace-ui/blob/22e96f2b3ad0cd3382008eac9b4d6a27982404b8/HMI/README.md?plain=1#L91
+MAX_SLEEP_TIMEOUT = 65
 
 def AUTO_LOAD():
     val = ["text_sensor", "json"]
@@ -33,7 +38,6 @@ entity_ids: dict[str] = {}
 entity_id_index = 0
 uuid_index = 0
 iconJson = None
-translationJson = None
 make_shared = cg.std_ns.class_("make_shared")
 unique_ptr = cg.std_ns.class_("unique_ptr")
 nspanel_lovelace_ns = cg.esphome_ns.namespace("nspanel_lovelace")
@@ -59,10 +63,12 @@ NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
     automation.Trigger.template(cg.std_string)
 )
 
-ENTITY_ID_RE = re.compile(r"^(?:(delete)|([\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9])|(iText.[^~]*?))$")
-## The list of currently supported entities
+# Real HA entity id format: [domain].[name]. The pseudo-entities 'delete',
+# 'iText.[text]' and 'navigate.[card id]' are handled separately in valid_entity_id.
+ENTITY_ID_RE = re.compile(r"^[\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9]$")
+## The list of currently supported entity domains (exact match)
 ENTITY_TYPES = [
-    'sensor','binary_sensor','light','switch','scene','timer','weather','navigate',
+    'sensor','binary_sensor','light','switch','scene','timer','weather',
     'alarm_control_panel','input_boolean','button','input_button','cover','fan',
     'automation','script','climate','media_player','select','input_select',
     'number','input_number','text','input_text','lock','sun','person','vacuum'
@@ -160,7 +166,11 @@ CONF_CARD_ALARM_SUPPORTED_MODES = "supported_modes"
 CONF_CARD_THERMO_ENTITY_ID = "thermo_entity_id"
 CONF_CARD_MEDIA_ENTITY_ID = "media_entity_id"
 
+ICON_HEX_RE = re.compile(r"^[0-9A-Fa-f]{4}$")
+
 def load_icons():
+    """Load the bundled icons.json catalog. The catalog must be a nonempty list
+    of objects with a nonempty string 'name' and a 4-character hex 'hex'."""
     global iconJson
     current_directory = os.path.dirname(__file__)
     iconJsonPath = os.path.join(current_directory, 'icons.json')
@@ -168,39 +178,90 @@ def load_icons():
     try:
         with open(iconJsonPath, encoding="utf-8") as read_file:
             iconJson = json.load(read_file)
-    except (UnicodeDecodeError, OSError):
-        import requests
-        response = requests.get("https://raw.githubusercontent.com/olicooper/esphome-nspanel-lovelace-native/dev/components/nspanel_lovelace/icons.json")
-        if response.ok:
-            with open(iconJsonPath, mode="w", encoding="utf-8") as new_file:
-                new_file.write(response.text)
-            iconJson = json.loads(response.text)
-        else:
-            raise cv.invalid("Failed to load icons, do you have internet connection?")
-
-    if iconJson is None or len(iconJson) == 0 or len(iconJson[0]["name"]) == 0 or len(iconJson[0]["hex"]) == 0:
-        raise cv.Invalid(f"Icons json invalid, please check the file. File location: {iconJsonPath}")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise cv.Invalid(f"Failed to load icons catalog from '{iconJsonPath}': {err}")
+    if not isinstance(iconJson, list) or len(iconJson) == 0:
+        raise cv.Invalid(f"Icons catalog is empty: '{iconJsonPath}'")
+    for entry in iconJson:
+        if (not isinstance(entry, dict)
+                or not isinstance(entry.get("name"), str) or not entry["name"]
+                or not isinstance(entry.get("hex"), str) or not ICON_HEX_RE.match(entry["hex"])):
+            raise cv.Invalid(
+                f"Icons catalog entry is invalid (need nonempty string 'name' and a "
+                f"4-character hex 'hex'): {entry!r}. File location: {iconJsonPath}")
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
 
-def load_translations(lang: str):
-    global translationJson
-    current_directory = os.path.dirname(__file__)
-    jsonPath = os.path.abspath(lang)
-    if not lang.endswith('.json'):
-        jsonPath = os.path.join(current_directory, "translations", f"{lang}.json")
-    _LOGGER.debug(f"[nspanel_lovelace] Attempting to load translation from '{jsonPath}'")
+def has_build_define(esphome_config: dict, name: str) -> bool:
+    """True when a build flag defines ``name``.
+
+    Flag entries are shell-lexed the way ESPHome's floor version (2026.11.0)
+    lexes them before compiling (esphome.platformio.library.lex_build_flags):
+    one entry may hold several whitespace-separated flags, and a bare ``-D``
+    is re-glued with its argument. A lexed token defines ``name`` when it is
+    exactly ``-D<name>`` or ``-D<name>=...`` - no substring matching. Checks
+    the modern ``esphome.build_flags`` location and the legacy
+    ``platformio_options.build_flags`` location (list or scalar).
+    """
+    from esphome.platformio.library import lex_build_flags
+    locations = [esphome_config.get(CONF_BUILD_FLAGS)]
+    pio = esphome_config.get(CONF_PLATFORMIO_OPTIONS)
+    if isinstance(pio, dict):
+        locations.append(pio.get("build_flags"))
+    for loc in locations:
+        if not loc:
+            continue
+        for token in lex_build_flags(loc, "esphome.build_flags"):
+            if token == f"-D{name}" or token.startswith(f"-D{name}="):
+                return True
+    return False
+
+def resolve_translation_path(language: str, config_relative: Callable[[str], Path]) -> tuple[Path, bool]:
+    """Resolve a locale language to its translation file.
+
+    Bundled languages (no ".json" suffix) resolve inside the bundled
+    translations/ directory. A ".json" language resolves relative to the
+    top-level configuration directory (config_relative), or unchanged when
+    absolute. When the config-relative path does not exist, the legacy
+    working-directory path is returned instead and the boolean is True
+    (never for absolute paths or bundled languages).
+    """
+    if not language.endswith(".json"):
+        return Path(__file__).resolve().parent / "translations" / f"{language}.json", False
+    if os.path.isabs(language):
+        return Path(language), False
+    config_path = Path(config_relative(language))
+    if config_path.exists():
+        return config_path, False
+    legacy_path = Path(os.path.abspath(language))
+    if legacy_path.exists():
+        return legacy_path, True
+    return config_path, False
+
+def load_translations(path) -> dict:
+    """Load a translation file and validate its shape: a JSON object mapping
+    string keys to string values containing every REQUIRED_TRANSLATION_KEY.
+    Extra string-valued keys are allowed and preserved (insertion order)."""
     try:
-        with open(jsonPath, encoding="utf-8") as read_file:
-            translationJson = json.load(read_file)
-    except (UnicodeDecodeError, OSError):
-        raise cv.Invalid(f"Failed to load translation file from '{jsonPath}', does it exist?")
-    missingKeys = []
-    for k in REQUIRED_TRANSLATION_KEYS:
-        if k not in translationJson:
-            missingKeys.append(k)
-    if len(missingKeys) > 0:
-        raise cv.Invalid(f"Translation file missing the following required keys: {missingKeys}")
-    _LOGGER.info(f"[nspanel_lovelace] Loaded '{lang}' translation file")
+        with open(path, encoding="utf-8") as read_file:
+            data = json.load(read_file)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as err:
+        raise cv.Invalid(f"Failed to load translation file from '{path}': {err}", [CONF_LOCALE, CONF_LANGUAGE])
+    if not isinstance(data, dict):
+        raise cv.Invalid(
+            f"Translation file '{path}' must be a JSON object of string keys to string values",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    missingKeys = [k for k in REQUIRED_TRANSLATION_KEYS if k not in data]
+    if missingKeys:
+        raise cv.Invalid(
+            f"Translation file '{path}' is missing the following required keys: {missingKeys}",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    badKeys = [k for k, v in data.items() if not isinstance(v, str)]
+    if badKeys:
+        raise cv.Invalid(
+            f"Translation file '{path}' has non-string values for the following keys: {badKeys}",
+            [CONF_LOCALE, CONF_LANGUAGE])
+    _LOGGER.info(f"[nspanel_lovelace] Loaded translation file '{path}' ({len(data)} entries)")
+    return data
 
 def get_icon(iconHexStr) -> Union[cg.MockObj, None]:
     global custom_icons, custom_icons_index
@@ -253,38 +314,53 @@ def valid_uuid(value):
         f'Value must be 30 characters or less in length and contain only numbers, letters and underscores e.g. "living_room_light_1"'
     )
 
-def valid_entity_id(entity_type_allowlist: list[str] = None):
-    """Validate that a given entity_id is correctly formatted and present in the entity type allowlist."""
+def valid_entity_id(entity_type_allowlist: list[str] | None = None, *,
+                    allow_navigation: bool = False,
+                    allow_text: bool = False,
+                    allow_delete: bool = False):
+    """Validate that a given entity_id is correctly formatted and present in the entity type
+    allowlist. The pseudo-entities 'navigate.[card id]', 'iText.[text]' and 'delete' are only
+    accepted where explicitly allowed (generic card tiles)."""
+    allowed = ENTITY_TYPES if entity_type_allowlist is None else entity_type_allowlist
+
     def validator(value):
         value = cv.string_strict(value)
         if not value:
-            return value
-        if re.match(ENTITY_ID_RE, value):
-            if value == 'delete' or value.startswith('iText.'):
+            raise cv.Invalid("entity_id must not be empty")
+        if value == 'delete':
+            if allow_delete:
                 return value
-            if [t for t in ENTITY_TYPES if value.startswith(t)]:
-                if entity_type_allowlist is None:
-                    return value
-                elif [w for w in entity_type_allowlist if value.startswith(w)]:
-                    return value
-                raise cv.Invalid(
-                    f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {entity_type_allowlist}"
-                )
             raise cv.Invalid(
-                f"entity type '{value.split('.')[0]}' is not allowed here. Allowed types are: {ENTITY_TYPES}"
+                f'the special "delete" entity is not allowed here. Allowed types are: {allowed}'
             )
         if value.startswith('iText.'):
+            if not allow_text:
+                raise cv.Invalid(
+                    f'iText entities are not allowed here. Allowed types are: {allowed}'
+                )
+            if '~' in value:
+                raise cv.Invalid(
+                    f'entity_id "{value}" must match the format "iText.[text to display]" and '
+                    'not contain the character "~" (tilde)'
+                )
+            return value
+        if not ENTITY_ID_RE.match(value):
             raise cv.Invalid(
-                f'entity_id "{value}" must match the format "iText.[text to display]" and '+
-                'and not contain the character "~" (tilde)'
+                f'entity_id "{value}" must match the format "[entity type].[entity name]" and '
+                'contain only numbers (0-9), letters (A-Z) and underscores (_), '
+                'e.g. "light.living_room_light_1".'
             )
-        elif value.startswith('delete'):
+        domain = value.split('.', 1)[0]
+        if domain == 'navigate':
+            if allow_navigation:
+                return value
             raise cv.Invalid(
-                f'When using the special "delete" entity type, you cannot also specify a value'
+                f'the special "navigate" entity is not allowed here. Allowed types are: {allowed}'
             )
+        if domain in allowed:
+            return value
         raise cv.Invalid(
-            f'entity_id "{value}" must match the format "[entity type].[entity name]" and '+
-            'contain only numbers (0-9), letters (A-Z) and underscores (_), e.g. "light.living_room_light_1".'
+            f"entity type '{domain}' is not allowed here. Allowed types are: {allowed}"
         )
     return validator
 
@@ -327,10 +403,28 @@ SCHEMA_ICON = cv.Any(
 )
 
 SCHEMA_STATUS_ICON = cv.Schema({
-    cv.Optional(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
+    # The StatusIconItem constructors all require an entity, so a provided
+    # status icon block without an entity_id is a config error, not a codegen one.
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
     cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
+
+def valid_screensaver_weather(config):
+    """The weather entity domain depends on forecast_method: the documented
+    legacy 'template_sensor' mode accepts a sensor (README fallback) or a
+    weather entity, while 'service' mode requires a weather entity."""
+    config = cv.Schema({
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor', 'weather']),
+        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
+    })(config)
+    if config[CONF_SCREENSAVER_FORECAST_METHOD] == "service" and \
+            not config[CONF_ENTITY_ID].startswith("weather."):
+        raise cv.Invalid(
+            "forecast_method 'service' requires a weather entity (weather.<name>)",
+            [CONF_ENTITY_ID],
+        )
+    return config
 
 SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
@@ -338,16 +432,13 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
     cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, default=False): cv.boolean,
-    cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
-        cv.Required(CONF_ENTITY_ID): valid_entity_id(),
-        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
-    }),
+    cv.Optional(CONF_SCREENSAVER_WEATHER): valid_screensaver_weather,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
 
 SCHEMA_CARD_ENTITY = cv.Schema({
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(),
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(allow_navigation=True, allow_text=True, allow_delete=True),
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
     cv.Optional(CONF_ICON): SCHEMA_ICON,
 })
@@ -356,9 +447,8 @@ SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
     cv.Optional(CONF_CARD_TITLE): cv.string,
     cv.Optional(CONF_CARD_HIDDEN, default=False): cv.boolean,
-    # Timeout range from 0s to 65s. 0s means disable screensaver.
-    # note: Max is limited by HMI firmware: https://github.com/joBr99/nspanel-lovelace-ui/blob/22e96f2b3ad0cd3382008eac9b4d6a27982404b8/HMI/README.md?plain=1#L91
-    cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, 120)
+    # Timeout range 0..MAX_SLEEP_TIMEOUT seconds (0 disables the screensaver)
+    cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, MAX_SLEEP_TIMEOUT)
 })
 
 def add_entity_id(id: str):
@@ -389,12 +479,37 @@ def validate_config(config):
             "that can't be configured under Arduino."
         )
     model = config[CONF_MODEL]
-    if CONF_LANGUAGE not in config[CONF_LOCALE]:
-        raise cv.Invalid("A language must be specified in locale")
-    # Build a list of custom card ids
+    # The locale schema defaults language to 'en', so an explicit empty value
+    # is the only bad case. Validate the translation file early so a missing
+    # file, bad JSON or missing keys fail config validation (at
+    # locale.language), not codegen.
+    language = config[CONF_LOCALE][CONF_LANGUAGE]
+    if not language:
+        raise cv.Invalid("A language must be specified in locale", [CONF_LOCALE, CONF_LANGUAGE])
+    translation_path, legacy = resolve_translation_path(language, core.CORE.relative_config_path)
+    if legacy:
+        _LOGGER.warning(
+            f"[nspanel_lovelace] translation file '{language}' not found relative to the "
+            f"configuration directory; using the legacy working-directory path "
+            f"'{translation_path}'. Place the file next to the configuration instead.")
+    load_translations(translation_path)
+    # Build a list of custom card ids, rejecting duplicates
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         if CONF_ID in card_config:
-            card_ids[card_config[CONF_ID]] = i
+            card_id = card_config[CONF_ID]
+            if card_id in card_ids:
+                raise cv.Invalid(
+                    f"duplicate id '{card_id}': card ids must be unique",
+                    [CONF_CARDS, i, CONF_ID])
+            card_ids[card_id] = i
+
+    # The screensaver page id shares the page uuid space with card ids
+    if CONF_SCREENSAVER in config and CONF_ID in config[CONF_SCREENSAVER]:
+        screensaver_id = config[CONF_SCREENSAVER][CONF_ID]
+        if screensaver_id in card_ids:
+            raise cv.Invalid(
+                f"duplicate id '{screensaver_id}': screensaver and card ids must be unique",
+                [CONF_SCREENSAVER, CONF_ID])
 
     if CONF_DEFAULT_CARD in config and card_ids.get(config[CONF_DEFAULT_CARD]) is None:
         raise cv.Invalid(f"Cannot find a card with the id '{config[CONF_DEFAULT_CARD]}'", [CONF_DEFAULT_CARD])
@@ -421,17 +536,20 @@ def validate_config(config):
         if len(entities) > length_limits[1]:
             raise cv.Invalid(f"There must be at most {length_limits[1]} entities for '{card_config[CONF_CARD_TYPE]}' cards", err_path)
 
-        for entity_config in entities:
+        for j, entity_config in enumerate(entities):
             entity_id = entity_config.get(CONF_ENTITY_ID)
-            if entity_id.startswith('navigate'):
-                entity_arr = entity_id.split('.', 1)
-                # if len(entity_arr) != 2:
-                #     raise cv.Invalid(f'The entity_id "{entity_id}" format is invalid')
-                if card_ids.get(entity_arr[1]) is None:
-                    raise cv.Invalid(f'navigation entity_id invalid, no card has the id "{entity_arr[1]}"', err_path)
+            domain, _, card_id = entity_id.partition('.')
+            if domain == 'navigate':
+                # card_id is empty if the value is a bare 'navigate'; that yields a clean
+                # dangling-reference error below instead of an IndexError.
+                if card_ids.get(card_id) is None:
+                    raise cv.Invalid(
+                        f'navigation entity_id invalid, no card has the id "{card_id}"',
+                        err_path + [j, CONF_ENTITY_ID],
+                    )
             # Add all valid HA entities to global entity list for later processing
-            # if not (entity_id.startswith('iText') or entity_id.startswith('delete')):
-            if not entity_id.startswith('delete'):
+            # (iText pseudo-entities are included; 'delete' is the exact sentinel)
+            if entity_id != 'delete':
                 add_entity_id(entity_id)
         if CONF_CARD_ALARM_ENTITY_ID in card_config:
             add_entity_id(card_config.get(CONF_CARD_ALARM_ENTITY_ID))
@@ -454,8 +572,8 @@ def validate_config(config):
 CONFIG_SCHEMA = cv.All(
     cv.Schema({
         cv.GenerateID(): cv.declare_id(NSPanelLovelace),
-        # Timeout range from 0s to 65s. 0s means disable screensaver.
-        cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, 65),
+        # Timeout range 0..MAX_SLEEP_TIMEOUT seconds (0 disables the screensaver)
+        cv.Optional(CONF_SLEEP_TIMEOUT, default=10): cv.int_range(0, MAX_SLEEP_TIMEOUT),
         cv.Optional(CONF_EXP_VERT_UI, default=False): cv.boolean,
         cv.Optional(CONF_MODEL, default='eu'): cv.one_of('eu', 'us-l', 'us-p'),
         cv.Optional(CONF_DEFAULT_CARD): cv.string_strict,
@@ -582,7 +700,7 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
         entity_class = cg.global_ns.class_(variable_name)
         entity_class.op = "->"
 
-        if entity_config.get(CONF_ENTITY_ID, "delete").startswith('delete'):
+        if entity_config.get(CONF_ENTITY_ID, "delete") == 'delete':
             cg.add(cg.RawExpression(
                 f"auto {variable_name} = "
                 f"{make_shared.template(DeleteItem).__call__(card_class)}"))
@@ -603,28 +721,42 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
 
         cg.add(card_variable.add_item(entity_class))
 
-def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
+def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable_name: str, default_icon_value: str = 'alert-circle-outline') -> cg.MockObjClass:
     entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
     default_icon_value = get_icon(get_icon_hex(default_icon_value))
     attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
-    # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
+    # generate_icon_config converts a configured icon string to an expression
+    # (icon_t:: enum or CUSTOM_ICONS[n]), so "configured" must be tested on
+    # whether a value exists, not on its type.
+    has_icon = attrs["value"] is not None
+    has_color = isinstance(attrs["color"], int)
     # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
     basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
-    if isinstance(attrs["value"], str) and isinstance(attrs["color"], int):
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
-    elif isinstance(attrs["value"], str):
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]})')
-    elif isinstance(attrs["color"], int):
-        return cg.RawStatement(f'{basicstr}, {default_icon_value}, {attrs["color"]}u)')
+    if has_icon and has_color:
+        stmt = f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)'
+    elif has_icon:
+        stmt = f'{basicstr}, {attrs["value"]})'
+    elif has_color:
+        stmt = f'{basicstr}, {default_icon_value}, {attrs["color"]}u)'
     else:
-        return cg.RawStatement(f'{basicstr}, {default_icon_value})')
+        stmt = f'{basicstr}, {default_icon_value})'
+    cg.add(cg.RawExpression(f"auto {variable_name} = {stmt}"))
+    variable_class = cg.global_ns.class_(variable_name)
+    variable_class.op = '->'
+    # The constructor arguments are defaults only: on_entity_type_change()
+    # replaces the glyph for known entity types and the state callbacks
+    # recolor it. Re-apply explicitly configured values through the setters,
+    # which set the *_overridden_ flags those callbacks respect, otherwise
+    # the configured values are silently discarded at runtime.
+    if has_icon:
+        cg.add(cg.RawStatement(f'{variable_name}->set_icon_value({attrs["value"]});'))
+    if has_color:
+        cg.add(variable_class.set_icon_color(attrs["color"]))
+    return variable_class
 
 async def to_code(config):
     # note: not using 'psram' dependency because our sdkconfig options conflict
-    is_test_mode = [string for string in
-                    core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS] 
-                    if string.endswith("TEST_DEVICE_MODE")]
-    if is_test_mode:
+    if has_build_define(core.CORE.config[CONF_ESPHOME], "TEST_DEVICE_MODE"):
         _LOGGER.info(f"[nspanel_lovelace] TEST DEVICE MODE ACTIVE, PSRAM DISABLED")
     else:
         # NSPanel has non-standard PSRAM pins
@@ -654,21 +786,17 @@ async def to_code(config):
         cg.add_define("ARDUINOJSON_SLOT_ID_SIZE", 2)
         cg.add_define("ARDUINOJSON_ENABLE_STD_STRING", 1)
 
-    ## Explicitly enable services and states in ESPHome v2025.8.0+
-    if cv.Version.parse(ESPHOME_VERSION) >= cv.Version(2025,8,0):
-        cg.add_define("USE_API_HOMEASSISTANT_STATES")
-        cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
+    ## Explicitly enable services and states (floor version 2026.11.0, see require_esphome_version)
+    cg.add_define("USE_API_HOMEASSISTANT_STATES")
+    cg.add_define("USE_API_HOMEASSISTANT_SERVICES")
 
     nspanel = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(nspanel, config)
     await uart.register_uart_device(nspanel, config)
     cg.add_global(nspanel_lovelace_ns.using)
 
-    enable_tft_upload = True
-    if 'build_flags' in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]:
-        if [s for s in core.CORE.config[CONF_ESPHOME][CONF_PLATFORMIO_OPTIONS]
-            ['build_flags'] if 'DISABLE_NSPANEL_TFT_UPLOAD' in s]:
-            enable_tft_upload = False
+    enable_tft_upload = not has_build_define(
+        core.CORE.config[CONF_ESPHOME], "DISABLE_NSPANEL_TFT_UPLOAD")
 
     # TODO: check that upload_tft() function is not used anywhere
     if enable_tft_upload:
@@ -678,9 +806,7 @@ async def to_code(config):
         # core.CORE.add_define("USE_NSPANEL_TFT_UPLOAD")
         cg.add_build_flag("-DUSE_NSPANEL_TFT_UPLOAD")
 
-        ## todo: Remove this condition by esphome version 2026.6.x
-        if hasattr(esp32, "include_builtin_idf_component"):
-            esp32.include_builtin_idf_component("esp_http_client")
+        esp32.include_builtin_idf_component("esp_http_client")
         esp32.add_idf_sdkconfig_option("CONFIG_ESP_TLS_INSECURE", True)
         esp32.add_idf_sdkconfig_option(
             "CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY", True
@@ -693,14 +819,16 @@ async def to_code(config):
         cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
 
     locale_config = config[CONF_LOCALE]
-    global translationJson
-    load_translations(locale_config[CONF_LANGUAGE])
-    
-    # file specified, translation unknown
-    if '.' in locale_config[CONF_LANGUAGE] or len(locale_config[CONF_LANGUAGE]) == 0:
+    language = locale_config[CONF_LANGUAGE]
+    # Already validated in validate_config; the file is small enough to read again.
+    translation_path, _ = resolve_translation_path(language, core.CORE.relative_config_path)
+    translationJson = load_translations(translation_path)
+
+    # A custom JSON file has no matching built-in language name
+    if '.' in language:
         cg.add(nspanel.set_language("unknown"))
     else:
-        cg.add(nspanel.set_language(locale_config[CONF_LANGUAGE]))
+        cg.add(nspanel.set_language(language))
 
     cgv = []
     for k,v in translationJson.items():
@@ -755,26 +883,18 @@ async def to_code(config):
 
         if CONF_SCREENSAVER_STATUS_ICON_LEFT in screensaver_config:
             left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
-            screensaver_left_icon = get_status_icon_statement(
-                left_icon_config, 
-                StatusIconItem)
             iconleft_variable = screensaver_info[0] + "_iconleft"
-            cg.add(cg.RawExpression(f"auto {iconleft_variable} = {screensaver_left_icon}"))
-            iconleft_variable_class = cg.global_ns.class_(iconleft_variable)
-            iconleft_variable_class.op = '->'
+            iconleft_variable_class = get_status_icon_statement(
+                left_icon_config, StatusIconItem, iconleft_variable)
             if left_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconleft_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_left(iconleft_variable_class))
 
         if CONF_SCREENSAVER_STATUS_ICON_RIGHT in screensaver_config:
             right_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_RIGHT]
-            screensaver_right_icon = get_status_icon_statement(
-                right_icon_config, 
-                StatusIconItem)
             iconright_variable = screensaver_info[0] + "_iconright"
-            cg.add(cg.RawExpression(f"auto {iconright_variable} = {screensaver_right_icon}"))
-            iconright_variable_class = cg.global_ns.class_(iconright_variable)
-            iconright_variable_class.op = '->'
+            iconright_variable_class = get_status_icon_statement(
+                right_icon_config, StatusIconItem, iconright_variable)
             if right_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconright_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_right(iconright_variable_class))
@@ -789,7 +909,7 @@ async def to_code(config):
                     cg.add_define("USE_NSPANEL_WEATHER_SERVICE")
                 else:
                     _LOGGER.warning(
-                        "forecast_method 'template_sensor' is deprecated and will be removed in esphome 2026.6. "
+                        "forecast_method 'template_sensor' is deprecated (attribute-based weather mode). "
                         "Please use forecast_method 'service' instead (see the README for the required HA automation template)."
                     )
             screensaver_items = []
@@ -812,17 +932,11 @@ async def to_code(config):
     visible_card_count = len(visible_card_uuids)
     visible_index = 0
 
-    prev_card_uuid = next_card_uuid = None
     navleft_icon_value = get_icon(get_icon_hex("arrow-left-bold"))
     navhome_icon_value = get_icon(get_icon_hex("home"))
     navright_icon_value = get_icon(get_icon_hex("arrow-right-bold"))
     for i, card_config in enumerate(config.get(CONF_CARDS, [])):
         cg.add(cg.RawStatement("{"))
-        prev_card_uuid = visible_card_uuids[visible_index - 1]
-        if visible_index == (visible_card_count - 1):
-            next_card_uuid = visible_card_uuids[0]
-        elif (visible_index < (visible_card_count - 1)):
-            next_card_uuid = visible_card_uuids[visible_index + 1]
 
         page_info = PAGE_MAP[card_config[CONF_CARD_TYPE]]
         # card_class = None
@@ -884,6 +998,10 @@ async def to_code(config):
                     f"{unique_ptr.template(NavigationItem)}({navleft_statement})"))
                 cg.add(card_class.set_nav_left(cg.global_ns.class_(navleft_variable)))
         else:
+            # This card is in visible_card_uuids, so the list is non-empty and
+            # the modulo lookups are safe (a single visible card self-links).
+            prev_card_uuid = visible_card_uuids[(visible_index - 1) % visible_card_count]
+            next_card_uuid = visible_card_uuids[(visible_index + 1) % visible_card_count]
             visible_index += 1
             navleft_variable = card_variable + "_navleft"
             navleft_statement = cg.RawStatement(f'new {NavigationItem}(\"{get_new_uuid()}\", \"{prev_card_uuid}\", {navleft_icon_value})')

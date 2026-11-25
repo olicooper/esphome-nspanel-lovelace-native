@@ -393,8 +393,7 @@ def test_codegen_matches_golden() -> None:
     regression guard for the state-isolation and expression-API refactors:
     any reordering of codegen, a UUID-allocation shift, or a quoting change
     that the individual pattern asserts miss will fail the whole-file compare.
-    Reuses the baseline's generation (same fixture, same --only-generate run
-    is idempotent); does not add a second codegen invocation."""
+    Generates the fixture independently of the baseline test."""
     result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
     assert result.returncode == 0, (
         "esphome compile --only-generate ci/codegen.yaml failed:\n"

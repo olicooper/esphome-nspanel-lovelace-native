@@ -455,10 +455,7 @@ def test_unknown_default_card_rejected(tmp_path: Path) -> None:
 
 
 def test_unknown_card_type_rejected(tmp_path: Path) -> None:
-    """A card `type` that matches no known key is rejected, not silently
-    coerced. cv.typed_schema without a default_type raises for an unknown
-    key; this pins that a typo such as lowercase 'cardgrid' fails validation
-    (it used to be coerced into a cardGrid page when a default_type was set)."""
+    """An unknown card type such as lowercase 'cardgrid' fails validation."""
     body = """\
   cards:
     - type: cardgrid

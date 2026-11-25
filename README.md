@@ -12,11 +12,11 @@ A special thanks goes to these great projects for making this possible:
 
 ## Fork and ESPHome version policy
 
-This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native). It aims to stay ahead of ESPHome's monthly releases (for example, 2026.11.0, 2026.12.0, and 2027.1.0), targeting compatibility one or two releases ahead when possible. Future-release compatibility is an aim, not a guarantee.
+This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native). It aims to support current ESPHome releases and maintain backward compatibility for one or two previous monthly releases where practical; compatibility with older releases is not maintained. There is no commitment to support future releases ahead of their release.
 
-Backward compatibility with older ESPHome releases is not maintained. The minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
+The current minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
 
-Continuous integration blocks on the official ESPHome images: the supported floor (`2026.11.0`) and `stable` each compile the `basic`, `advanced` and `codegen` configurations (while `stable` resolves to the floor version, those legs duplicate each other; the floor stays pinned). A separate floor-pinned job runs the unit and code-generation tests once, plus the no-TFT codegen variant. A manual (`workflow_dispatch`-only) job compiles the codegen fixture against the official `beta` image as an advisory preview: a passing preview does not make beta a supported version.
+Continuous integration compiles the `basic`, `advanced`, `codegen` and `codegen-no-tft` configurations on the supported floor (`2026.11.0`) and `stable`. A separate floor-pinned job runs the unit and code-generation tests once. The `CI required` check aggregates both jobs; configure it as a required status check in branch protection after it appears in GitHub. A manual (`workflow_dispatch`-only) job compiles the codegen fixture against the official `beta` image as an advisory preview: a passing preview does not make beta a supported version.
 
 # Installation
 

@@ -19,6 +19,7 @@ on:
       - dev
     paths:
       - "components/nspanel_lovelace/**"
+      - ".github/workflows/build.yaml"
       - "*example.yaml"
       - "secrets-example.yaml"
       - "ci/**"
@@ -26,10 +27,7 @@ on:
 
 jobs:
   build:
-    # The check context is the stable name "Build" (matching the pre-matrix
-    # job) so any required status checks keep matching; the per-leg variant
-    # and version are reported in the job log, not the context name.
-    name: Build
+    name: Build (${{ matrix.variant }}, ESPHome ${{ matrix.version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -69,6 +67,18 @@ jobs:
       run: python -m pip install --quiet pytest
     - name: Run unit and codegen generation tests
       run: python -m pytest -q tests
+
+  required:
+    name: CI required
+    if: ${{ always() }}
+    needs: [build, unittest]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Require all blocking jobs
+      env:
+        BUILD_RESULT: ${{ needs.build.result }}
+        TEST_RESULT: ${{ needs.unittest.result }}
+      run: test "$BUILD_RESULT" = success && test "$TEST_RESULT" = success
 
   # Advisory preview: manual-only, never runs on push/PR, and a pass does
   # NOT make beta a supported version (the floor remains 2026.11.0).

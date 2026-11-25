@@ -175,6 +175,8 @@ wifi:
   password: !secret wifi_password
 
 api:
+  encryption: 
+    key: !secret api_key
   ## NOTE: This is automatically set when using `forecast_method: service` for weather updates
   # custom_services: true
   services:
@@ -203,7 +205,8 @@ api:
 
 ota:
   platform: esphome
-  password: !secret ota_password
+  # password: !secret ota_password
+  encryption:
 
 ## UART for the Nextion display
 uart:

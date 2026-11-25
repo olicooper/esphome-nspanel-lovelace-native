@@ -7,6 +7,7 @@
 #include "page_items.h"
 #include "translations.h"
 #include "types.h"
+#include <algorithm>
 #include <string>
 #include <memory>
 
@@ -269,24 +270,21 @@ std::string &ThermoCard::render(std::string &buffer) {
   buffer.append(Configuration::get_temperature_unit_str());
   buffer.append(1, SEPARATOR);
 
-  std::string dest_temp_str = 
-    this->thermo_entity_->get_attribute(ha_attr_type::temperature);
-  std::string dest_temp2_str;
-
-  if (dest_temp_str.empty()) {
-    dest_temp_str = this->thermo_entity_->get_attribute(
-      ha_attr_type::target_temp_high, "0");
-    dest_temp2_str = this->thermo_entity_->get_attribute(
-      ha_attr_type::target_temp_low);
-    if (!dest_temp2_str.empty()) {
-      float temp2_val = 0.0f;
-      if (!str_to_float(dest_temp2_str, temp2_val)) temp2_val = 0.0f;
-      dest_temp2_str = std::to_string(static_cast<int>(temp2_val * 10));
-    }
-  }
-  float dest_temp_val = 0.0f;
-  if (!str_to_float(dest_temp_str, dest_temp_val)) dest_temp_val = 0.0f;
-  dest_temp_str = std::to_string(static_cast<int>(dest_temp_val * 10));
+  const ThermostatControls controls(this->thermo_entity_.get());
+  const auto tenths = [&controls](const std::string &value) {
+    float parsed = 0.0f;
+    if (!str_to_float(value, parsed) || controls.min > controls.max) return std::string("0");
+    // Preserve float rounding, but compare in double so INT_MAX doesn't round up.
+    const double scaled = parsed * 10.0f;
+    if (!std::isfinite(scaled) || scaled < INT_MIN || scaled > INT_MAX) return std::string("0");
+    // Either dual control sends both targets, so the untouched target must also be legal.
+    return std::to_string(std::clamp(static_cast<int>(scaled), controls.min, controls.max));
+  };
+  const auto &temperature = this->thermo_entity_->get_attribute(ha_attr_type::temperature);
+  const auto &low = this->thermo_entity_->get_attribute(ha_attr_type::target_temp_low);
+  const auto dest_temp_str = tenths(temperature.empty()
+    ? this->thermo_entity_->get_attribute(ha_attr_type::target_temp_high) : temperature);
+  const auto dest_temp2_str = temperature.empty() && !low.empty() ? tenths(low) : "";
 
   buffer.append(dest_temp_str).append(1, SEPARATOR);
 
@@ -305,29 +303,10 @@ std::string &ThermoCard::render(std::string &buffer) {
   }
   buffer.append(1, SEPARATOR);
 
-  buffer.append(std::to_string(static_cast<int>([&]() {
-    float val = 0.0f;
-    if (!str_to_float(this->thermo_entity_->get_attribute(
-      ha_attr_type::min_temp, "0"), val)) val = 0.0f;
-    return val * 10;
-  }())));
-  buffer.append(1, SEPARATOR);
+  buffer.append(std::to_string(controls.display_min)).append(1, SEPARATOR);
+  buffer.append(std::to_string(controls.display_max)).append(1, SEPARATOR);
+  buffer.append(std::to_string(controls.step));
 
-  buffer.append(std::to_string(static_cast<int>([&]() {
-    float val = 0.0f;
-    if (!str_to_float(this->thermo_entity_->get_attribute(
-      ha_attr_type::max_temp, "0"), val)) val = 0.0f;
-    return val * 10;
-  }())));
-  buffer.append(1, SEPARATOR);
-
-  buffer.append(std::to_string(static_cast<int>([&]() {
-    float val = 0.5f;
-    if (!str_to_float(this->thermo_entity_->get_attribute(
-      ha_attr_type::target_temp_step, "0.5"), val)) val = 0.5f;
-    return val * 10;
-  }())));
-  
   //TODO: add overwrite_supported_modes
   auto& hvac_modes_str = 
     this->thermo_entity_->get_attribute(ha_attr_type::hvac_modes);
@@ -437,8 +416,8 @@ std::string &MediaCard::render(std::string &buffer) {
   buffer.append(2, SEPARATOR);
 
   float volume_level_val = 0.0f;
-  if (!str_to_float(this->media_entity_->get_attribute(
-    ha_attr_type::volume_level, "0"), volume_level_val)) volume_level_val = 0.0f;
+  if (!str_to_float(this->media_entity_->get_attribute(ha_attr_type::volume_level), volume_level_val) ||
+      volume_level_val < 0.0f || volume_level_val > 1.0f) volume_level_val = 0.0f;
   buffer.append(std::to_string(
     static_cast<uint8_t>(volume_level_val * 100.0f)));
   buffer.append(1, SEPARATOR);

@@ -9,8 +9,7 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
-      - "*example.yaml"
-      - "secrets-example.yaml"
+      - "examples/**"
       - "ci/**"
       - "tests/**"
 
@@ -20,8 +19,7 @@ on:
     paths:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
-      - "*example.yaml"
-      - "secrets-example.yaml"
+      - "examples/**"
       - "ci/**"
       - "tests/**"
 
@@ -56,7 +54,7 @@ jobs:
       run: esphome version
     - name: Copy test secrets
       run: |
-        cp secrets-example.yaml secrets.yaml
+        cp examples/secrets-example.yaml examples/secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
 
   # Single floor-pinned host-test job: the pytest suite runs once (it does not

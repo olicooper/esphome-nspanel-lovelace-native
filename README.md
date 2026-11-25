@@ -16,7 +16,7 @@ This repository is a fork of [olicooper/esphome-nspanel-lovelace-native](https:/
 
 The current minimum supported version is ESPHome 2026.11.0; the minimum may increase as this fork moves forward. ESP-IDF is required, and Arduino is not supported.
 
-Continuous integration compiles the `basic`, `advanced`, `codegen` and `codegen-no-tft` configurations on the supported floor (`2026.11.0`) and `stable`. A separate floor-pinned job runs the unit and code-generation tests once. The `CI required` check aggregates both jobs; configure it as a required status check in branch protection after it appears in GitHub. A manual (`workflow_dispatch`-only) job compiles the codegen fixture against the official `beta` image as an advisory preview: a passing preview does not make beta a supported version.
+Continuous integration compiles the `basic`, `advanced`, `codegen` and `codegen-no-tft` configurations on the supported floor (`2026.11.0`) and `stable`. A separate floor-pinned job runs the Python unit and code-generation tests once, and a host job runs the C++ tests. The `CI required` check requires all three to pass (firmware matrix, Python tests, and C++ host tests); configure it as a required status check in branch protection after it appears in GitHub. A manual (`workflow_dispatch`-only) job compiles the codegen fixture against the official `beta` image as an advisory preview: a passing preview does not make beta a supported version.
 
 Because the minimum version is enforced by `cv.require_esphome_version`, the code carries no `ESPHOME_VERSION_CODE` guards for older releases; version-specific compatibility code is removed when the minimum moves up.
 
@@ -26,15 +26,15 @@ Because the minimum version is enforced by `cv.require_esphome_version`, the cod
 
 # Installation
 
-The installation of ESPHome on the ESP32 follows the standard ESPHome build method e.g. `esphome run --device COM6 basic-example.yaml`. It is possible to do OTA updates with the ESPHome CLI after the initial upload.
+The examples use the local component in this checkout. Copy `examples/secrets-example.yaml` to `examples/secrets.yaml` and fill in your values, then use the standard ESPHome build method, e.g. `esphome run --device COM6 examples/basic-example.yaml`. It is possible to do OTA updates with the ESPHome CLI after the initial upload.
 
 For the GUI, this project relies on the HMI TFT firmware from the [ESPHome NSPanel Lovelace UI](https://github.com/sairon/esphome-nspanel-lovelace-ui) project. 
 The firmware version reported by the screen needs to be `52` or `53` for it to be compatible with this project.
-If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](basic-example.yaml#L60)) exposed by the device in HomeAssistant.
+If you don't have the custom HMI TFT firmware installed already you will need to upload the appropriate `nspanel*.tft` file from `v4.3.3` of the project which can be [found here](https://github.com/joBr99/nspanel-lovelace-ui/tree/v4.3.3/HMI). You can upload the correct TFT firmware after installing this component on the ESP32 by using the `upload_tft` service (seen in the [basic example](examples/basic-example.yaml#L60)) exposed by the device in HomeAssistant.
 
 # Configuration
 
-A basic configuration can be found in the [basic example](basic-example.yaml), but you'll probably also want to look at the [advanced example](advanced-example.yaml) which shows the features currently available. This is loosely based on the appdaemon configuration format ([found here](https://github.com/joBr99/nspanel-lovelace-ui/blob/v4.3.3/appdaemon/apps-simple.yaml)) to make it easier to transition to this native ESPHome solution, but please don't expect this to translate exactly as it is not possible to make it work in the exact same way given the limitations of the ESP32.
+A basic configuration can be found in the [basic example](examples/basic-example.yaml), but you'll probably also want to look at the [advanced example](examples/advanced-example.yaml) which shows the features currently available. This is loosely based on the appdaemon configuration format ([found here](https://github.com/joBr99/nspanel-lovelace-ui/blob/v4.3.3/appdaemon/apps-simple.yaml)) to make it easier to transition to this native ESPHome solution, but please don't expect this to translate exactly as it is not possible to make it work in the exact same way given the limitations of the ESP32.
 
 ## PSRAM
 
@@ -72,6 +72,14 @@ Please see the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/m
 PRs to expand the functionality or fix bugs are very welcome!
 
 # Known Issues
+
+### Timer popup on TFT v4.3.3
+
+`popupTimer` shows a snapshot when opened or reopened, and refreshes when Home Assistant updates the open timer. It does not count down on screen between updates. An active timer's remaining time is calculated from Home Assistant's `finishes_at` and requires a valid configured ESPHome time source.
+
+The TFT owns the 30-second inactivity timeout so local touches, including timer editing, can keep the popup open. Those touches are not reported to ESPHome, and every timer detail update resets the TFT's inactivity counter. Sending a live update every second would prevent the popup from timing out, so the component sends snapshots instead. This does not change the timer running in Home Assistant.
+
+The host test verifies that a 24-hour active timer is sent as 1,440 minutes and 0 seconds, without wrapping at 60 minutes. That verifies the payload, not how it fits or renders on a physical panel. The on-screen 24-hour display and touch timeout have not been verified on hardware.
 
 ### 1. Weather forecast is not displayed on the screensaver when using Home Assistant 2024.4 or later
 

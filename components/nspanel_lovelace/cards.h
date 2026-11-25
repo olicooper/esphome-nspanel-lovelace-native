@@ -128,6 +128,7 @@ public:
   void accept(PageVisitor& visitor) override;
 
   void configure_temperature_unit();
+  Entity *get_thermo_entity() const { return this->thermo_entity_.get(); }
 
   std::string &render(std::string &buffer) override;
 

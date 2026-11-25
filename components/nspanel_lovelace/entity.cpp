@@ -1,7 +1,53 @@
 #include "entity.h"
 
+#include <algorithm>
+
 namespace esphome {
 namespace nspanel_lovelace {
+
+ThermostatControls::ThermostatControls(const Entity *entity) {
+  if (entity == nullptr) return;
+
+  const auto bound = [](const std::string &value, int fallback, bool lower, int &display) {
+    double temp = 0.0;
+    if (!str_to_double(value, temp)) return fallback;
+    // Round toward the legal range; compare back in degrees to preserve exact tenths.
+    if (temp < INT16_MIN / 10.0) return lower ? INT16_MIN : INT16_MIN - 1;
+    if (temp > INT16_MAX / 10.0) return lower ? INT16_MAX + 1 : INT16_MAX;
+    int tenths = static_cast<int>(temp * 10.0);
+    if (lower && tenths / 10.0 < temp) ++tenths;
+    if (!lower && tenths / 10.0 > temp) --tenths;
+    return display = tenths;
+  };
+  this->min = bound(entity->get_attribute(ha_attr_type::min_temp), INT16_MIN, true, this->display_min);
+  this->max = bound(entity->get_attribute(ha_attr_type::max_temp), INT16_MAX, false, this->display_max);
+
+  float step = 0.0f;
+  if (str_to_float(entity->get_attribute(ha_attr_type::target_temp_step), step) &&
+      step > 0.0f && step <= INT16_MAX / 10.0) {
+    this->step = std::max(1, static_cast<int>(step * 10.0f));
+  }
+}
+
+bool ThermostatControls::normalize(int &low, int &high) const {
+  if (low < INT16_MIN || high > INT16_MAX || low > high || this->min > this->max) return false;
+
+  // v4.3.3 tests the displayed value before stepping. Only accept a crossing
+  // if reversing one step lands on a value that could have crossed that bound.
+  const auto accepts = [&](int value) {
+    if (value < this->min) {
+      return this->min == this->display_min && value + this->step > this->min && value + this->step <= this->max;
+    }
+    if (value > this->max) {
+      return this->max == this->display_max && value - this->step < this->max && value - this->step >= this->min;
+    }
+    return true;
+  };
+  if (!accepts(low) || !accepts(high)) return false;
+  low = std::clamp(low, this->min, this->max);
+  high = std::clamp(high, this->min, this->max);
+  return true;
+}
 
 Entity::Entity(const std::string &entity_id) :
     state_(entity_state::unknown) {
@@ -111,7 +157,85 @@ std::string Entity::get_attribute(ha_attr_type attr, const std::string &default_
   return it == attributes_.end() ? default_value : it->second;
 }
 
+static bool valid_effect_utf8(const std::string &effect) {
+  for (size_t pos = 0; pos < effect.size();) {
+    const auto len = utf8_scalar_size(effect, pos);
+    if (len == 0) return false;
+    pos += len;
+  }
+  return true;
+}
+
+// Python str repr uses fixed-width hex escapes for non-printable scalars.
+static bool append_effect_escape(const std::string &value, size_t &pos, size_t digits, std::string &effect) {
+  if (value.size() - pos < digits) return false;
+  uint32_t scalar = 0;
+  for (size_t i = 0; i < digits; ++i) {
+    const char c = value[pos++];
+    unsigned digit;
+    if (c >= '0' && c <= '9') digit = c - '0';
+    else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+    else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+    else return false;
+    scalar = (scalar << 4) | digit;
+  }
+  if (scalar > 0x10ffff || (scalar >= 0xd800 && scalar <= 0xdfff)) return false;
+  if (scalar < 0x80) {
+    effect += static_cast<char>(scalar);
+    return true;
+  }
+  const unsigned tail = scalar < 0x800 ? 1 : scalar < 0x10000 ? 2 : 3;
+  const unsigned prefix = tail == 1 ? 0xc0 : tail == 2 ? 0xe0 : 0xf0;
+  effect += static_cast<char>(prefix | (scalar >> (6 * tail)));
+  for (unsigned i = tail; i > 0; --i)
+    effect += static_cast<char>(0x80 | ((scalar >> (6 * (i - 1))) & 0x3f));
+  return true;
+}
+
+// Quoted effect names can contain commas; keep their boundaries until rendering.
+static std::vector<std::string> parse_effects(const std::string &value) {
+  constexpr size_t max_effects = 15;
+  std::vector<std::string> effects;
+  if (value.empty() || value == "None" || value == "none") return effects;
+  if (value.front() != '[') {
+    split_str(',', value, effects);
+    if (!std::all_of(effects.begin(), effects.end(), valid_effect_utf8)) return {};
+    if (effects.size() > max_effects) effects.resize(max_effects);
+    return effects;
+  }
+  size_t pos = value.find_first_not_of(" \t\r\n", 1);
+  while (pos != std::string::npos) {
+    const char quote = value[pos++];
+    if (quote == ']') return value.find_first_not_of(" \t\r\n", pos) == std::string::npos ? effects : std::vector<std::string>{};
+    if (quote != '\'' && quote != '"') return {};
+    std::string effect;
+    while (pos < value.size() && value[pos] != quote) {
+      char c = value[pos++];
+      if (c == '\n' || c == '\r') return {};
+      if (c == '\\' && pos < value.size()) {
+        c = value[pos++];
+        if (c == 'x' || c == 'u' || c == 'U') {
+          if (!append_effect_escape(value, pos, c == 'x' ? 2 : c == 'u' ? 4 : 8, effect)) return {};
+          continue;
+        }
+        if (c == 'n') c = '\n';
+        else if (c == 'r') c = '\r';
+        else if (c == 't') c = '\t';
+        else if (c != '\\' && c != '\'' && c != '"') return {};
+      }
+      effect += c;
+    }
+    if (pos == value.size() || !valid_effect_utf8(effect)) return {};
+    if (!effect.empty() && effects.size() < max_effects) effects.push_back(std::move(effect));
+    pos = value.find_first_not_of(" \t\r\n", pos + 1);
+    if (pos == std::string::npos || (value[pos] != ',' && value[pos] != ']')) return {};
+    if (value[pos] == ',') pos = value.find_first_not_of(" \t\r\n", pos + 1);
+  }
+  return {};
+}
+
 void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
+  if (attr == ha_attr_type::effect_list) effects_ = parse_effects(value);
   if (value.empty() || value == "None" || value == "none") {
     attributes_.erase(attr);
     this->notify_attribute_change(attr, "");
@@ -125,26 +249,13 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
     this->attributes_[attr] = std::to_string(static_cast<int>(round(
         scale_value(brightness_val, {0, 255}, {0, 100}))));
   } else if (attr == ha_attr_type::color_temp) {
-    auto &minstr = this->get_attribute(ha_attr_type::min_mireds);
-    auto &maxstr = this->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = 153;
-    if (!minstr.empty()) {
-      int parsed = 0;
-      if (str_to_int(minstr, parsed)) min_mireds = static_cast<uint16_t>(parsed);
-    }
-    uint16_t max_mireds = 500;
-    if (!maxstr.empty()) {
-      int parsed = 0;
-      if (str_to_int(maxstr, parsed)) max_mireds = static_cast<uint16_t>(parsed);
-    }
+    const auto range = mired_range(this->get_attribute(ha_attr_type::min_mireds),
+                                   this->get_attribute(ha_attr_type::max_mireds));
     int temp_val = 0;
     if (!str_to_int(value, temp_val)) return;
-    this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(
-        temp_val,
-        {static_cast<double>(min_mireds), static_cast<double>(max_mireds)},
-        {0, 100}))));
+    const double temp = std::clamp(static_cast<double>(temp_val), range[0], range[1]);
+    this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(temp, range, {0, 100}))));
   } else if (attr == ha_attr_type::supported_color_modes ||
-      attr == ha_attr_type::effect_list ||
       attr == ha_attr_type::preset_modes ||
       attr == ha_attr_type::swing_modes ||
       attr == ha_attr_type::fan_modes ||
@@ -155,14 +266,7 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
       attr == ha_attr_type::options) {
     // todo: remove this when esphome starts sending properly formatted array strings
     this->attributes_[attr] = convert_python_arr_str(value);
-    
-    // only store the first 14 effects as additonal ones will never be rendered
-    if (attr == ha_attr_type::effect_list) {
-      auto split_pos = find_nth_of(',', 15, this->attributes_[attr]);
-      if (split_pos != std::string::npos) {
-        this->attributes_[attr] = this->attributes_[attr].substr(0, split_pos);
-      }
-    }
+
     this->attributes_[attr].shrink_to_fit();
   } else {
     this->attributes_[attr] = value;

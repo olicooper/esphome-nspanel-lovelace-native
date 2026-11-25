@@ -212,7 +212,7 @@ protected:
   std::function<void(StatefulPageItem *)> on_state_callback_;
   const char *render_type_;
 
-  virtual void set_on_state_callback_(const char *type);
+  virtual void set_on_state_callback_();
 
   static void state_on_off_fn(StatefulPageItem *me);
   static void state_binary_sensor_fn(StatefulPageItem *me);

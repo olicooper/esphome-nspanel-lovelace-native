@@ -357,16 +357,30 @@ void NSPanelLovelace::loop() {
   }
 #endif
 
-  // Monitor for commands arriving from the screen over UART
+  // Expire a partial frame after a 100 ms gap between RX drains (a maximum
+  // frame takes ~36 ms at 115200 baud). Never scan its payload for frames:
+  // without a gap, a truncated frame can consume bytes of the following one.
+  static constexpr uint32_t RX_IDLE_TIMEOUT_MS = 100;
+  if (!this->buffer_.empty() && millis() - this->rx_last_byte_ms_ >= RX_IDLE_TIMEOUT_MS) {
+    this->buffer_.clear();
+  }
+
   uint8_t d;
-  while (this->available()) {
-    this->read_byte(&d);
+  bool received = false;
+  while (this->available() && this->read_byte(&d)) {
+    received = true;
     this->buffer_.push_back(d);
     if (!this->process_data_()) {
       ESP_LOGW(TAG, "Unparsed data: %s", esphome::format_hex(this->buffer_).c_str());
-      this->buffer_.clear();
+      // The rejected bytes can end with the start of the next frame.
+      auto &buffer = this->buffer_;
+      const size_t size = buffer.size();
+      const size_t keep = d == 0x55 ? 1 :
+          (d == 0xbb && size >= 2 && buffer[size - 2] == 0x55 ? 2 : 0);
+      buffer.erase(buffer.begin(), buffer.end() - keep);
     }
   }
+  if (received && !this->buffer_.empty()) this->rx_last_byte_ms_ = millis();
 
   if (this->force_current_page_update_) {
     this->force_current_page_update_ = false;
@@ -374,7 +388,8 @@ void NSPanelLovelace::loop() {
     if (this->popup_page_current_uuid_.empty()) {
       this->render_item_update_();
     } else {
-      this->render_popup_page_update_(this->cached_page_item_);
+      this->render_popup_page_update_(this->get_current_page_item_(this->popup_page_current_uuid_),
+                                      false, this->popup_is_input_select_);
     }
   }
 
@@ -494,13 +509,18 @@ bool NSPanelLovelace::process_data_() {
   if (at == 0)
     return new_byte == 0x55;
   // Byte 1: HEADER2 (always 0xBB)
-  if (at == 1)
+  if (at == 1) {
+    if (new_byte == 0x55) {
+      this->buffer_.erase(this->buffer_.begin());
+      return true;
+    }
     return new_byte == 0xBB;
-
-  // Byte 3 & 4 - length (little endian)
-  if (at == 2 || at == 3) {
-    return true;
   }
+
+  // The display sends commands, not bulk data; bound malformed frame allocation.
+  static constexpr uint16_t MAX_TFT_COMMAND_BYTES = 4096;
+  if (at == 2) return true;
+  if (at == 3) return encode_uint16(data[3], data[2]) <= MAX_TFT_COMMAND_BYTES;
   uint16_t length = encode_uint16(data[3], data[2]);
 
   // Wait until all data comes in
@@ -510,7 +530,7 @@ bool NSPanelLovelace::process_data_() {
   }
 
   // Last two bytes: CRC; return after first one
-  if (at == 4 + length) {
+  if (at == 4u + length) {
     return true;
   }
 
@@ -541,32 +561,41 @@ void NSPanelLovelace::process_command_(const std::string &message) {
 
   std::vector<std::string> tokens;
   tokens.reserve(5);
-  split_str(',', message, tokens);
+  // Preserve empty wire fields so truncated commands cannot shift into valid ones.
+  size_t start = 0;
+  for (size_t end = message.find(','); end != std::string::npos; end = message.find(',', start)) {
+    if (tokens.size() == 5) {
+      if (tokens.size() >= 2 && tokens[0] == "event") this->incoming_msg_callback_.call(message);
+      return;
+    }
+    tokens.emplace_back(message, start, end - start);
+    start = end + 1;
+  }
+  tokens.emplace_back(message, start);
   if (tokens.size() < 2 || tokens.at(0) != "event") { return; }
 
   // note: from luibackend/mqtt.py
   if (tokens.at(1) == action_type::buttonPress2) {
-    if (tokens.size() == 5) {
-      this->process_button_press_(tokens.at(2), tokens.at(3), tokens.at(4));
-    } else if (tokens.size() == 4) {
-      this->process_button_press_(tokens.at(2), tokens.at(3));
+    if ((tokens.size() == 4 || tokens.size() == 5) && !tokens[2].empty() && !tokens[3].empty()) {
+      if (tokens.size() == 5) {
+        this->process_button_press_(tokens[2], tokens[3], tokens[4]);
+      } else {
+        this->process_button_press_(tokens[2], tokens[3]);
+      }
     }
   } else if (tokens.at(1) == action_type::pageOpenDetail) {
-    // A truncated frame, or one with an empty field that split_str drops, has
-    // fewer than the 4 fields addressed below. .at() aborts the process under
-    // -fno-exceptions, so check the size before indexing.
-    if (tokens.size() < 4) {
+    if (tokens.size() != 4 || tokens[2].empty() || tokens[3].empty()) {
       ESP_LOGW(TAG, "Short pageOpenDetail command ignored: %s", message.c_str());
-      return;
+    } else {
+      this->render_popup_page_(tokens[2], tokens[3]);
     }
-    this->render_popup_page_(tokens.at(3));
   } else if (tokens.at(1) == action_type::sleepReached) {
     //std::string page = tokens.at(2);
     this->render_page_(render_page_option::screensaver_page);
   } else if (tokens.at(1) == action_type::startup) {
-    if (tokens.size() == 4) {
-      uint16_t ver = 0;
-      if(std::sscanf(tokens.at(2).c_str(), "%" PRIu16, &ver) == 1) {
+    if (tokens.size() == 4 && !tokens[3].empty()) {
+      int ver = 0;
+      if (str_to_int(tokens[2], ver) && ver >= 0 && ver <= UINT16_MAX) {
         Configuration::set_version(ver);
       }
       Configuration::set_model(tokens.at(3));
@@ -682,6 +711,7 @@ void NSPanelLovelace::render_current_page_() {
       .append(page->get_render_type_str());
   this->send_buffered_command_();
   this->popup_page_current_uuid_.clear();
+  this->popup_is_input_select_ = false;
 
   this->set_display_timeout(page->get_sleep_timeout());
   
@@ -746,87 +776,71 @@ void NSPanelLovelace::render_popup_notify_page_(const std::string &internal_id,
   this->send_buffered_command_();
 }
 
-void NSPanelLovelace::render_popup_page_(const std::string &internal_id) {
-  if (!this->render_popup_page_update_(internal_id)) return;
-  this->set_display_timeout(10);
-}
-
-bool NSPanelLovelace::render_popup_page_update_(const std::string &internal_id) {
+StatefulPageItem *NSPanelLovelace::get_current_page_item_(const std::string &uuid) {
   auto page = this->page_mgr_.current_page();
-  if (!page) {
-    ESP_LOGW(TAG, "Render popup page: page null");
-    return false;
+  if (page == nullptr) return nullptr;
+  for (const auto &item : page->get_items()) {
+    if (item->get_uuid() == uuid) return page_item_cast<StatefulPageItem>(item.get());
   }
-
-  // Sometimes a StatefulPageItem does not exist for an entity,
-  // handle this edge case. Only certain cards support this.
-  if (!esphome::str_startswith(internal_id, entity_type::uuid)) {
-    auto entity = this->get_entity_(internal_id);
-    if (entity == nullptr) {
-      ESP_LOGW(TAG, "[popup] entity not found '%s'", internal_id.c_str());
-      return false;
-    }
-    bool rendered = false;
-    if (page->is_type(page_type::cardThermo)) {
-      if (entity->is_type(entity_type::climate)) {
-        this->render_climate_detail_update_(entity);
-        rendered = true;
-      }
-    }
-    if (rendered) this->send_buffered_command_();
-    return rendered;
-  }
-
-  auto uuid = internal_id.substr(5);
-
-  if (this->cached_page_item_ == nullptr || this->cached_page_item_->get_uuid() != uuid) {
-    if (page->get_items().size() == 0) return false;
-    // Only search for items in the current page to reduce processing time
-    for (auto &item : page->get_items()) {
-      if (item->get_uuid() != uuid) continue;
-      if (auto page_item = page_item_cast<StatefulPageItem>(item.get())) {
-        this->cached_page_item_ = page_item;
-        break;
-      } else {
-        ESP_LOGW(TAG, "[popup] item cast failed");
-        return false;
-      }
-    }
-  }
-
-  if (this->cached_page_item_ == nullptr || this->cached_page_item_->get_uuid() != uuid) {
-    ESP_LOGW(TAG, "[popup] entity not found on page '%s'", internal_id.c_str());
-    return false;
-  }
-  
-  this->popup_page_current_uuid_ = uuid;
-  return this->render_popup_page_update_(this->cached_page_item_);
+  return nullptr;
 }
 
-bool NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item) {
+void NSPanelLovelace::render_popup_page_(const std::string &detail, const std::string &internal_id) {
+  auto page = this->page_mgr_.current_page();
+  if (page == nullptr) return;
+
+  if (internal_id.compare(0, 5, "uuid.") != 0) {
+    if (detail != "popupThermo" || !page->is_type(page_type::cardThermo)) return;
+    auto entity = static_cast<ThermoCard *>(page)->get_thermo_entity();
+    if (!entity->is_type(entity_type::climate) || entity->get_entity_id() != internal_id) return;
+    this->popup_page_current_uuid_.clear();
+    this->popup_is_input_select_ = false;
+    this->render_climate_detail_update_(entity);
+    this->send_buffered_command_();
+    this->set_display_timeout(10);
+    return;
+  }
+
+  if (internal_id.size() == 5) return;
+  const auto uuid = internal_id.substr(5);
+  auto item = this->get_current_page_item_(uuid);
+  if (item == nullptr) return;
+  const bool timer = item->is_type(entity_type::timer);
+  const bool input_select = detail == "popupInSel";
+  const bool matches = (detail == "popupTimer" && timer) ||
+      (detail == "popupLight" && item->is_type(entity_type::light)) ||
+      (detail == "popupShutter" && item->is_type(entity_type::cover)) ||
+      (detail == "popupThermo" && item->is_type(entity_type::climate)) ||
+      (detail == "popupFan" && item->is_type(entity_type::fan)) ||
+      (input_select && (item->is_type(entity_type::light) || item->is_type(entity_type::select) ||
+        item->is_type(entity_type::input_select) || item->is_type(entity_type::media_player)));
+  if (!matches) return;
+  if (!this->render_popup_page_update_(item, true, input_select)) return;
+  this->popup_page_current_uuid_ = uuid;
+  this->popup_is_input_select_ = input_select;
+  if (!timer) this->set_display_timeout(10);
+}
+
+bool NSPanelLovelace::render_popup_page_update_(StatefulPageItem *item, bool opening, bool input_select) {
   if (item == nullptr) return false;
 
-  if (item->is_type(entity_type::light)) {
+  if (input_select) {
+    this->render_input_select_detail_update_(item);
+  } else if (item->is_type(entity_type::light)) {
     this->render_light_detail_update_(item);
   } else if (item->is_type(entity_type::timer)) {
-    this->set_display_timeout(30);
-    this->render_timer_detail_update_(item);
-    this->set_interval(entity_type::timer, 1000, [this, item]() {
-      if (this->popup_page_current_uuid_ != item->get_uuid()) {
-        this->cancel_interval(entity_type::timer);
-        return;
-      }
-      this->render_timer_detail_update_(item);
-    });
+    if (!this->render_timer_detail_update_(item)) return false;
+    if (opening) {
+      auto timer_command = std::move(this->command_buffer_);
+      this->set_display_timeout(30);
+      this->command_buffer_ = std::move(timer_command);
+      // v4.3.3 resets the TFT's inactivity counter on every detail packet.
+      // Send a snapshot, not periodic countdown redraws; local touches are TFT-only.
+    }
   } else if (item->is_type(entity_type::cover)) {
     this->render_cover_detail_update_(item);
   } else if (item->is_type(entity_type::climate)) {
     this->render_climate_detail_update_(item);
-  } else if (
-      item->is_type(entity_type::select) ||
-      item->is_type(entity_type::input_select) ||
-      item->is_type(entity_type::media_player)) {
-    this->render_input_select_detail_update_(item);
   } else if (item->is_type(entity_type::fan)) {
     this->render_fan_detail_update_(item);
   } else {
@@ -856,11 +870,12 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   auto &tilt_position_str = entity->
     get_attribute(ha_attr_type::current_tilt_position);
 
-  uint8_t position = value_or_default(position_str, 0U);
-  uint8_t tilt_position = value_or_default(entity->
-    get_attribute(ha_attr_type::current_tilt_position), 0U);
-  uint16_t supported_features = value_or_default(entity->
-    get_attribute(ha_attr_type::supported_features), 0U);
+  int position = 0, tilt_position = 0;
+  int supported_features = 0;
+  const bool position_known = !position_str.empty() && str_to_percentage(position_str, position);
+  const bool tilt_known = !tilt_position_str.empty() && str_to_percentage(tilt_position_str, tilt_position);
+  if (!str_to_int(supported_features_str, supported_features) ||
+      supported_features < 0 || supported_features > UINT16_MAX) supported_features = 0;
 
   // Icons
   const icon_char_t* cover_icon = icon_t::none;
@@ -878,7 +893,7 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   bool icon_up_status = false;
   bool icon_stop_status = false;
   bool icon_down_status = false;
-  bool position_status = false;
+  const bool position_slider_enabled = position_known && (supported_features & 0b00000100);  // SET_POSITION
   bool icon_tilt_left_status = false;
   bool icon_tilt_stop_status = false;
   bool icon_tilt_right_status = false;
@@ -895,13 +910,11 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   // Position
   if (supported_features & 0b00001111) {
     text_position = get_translation(translation_item::position);
-    position_status = true;
   }
   // OPEN
   if (supported_features & 0b00000001) {
-    if (position != 100 && !((entity->is_state(entity_state::open) ||
-        entity->is_state(entity_state::unknown)) &&
-        position_str.empty())) {
+    if (!position_known ? !(entity->is_state(entity_state::open) ||
+                                  entity->is_state(entity_state::unknown)) : position != 100) {
       icon_up_status = true;
     }
     if (cover_icons_found)
@@ -909,9 +922,8 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
   }
   // CLOSE
   if (supported_features & 0b00000010) {
-    if (position != 0 && !((entity->is_state(entity_state::closed) ||
-        entity->is_state(entity_state::unknown)) &&
-        position_str.empty())) {
+    if (!position_known ? !(entity->is_state(entity_state::closed) ||
+                                  entity->is_state(entity_state::unknown)) : position != 0) {
       icon_down_status = true;
     }
     if (cover_icons_found)
@@ -942,16 +954,10 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     icon_tilt_stop = icon_t::stop;
     icon_tilt_stop_status = true;
   }
-  // SUPPORT_SET_TILT_POSITION
-  if (supported_features & 0b10000000) {
-    tilt_position_status = true;
-    if (tilt_position == 0) {
-      icon_tilt_right_status = false;
-    }
-    if (tilt_position == 100) {
-      icon_tilt_left_status = false;
-    }
-  }
+  // SUPPORT_SET_TILT_POSITION only controls the slider, not the arrows.
+  tilt_position_status = (supported_features & 0b10000000) && tilt_known;
+  if (tilt_known && tilt_position == 0) icon_tilt_right_status = false;
+  if (tilt_known && tilt_position == 100) icon_tilt_left_status = false;
 
   this->command_buffer_
     // entityUpdateDetail~
@@ -959,10 +965,10 @@ void NSPanelLovelace::render_cover_detail_update_(StatefulPageItem *item) {
     // entity_id~
     .append("uuid.").append(item->get_uuid()).append(1, SEPARATOR)
     // slider_pos~
-    .append(esphome::to_string(position)).append(1, SEPARATOR)
+    .append(position_slider_enabled ? esphome::to_string(position) : generic_type::disable).append(1, SEPARATOR)
     // position text + state / value~
     .append(text_position).append(": ")
-    .append(position_status
+    .append(position_known && !text_position.empty()
       ? esphome::to_string(position).append("%")
       : entity->get_state())
     .append(1, SEPARATOR)
@@ -1057,66 +1063,74 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
     // brightness_translation~
     .append(get_translation(translation_item::brightness)).append(1, SEPARATOR)
     // effect_supported ('enable' or 'disable')
-    .append(entity->has_attribute(ha_attr_type::effect_list) ?
+    .append(!entity->get_effects().empty() ?
       generic_type::enable : generic_type::disable);
 }
 
 // entityUpdateDetail~{entity_id}~~{icon_color}~{entity_id}~{min_remaining}~{sec_remaining}~{editable}~{action1}~{action2}~{action3}~{label1}~{label2}~{label3}
-void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
-  if (item == nullptr) return;
+bool NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
+  if (item == nullptr) return false;
 
   auto &state = item->get_state();
   bool render = false;
   uint16_t min_remaining = 0, sec_remaining = 0;
-  bool idle = state == entity_state::paused || state == entity_state::idle;
+  const bool idle = state == entity_state::paused || state == entity_state::idle;
 
   if (idle) {
-    this->cancel_interval(entity_type::timer);
-    std::string time_remaining_str;
-    if (state == entity_state::paused) {
-      time_remaining_str = item->get_attribute(ha_attr_type::remaining);
+    render = parse_timer_duration(item->get_attribute(state == entity_state::paused
+      ? ha_attr_type::remaining : ha_attr_type::duration), min_remaining, sec_remaining);
+  }
+#ifdef USE_TIME
+  else if (state == entity_state::active && this->time_id_.has_value()) {
+    const auto &finishes_at = item->get_attribute(ha_attr_type::finishes_at);
+    tm t{};
+    const char *start = finishes_at.c_str();
+    const char *end = strptime(start, "%Y-%m-%dT%H:%M:%S", &t);
+    int offset_seconds = 0;
+    if (finishes_at.size() >= 19 && end == start + 19) {
+      // HA may append fractional seconds and an ISO 8601 timezone.
+      if (*end == '.') {
+        const char *fraction = ++end;
+        end += strspn(end, "0123456789");
+        if (end == fraction) end = nullptr;
+      }
+      if (end && *end == 'Z') {
+        ++end;
+      } else if (end && (*end == '+' || *end == '-')) {
+        int sign = *end == '+' ? 1 : -1;
+        tm offset{};
+        end = strptime(end + 1, "%H:%M", &offset);
+        if (end && offset.tm_hour <= 23 && offset.tm_min <= 59)
+          offset_seconds = sign * (offset.tm_hour * 3600 + offset.tm_min * 60);
+        else
+          end = nullptr;
+      }
     } else {
-      time_remaining_str = item->get_attribute(ha_attr_type::duration);
+      end = nullptr;
     }
-    if (!time_remaining_str.empty()) {
-      std::vector<std::string> time_parts;
-      split_str(':', time_remaining_str, time_parts);
-      if (time_parts.size() == 3) {
-        int min_part = 0, sec_part = 0, min_sec = 0;
-        if (!str_to_int(time_parts[0], min_part) ||
-            !str_to_int(time_parts[1], sec_part) ||
-            !str_to_int(time_parts[2], min_sec)) return;
-        min_remaining = (min_part * 60) + sec_part;
-        sec_remaining = min_sec;
+    if (end == start + finishes_at.size()) {
+      ESPTime now = this->time_id_.value()->now();
+      ESPTime parsed = ESPTime::from_c_tm(&t, 0);
+      const bool valid_date = parsed.fields_in_range(false, false);
+      if (valid_date) parsed.recalc_timestamp_utc(false);
+      const time_t end = valid_date ? parsed.timestamp - offset_seconds : -1;
+      if (now.is_valid() && end != -1) {
+        double seconds = std::clamp(difftime(end, now.timestamp), 0.0,
+                                    static_cast<double>(UINT16_MAX) * 60 + 59);
+        const auto total_seconds = static_cast<uint32_t>(seconds);
+        min_remaining = static_cast<uint16_t>(total_seconds / 60);
+        sec_remaining = static_cast<uint16_t>(total_seconds % 60);
         render = true;
       }
     }
   }
-  // active
-  else {
-    auto &finishes_at = item->get_attribute(ha_attr_type::finishes_at);
-    if (!finishes_at.empty()) {
-      tm t{};
-      if (iso8601_to_tm(finishes_at.c_str(), t)) {
-        ESPTime now = this->time_id_.value()->now();
-        if (now.is_valid()) {
-          double seconds = difftime(mktime(&t), now.timestamp);
-          if (seconds >= UINT16_MAX) seconds = UINT16_MAX;
-          if (seconds < 0) seconds = 0;
-          min_remaining = static_cast<uint16_t>(seconds) / 60;
-          sec_remaining = static_cast<uint16_t>(seconds) % 60;
-          render = true;
-          if (seconds == 0) {
-            this->cancel_interval(entity_type::timer);
-          }
-        }
-      }
-    }
-  }
-
+#endif
   if (!render) {
+    this->popup_is_input_select_ = false;
+    this->command_buffer_.clear();
+    this->popup_page_current_uuid_.clear();
     this->render_current_page_();
-    return;
+    return false;
   }
 
   this->command_buffer_
@@ -1154,6 +1168,7 @@ void NSPanelLovelace::render_timer_detail_update_(StatefulPageItem *item) {
     .append(1, SEPARATOR)
     // label3
     .append(idle ? "" : get_translation(translation_item::finish));
+  return true;
 }
 
 void NSPanelLovelace::render_climate_detail_update_(StatefulPageItem *item) {
@@ -1248,13 +1263,28 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
     options = item->get_attribute(ha_attr_type::options);
   }
   else if (item->is_type(entity_type::light)) {
-    options = item->get_attribute(ha_attr_type::effect_list);
+    for (const auto &effect : item->get_entity()->get_effects()) {
+      if (!options.empty()) options += '?';
+      // v4.3.3 labels have a size of 40; 15 labels plus separators fit vaModeList (900).
+      constexpr size_t max_label_bytes = 40;
+      const auto start = options.size();
+      for (size_t pos = 0; pos < effect.size();) {
+        const auto len = utf8_scalar_size(effect, pos);
+        if (len == 0 || options.size() - start + len > max_label_bytes) break;
+        const char c = effect[pos];
+        if (len == 1 && (c == '?' || c == SEPARATOR || static_cast<unsigned char>(c) < 32 || c == 127))
+          options += '_';
+        else
+          options.append(effect, pos, len);
+        pos += len;
+      }
+    }
   }
   else if (item->is_type(entity_type::media_player)) {
     options = item->get_attribute(ha_attr_type::source_list);
     state = item->get_attribute(ha_attr_type::source);
   }
-  if (!options.empty()) replace_all(options, ',', '?');
+  if (!item->is_type(entity_type::light)) replace_all(options, ',', '?');
 
   this->command_buffer_
     // entityUpdateDetail2~
@@ -1284,11 +1314,7 @@ void NSPanelLovelace::render_fan_detail_update_(StatefulPageItem *item) {
   uint8_t speed_max = 100;
   if (!percentage_step.empty()) {
     float speed_val = 0.0f;
-    if (speed.empty()) {
-      speed = "0";
-    } else {
-      if (!str_to_float(speed, speed_val)) speed_val = 0.0f;
-    }
+    if (!str_to_float(speed, speed_val) || speed_val < 0.0f || speed_val > 100.0f) speed_val = 0.0f;
     float step_val = 1.0f;
     if (!str_to_float(percentage_step, step_val)) step_val = 1.0f;
     if (step_val < 1.0f) step_val = 1.0f; // avoid divide-by-zero
@@ -1693,123 +1719,97 @@ void NSPanelLovelace::check_time_() {
 
 #endif
 
-const std::string &NSPanelLovelace::try_replace_uuid_with_entity_id_(
-    const std::string &uuid_or_entity_id) {
-  // not a uuid if it does not begin with the uuid prefix
-  // (navigation uuids are dealt with separately)
-  if (!esphome::str_startswith(uuid_or_entity_id, entity_type::uuid))
-    return uuid_or_entity_id;
-
-  auto uuid = uuid_or_entity_id.substr(5);
-  auto item = this->get_page_item_(uuid);
-  if (item == nullptr) return uuid_or_entity_id;
-  
-  return item->get_entity_id();
+const std::string *NSPanelLovelace::try_replace_uuid_with_entity_id_(const std::string &internal_id) {
+  if (internal_id.size() <= 5 || internal_id.compare(0, 5, "uuid.") != 0) return nullptr;
+  auto item = this->get_page_item_(internal_id.substr(5));
+  return item != nullptr ? &item->get_entity_id() : nullptr;
 }
 
-void NSPanelLovelace::set_mode_from_index_(const std::string &entity_type,
-    const std::string &entity_id, ha_attr_type attr_type,
-    ha_action_type action_type, const std::string &data_key,
-    const std::string &value) {
+std::string NSPanelLovelace::get_mode_from_index_(const std::string &entity_id, ha_attr_type attr_type,
+                                                   const std::string &value) {
   auto entity = this->get_entity_(entity_id);
-  if (entity == nullptr) return;
+  if (entity == nullptr) return {};
   auto &modes_str = entity->get_attribute(attr_type);
-  if (modes_str.empty()) return;
+  if (modes_str.empty()) return {};
   std::vector<std::string> modes;
   split_str(',', modes_str, modes);
   int index = 0;
   if (!str_to_int(value, index) || index < 0 ||
-      static_cast<size_t>(index) >= modes.size()) return;
-  auto &selected_mode = modes.at(static_cast<size_t>(index));
-  this->call_ha_service_(
-    entity_type, action_type, {{
-      {to_string(ha_attr_type::entity_id), entity_id},
-      {data_key, selected_mode}
-    }});
+      static_cast<size_t>(index) >= modes.size()) return {};
+  return modes[static_cast<size_t>(index)];
 }
 
 void NSPanelLovelace::process_button_press_(
-    std::string &internal_id, 
+    const std::string &internal_id,
     const std::string &button_type, 
     const std::string &value,
     bool called_from_timeout) {
   if (button_type.empty()) return;
 
-  // Screen tapped when on the screensaver, show the default card or use the first card in the config.
-  if (internal_id == to_string(page_type::screensaver) && button_type == button_type::bExit) {
-    // todo: make a note of last used card
-    //
-    // config.get("screensaver.defaultCard")
-    // use defaultCard if defaultCard not null
-
-    // _previous_card.clear();
-    // _current_card = action_type::screensaver;
-    // render_card(_current_card);
-
-    // exit screensaver when screen tapped once or twice when double tap is enabled
-    if ((!this->double_tap_to_unlock_ && value == "1") || value >= "2") {
-      this->render_page_(render_page_option::default_page);
-    }
-    // screen tapped multiple times
-    else {
-      // todo
-      // int tap_count = std::to_integer(value);
-    }
-    return;
-  }
-
-  if (button_type == button_type::sleepReached) {
-    // todo
-    // make a note of last used card then render screensaver
-    // _previous_card = _current_card;
-    // _current_card = action_type::screensaver;
-    // render_page_(_current_card);
-    this->render_page_(render_page_option::screensaver_page);
-    return;
-  }
-
   if (button_type == button_type::bExit) {
-    this->render_current_page_();
+    if (internal_id == to_string(page_type::screensaver)) {
+      int taps = 0;
+      if (str_to_int(value, taps) && taps >= (this->double_tap_to_unlock_ ? 2 : 1))
+        this->render_page_(render_page_option::default_page);
+    } else if (value.empty() && (internal_id == "popupLight" || internal_id == "popupShutter" ||
+        internal_id == "popupThermo" || internal_id == "popupFan" || internal_id == "popupInSel" ||
+        internal_id == "popupTimer" || internal_id == "popupNotify")) {
+      this->render_current_page_();
+    }
     return;
   }
-  
-  // Throttle and filter processing of spammy actions to avoid command flooding
-  if (!called_from_timeout) {
-    if (internal_id == this->button_press_uuid_ && 
-        button_type == this->button_press_type_) {
+
+  const auto dispatch_now = [&]() {
+    if (called_from_timeout) return true;
+    if (internal_id == this->button_press_uuid_ && button_type == this->button_press_type_) {
       this->button_press_value_ = value;
-      if (this->button_press_timeout_set_) return;
-      this->set_timeout("btnpr", 200, [this]() {
-        this->button_press_timeout_set_ = false;
-        ESP_LOGD(TAG, "Button press delayed: %s,%s,%s", 
-            this->button_press_uuid_.c_str(), this->button_press_type_.c_str(), 
-            this->button_press_value_.c_str());
-        this->process_button_press_(
-            this->button_press_uuid_, this->button_press_type_, 
-            this->button_press_value_, true);
-      });
-      this->button_press_timeout_set_ = true;
-      return;
-    } else if (this->button_press_timeout_set_) {
+      if (!this->button_press_timeout_set_) {
+        this->set_timeout("btnpr", 200, [this]() {
+          this->button_press_timeout_set_ = false;
+          this->process_button_press_(this->button_press_uuid_, this->button_press_type_,
+                                      this->button_press_value_, true);
+        });
+        this->button_press_timeout_set_ = true;
+      }
+      return false;
+    }
+    if (this->button_press_timeout_set_) {
       this->cancel_timeout("btnpr");
       this->button_press_timeout_set_ = false;
     }
     this->button_press_uuid_ = internal_id;
     this->button_press_type_ = button_type;
-  }
+    return true;
+  };
 
   auto entity_type = get_entity_type(internal_id);
-  std::string& entity_id = internal_id;
+  std::string entity_id = internal_id;
   
   if (entity_type == entity_type::uuid) {
-    entity_id = this->try_replace_uuid_with_entity_id_(internal_id);
-    ESP_LOGV(TAG, "Lookup %s -> %s", internal_id.c_str(), entity_id.c_str());
+    const auto *resolved_id = this->try_replace_uuid_with_entity_id_(internal_id);
+    if (resolved_id == nullptr) return;
+    ESP_LOGV(TAG, "Lookup %s -> %s", internal_id.c_str(), resolved_id->c_str());
+    entity_id = *resolved_id;
     entity_type = get_entity_type(entity_id);
     if (entity_type == nullptr) return;
   }
 
+  const auto dot = entity_id.find('.');
+  const bool navigation = entity_type == entity_type::nav_prev || entity_type == entity_type::nav_next ||
+      entity_type == entity_type::nav_up || entity_type == entity_type::navigate || entity_type == entity_type::navigate_uuid;
+  if (entity_type == nullptr || (!navigation && (dot == std::string::npos || dot + 1 == entity_id.size())) ||
+      entity_id.find('\0') != std::string::npos || value.find('\0') != std::string::npos) return;
+  if (!navigation && !std::all_of(entity_id.begin() + dot + 1, entity_id.end(), [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+      })) return;
+
+  // Only validated paths may alter the pending repeat.
   if (button_type == button_type::onOff) {
-    if (!value.empty()) {
+    if (entity_type != entity_type::light && entity_type != entity_type::switch_ &&
+        entity_type != entity_type::input_boolean && entity_type != entity_type::automation &&
+        entity_type != entity_type::fan) return;
+    if (value == "0" || value == "1") {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, 
         value == "1" ? ha_action_type::turn_on : ha_action_type::turn_off, 
@@ -1823,13 +1823,15 @@ void NSPanelLovelace::process_button_press_(
       if (entity == nullptr) return;
       float step = 0.0f;
       if (!str_to_float(entity->get_attribute(ha_attr_type::percentage_step, "0"), step)) return;
+      if (step < 0.0f) return;
       if (step > 100.0f) step = 100.0f;
       float val = 0.0f;
-      if (!str_to_float(value, val)) return;
+      if (!str_to_float(value, val) || val < 0.0f || val > 100.0f) return;
       val *= step;
       if (val > 100.0f) val = 100.0f;
       auto pct = esphome::str_snprintf("%.6f", 11, val);
       
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, 
         ha_action_type::set_percentage, 
@@ -1838,30 +1840,43 @@ void NSPanelLovelace::process_button_press_(
           {to_string(ha_attr_type::percentage), pct}
         }});
     } else {
-      float val = 0.0f;
-      if (!str_to_float(value, val)) return;
+      if (entity_type != entity_type::number && entity_type != entity_type::input_number) return;
+      double val = 0.0;
+      if (!str_to_double(value, val) || value.find_first_of("xXpP") != std::string::npos) return;
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, 
         ha_action_type::set_value, 
         {{
           {to_string(ha_attr_type::entity_id), entity_id},
-          {to_string(ha_attr_type::value), esphome::str_snprintf("%.2f", 7, val)}
+          {to_string(ha_attr_type::value), value}
         }});
     }
   }
   // cover and shutter cards
   else if (button_type == button_type::up) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::open_cover, entity_id);
   } else if (button_type == button_type::stop) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::stop_cover, entity_id);
   } else if (button_type == button_type::down) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::close_cover, entity_id);
   } else if (button_type == button_type::positionSlider) {
+    if (entity_type != entity_type::cover) return;
     int pos_val = 0;
-    if (!str_to_int(value, pos_val)) return;
+    if (!str_to_percentage(value, pos_val)) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_cover_position, 
@@ -1870,17 +1885,28 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::position), std::to_string(pos_val)}
       }});
   } else if (button_type == button_type::tiltOpen) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::open_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltStop) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::stop_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltClose) {
+    if (entity_type != entity_type::cover) return;
+    if (!value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::close_cover_tilt, entity_id);
   } else if (button_type == button_type::tiltSlider) {
+    if (entity_type != entity_type::cover) return;
     int tilt_val = 0;
-    if (!str_to_int(value, tilt_val)) return;
+    if (!str_to_percentage(value, tilt_val)) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_cover_tilt_position, 
@@ -1889,20 +1915,28 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::tilt_position), std::to_string(tilt_val)}
       }});
   } else if (button_type == button_type::button) {
-    if (!entity_type) return;
+    if (!value.empty()) return;
     if (entity_type == entity_type::navigate ||
         entity_type == entity_type::navigate_uuid) {
-      auto uuid = internal_id.substr(strlen(entity_type) + 1);
+      const auto prefix_size = strlen(entity_type) + 1;
+      if (entity_id.size() <= prefix_size || entity_id[prefix_size - 1] != '.') return;
+      auto uuid = entity_id.substr(prefix_size);
+      if (this->page_mgr_.pages_empty() || this->page_mgr_.find_page(uuid) == nullptr) return;
+      if (!dispatch_now()) return;
       this->render_page_(uuid);
     } else if (entity_type == entity_type::nav_prev) {
+      if (!dispatch_now()) return;
       this->render_page_(render_page_option::prev);
     } else if (entity_type == entity_type::nav_next) {
+      if (!dispatch_now()) return;
       this->render_page_(render_page_option::next);
     } else if (entity_type == entity_type::nav_up) {
+      if (!dispatch_now()) return;
       this->render_current_page_();
     } else if (
         entity_type == entity_type::scene ||
         entity_type == entity_type::script) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, ha_action_type::turn_on, entity_id);
     } else if (
@@ -1911,19 +1945,23 @@ void NSPanelLovelace::process_button_press_(
         entity_type == entity_type::input_boolean ||
         entity_type == entity_type::automation ||
         entity_type == entity_type::fan) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, ha_action_type::toggle, entity_id);
     } else if (
         entity_type == entity_type::button ||
         entity_type == entity_type::input_button) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, ha_action_type::press, entity_id);
     } else if (entity_type == entity_type::input_select) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, ha_action_type::select_next, entity_id);
     } else if (entity_type == entity_type::vacuum) {
       auto entity = this->get_entity_(entity_id);
       if (entity == nullptr) return;
+      if (!dispatch_now()) return;
       this->call_ha_service_(entity_type,
         entity->is_state(entity_state::docked) 
           ? ha_action_type::start 
@@ -1932,6 +1970,7 @@ void NSPanelLovelace::process_button_press_(
     } else if (entity_type == entity_type::lock) {
       auto entity = this->get_entity_(entity_id);
       if (entity == nullptr) return;
+      if (!dispatch_now()) return;
       this->call_ha_service_(entity_type,
         entity->is_state(entity_state::locked) 
           ? ha_action_type::unlock 
@@ -1941,17 +1980,25 @@ void NSPanelLovelace::process_button_press_(
   }
   // media cards
   else if (button_type == button_type::mediaNext) {
+    if (entity_type != entity_type::media_player || !value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::media_next_track, entity_id);
   } else if (button_type == button_type::mediaBack) {
+    if (entity_type != entity_type::media_player || !value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::media_previous_track, entity_id);
   } else if (button_type == button_type::mediaPause) {
+    if (entity_type != entity_type::media_player || !value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, ha_action_type::media_play_pause, entity_id);
   } else if (button_type == button_type::mediaOnOff) {
+    if (entity_type != entity_type::media_player || !value.empty()) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       entity->is_state(entity_state::on) 
@@ -1959,12 +2006,14 @@ void NSPanelLovelace::process_button_press_(
         : ha_action_type::turn_on,
       entity_id);
   } else if (button_type == button_type::mediaShuffle) {
+    if (entity_type != entity_type::media_player || !value.empty()) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto shuffle = entity->get_attribute(ha_attr_type::shuffle);
     if (shuffle.empty()) return;
     shuffle = shuffle == entity_state::off 
       ? entity_state::on : entity_state::off;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::shuffle_set,
@@ -1973,9 +2022,11 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::shuffle), shuffle}
       }});
   } else if (button_type == button_type::volumeSlider) {
+    if (entity_type != entity_type::media_player) return;
     int volume_val = 0;
-    if (!str_to_int(value, volume_val)) return;
+    if (!str_to_percentage(value, volume_val)) return;
     auto volume = esphome::str_snprintf("%.2f", 7, volume_val * 0.01f);
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::volume_set,
@@ -1984,6 +2035,8 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::volume_level), volume}
       }});
   } else if (button_type == button_type::speakerSel) {
+    if (entity_type != entity_type::media_player || value.empty()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::select_source,
@@ -1992,6 +2045,7 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::source), value}
       }});
   } else if (button_type == button_type::modeMediaPlayer) {
+    if (entity_type != entity_type::media_player) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto source_list_str = entity->get_attribute(ha_attr_type::source_list);
@@ -2001,6 +2055,7 @@ void NSPanelLovelace::process_button_press_(
     int index = 0;
     if (!str_to_int(value, index)) return;
     if (source_list.size() <= static_cast<size_t>(index)) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::select_source,
@@ -2011,9 +2066,11 @@ void NSPanelLovelace::process_button_press_(
   }
   // light cards
   else if (button_type == button_type::brightnessSlider) {
+    if (entity_type != entity_type::light) return;
     if (value.empty()) return;
     int brightness_val = 0;
-    if (!str_to_int(value, brightness_val)) return;
+    if (!str_to_percentage(value, brightness_val)) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::turn_on, 
@@ -2026,30 +2083,16 @@ void NSPanelLovelace::process_button_press_(
           ))}
       }});
   } else if (button_type == button_type::colorTempSlider) {
+    if (entity_type != entity_type::light) return;
     if (value.empty()) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
-    auto &minstr = entity->get_attribute(ha_attr_type::min_mireds);
-    auto &maxstr = entity->get_attribute(ha_attr_type::max_mireds);
-    uint16_t min_mireds = 153;
-    if (!minstr.empty()) {
-      int parsed = 0;
-      if (str_to_int(minstr, parsed)) min_mireds = static_cast<uint16_t>(parsed);
-    }
-    uint16_t max_mireds = 500;
-    if (!maxstr.empty()) {
-      int parsed = 0;
-      if (str_to_int(maxstr, parsed)) max_mireds = static_cast<uint16_t>(parsed);
-    }
-    if (min_mireds >= max_mireds) {
-      ESP_LOGW(TAG, "min/max mired range invalid %i>=%i", min_mireds, max_mireds);
-      min_mireds = 153;
-      max_mireds = 500;
-    }
-
+    const auto range = mired_range(entity->get_attribute(ha_attr_type::min_mireds),
+                                   entity->get_attribute(ha_attr_type::max_mireds));
     int temp_val = 0;
-    if (!str_to_int(value, temp_val)) return;
+    if (!str_to_percentage(value, temp_val)) return;
     
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::turn_on, 
@@ -2058,24 +2101,24 @@ void NSPanelLovelace::process_button_press_(
         // scale 0-100 from slider to color range of the light
         {to_string(ha_attr_type::color_temp), std::to_string(
           static_cast<int>(
-            scale_value(temp_val, {0, 100},
-            {static_cast<double>(min_mireds), static_cast<double>(max_mireds)})
+            scale_value(temp_val, {0, 100}, range)
           ))}
       }});
   } else if (button_type == button_type::colorWheel) {
+    if (entity_type != entity_type::light) return;
     if (value.empty()) return;
 
-    std::vector<std::string> xy_tokens;
-    split_str('|', value, xy_tokens);
-    if (xy_tokens.size() != 3) return;
+    std::array<std::string, 3> xy_tokens;
+    if (!split_fixed('|', value, xy_tokens)) return;
 
-    double x = 0.0, y = 0.0, z = 0.0;
+    double x = 0.0, y = 0.0;
+    float width = 0.0f;
     if (!str_to_double(xy_tokens[0], x) || !str_to_double(xy_tokens[1], y) ||
-        !str_to_double(xy_tokens[2], z)) return;
-    if (z <= 0.0) return;
-    std::string rgb_str = to_string(
-        xy_to_rgb(x, y, z), ',', '[', ']');
+        !str_to_float(xy_tokens[2], width) || width / 2.0f <= 0.0f ||
+        x < 0.0 || x > width || y < 0.0 || y > width) return;
+    std::string rgb_str = to_string(xy_to_rgb(x, y, width), ',', '[', ']');
 
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::turn_on, 
@@ -2088,9 +2131,13 @@ void NSPanelLovelace::process_button_press_(
   }
   // thermo/climate card
   else if (button_type == button_type::tempUpd) {
+    if (entity_type != entity_type::climate) return;
     int temp_val = 0;
     if (!str_to_int(value, temp_val)) return;
-    auto val = esphome::str_snprintf("%.1f", 6, temp_val * 0.1);
+    int high = temp_val;
+    if (!ThermostatControls(this->get_entity_(entity_id)).normalize(temp_val, high)) return;
+    auto val = esphome::str_snprintf("%.1f", 32, temp_val / 10.0);
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -2099,18 +2146,19 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::temperature), val}
       }});
   } else if (button_type == button_type::tempUpdHighLow) {
-    std::vector<std::string> temp_values;
-    split_str('|', value, temp_values);
-    if (temp_values.size() < 2 || temp_values[0].empty() ||
-        temp_values[1].empty()) return;
+    if (entity_type != entity_type::climate) return;
+    std::array<std::string, 2> temp_values;
+    if (!split_fixed('|', value, temp_values)) return;
     int temp_high_val = 0;
     int temp_low_val = 0;
     if (!str_to_int(temp_values[0], temp_high_val) ||
-        !str_to_int(temp_values[1], temp_low_val)) return;
+        !str_to_int(temp_values[1], temp_low_val) ||
+        !ThermostatControls(this->get_entity_(entity_id)).normalize(temp_low_val, temp_high_val)) return;
     auto temp_high = esphome::str_snprintf(
-      "%.1f", 6, temp_high_val * 0.1);
+      "%.1f", 32, temp_high_val / 10.0);
     auto temp_low = esphome::str_snprintf(
-      "%.1f", 6, temp_low_val * 0.1);
+      "%.1f", 32, temp_low_val / 10.0);
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_temperature, 
@@ -2120,6 +2168,9 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::target_temp_low), temp_low}
       }});
   } else if (button_type == button_type::hvacAction) {
+    const icon_char_t *icon;
+    if (entity_type != entity_type::climate || !try_get_value(CLIMATE_ICON_MAP, icon, value)) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type, 
       ha_action_type::set_hvac_mode, 
@@ -2127,18 +2178,19 @@ void NSPanelLovelace::process_button_press_(
         {to_string(ha_attr_type::entity_id), entity_id},
         {to_string(ha_attr_type::hvac_mode), value}
       }});
-  } else if (button_type == button_type::modePresetModes) {
-    this->set_mode_from_index_(entity_type, entity_id,
-      ha_attr_type::preset_modes, ha_action_type::set_preset_mode,
-      to_string(ha_attr_type::preset_mode), value);
-  } else if (button_type == button_type::modeSwingModes) {
-    this->set_mode_from_index_(entity_type, entity_id,
-      ha_attr_type::swing_modes, ha_action_type::set_swing_mode,
-      to_string(ha_attr_type::swing_mode), value);
-  } else if (button_type == button_type::modeFanModes) {
-    this->set_mode_from_index_(entity_type, entity_id,
-      ha_attr_type::fan_modes, ha_action_type::set_fan_mode,
-      to_string(ha_attr_type::fan_mode), value);
+  } else if (button_type == button_type::modePresetModes || button_type == button_type::modeSwingModes ||
+             button_type == button_type::modeFanModes) {
+    if (entity_type != entity_type::climate &&
+        !(entity_type == entity_type::fan && button_type == button_type::modePresetModes)) return;
+    const bool preset = button_type == button_type::modePresetModes;
+    const bool swing = button_type == button_type::modeSwingModes;
+    const auto mode = this->get_mode_from_index_(entity_id,
+        preset ? ha_attr_type::preset_modes : swing ? ha_attr_type::swing_modes : ha_attr_type::fan_modes, value);
+    if (mode.empty() || !dispatch_now()) return;
+    this->call_ha_service_(entity_type,
+        preset ? ha_action_type::set_preset_mode : swing ? ha_action_type::set_swing_mode : ha_action_type::set_fan_mode,
+        {{to_string(ha_attr_type::entity_id), entity_id},
+         {to_string(preset ? ha_attr_type::preset_mode : swing ? ha_attr_type::swing_mode : ha_attr_type::fan_mode), mode}});
   }
   // alarm card
   else if (
@@ -2147,10 +2199,13 @@ void NSPanelLovelace::process_button_press_(
       button_type == button_type::armNight ||
       button_type == button_type::armVacation ||
       button_type == button_type::disarm) {
+    if (entity_type != entity_type::alarm_control_panel) return;
     auto action = std::string("alarm_").append(button_type);
     if (value.empty()) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(entity_type, action.c_str(), entity_id);
     } else {
+      if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, action.c_str(), 
         {{
@@ -2159,6 +2214,7 @@ void NSPanelLovelace::process_button_press_(
         }});
     }
   } else if (button_type == button_type::opnSensorNotify) {
+    if (entity_type != entity_type::alarm_control_panel || !value.empty()) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto &open_sensors_str = entity->get_attribute(ha_attr_type::open_sensors);
@@ -2171,6 +2227,7 @@ void NSPanelLovelace::process_button_press_(
     for (auto &&sensor : open_sensors) {
       message.append("- ").append(sensor).append("\r\n");
     }
+    if (!dispatch_now()) return;
     this->render_popup_notify_page_("", "", message);
   }
   // unlock card
@@ -2183,6 +2240,7 @@ void NSPanelLovelace::process_button_press_(
   else if (
       button_type == button_type::modeInputSelect ||
       button_type == button_type::modeSelect) {
+    if (entity_type != (button_type == button_type::modeSelect ? entity_type::select : entity_type::input_select)) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
     auto options_str = entity->get_attribute(ha_attr_type::options);
@@ -2192,6 +2250,7 @@ void NSPanelLovelace::process_button_press_(
     int index = 0;
     if (!str_to_int(value, index) || index < 0 ||
         static_cast<size_t>(index) >= options.size()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::select_option,
@@ -2202,15 +2261,17 @@ void NSPanelLovelace::process_button_press_(
   }
   // light
   else if (button_type == button_type::modeLight) {
+    if (entity_type != entity_type::light || !this->popup_is_input_select_ ||
+        this->popup_page_current_uuid_.empty() || internal_id != "uuid." + this->popup_page_current_uuid_) return;
+    auto item = this->get_current_page_item_(this->popup_page_current_uuid_);
+    if (item == nullptr || item->get_entity_id() != entity_id) return;
     auto entity = this->get_entity_(entity_id);
     if (entity == nullptr) return;
-    auto effects_str = entity->get_attribute(ha_attr_type::effect_list);
-    if (effects_str.empty()) return;
-    std::vector<std::string> effects;
-    split_str(',', effects_str, effects);
+    const auto &effects = entity->get_effects();
     int index = 0;
     if (!str_to_int(value, index) || index < 0 ||
         static_cast<size_t>(index) >= effects.size()) return;
+    if (!dispatch_now()) return;
     this->call_ha_service_(
       entity_type,
       ha_action_type::turn_on,
@@ -2220,16 +2281,26 @@ void NSPanelLovelace::process_button_press_(
       }});
   }
   // timer card
-  else if (esphome::str_startswith(button_type, entity_type::timer)) {
+  else if (button_type == button_type::timerStart || button_type == button_type::timerCancel ||
+           button_type == button_type::timerPause || button_type == button_type::timerFinish) {
+    if (entity_type != entity_type::timer) return;
     std::string service(button_type);
     service[5] = '.';
     if (value.empty()) {
+      if (!dispatch_now()) return;
       this->call_ha_service_(service, entity_id);
     } else {
-      this->call_ha_service_(service, 
+      uint16_t minutes, seconds;
+      if (button_type != button_type::timerStart || !parse_timer_duration(value, minutes, seconds, true)) return;
+      if (!dispatch_now()) return;
+      const auto duration = value.compare(0, 3, "00:") == 0
+          ? esphome::str_snprintf("%02u:%02u:%02u", 10, static_cast<unsigned>(minutes / 60),
+                                 static_cast<unsigned>(minutes % 60), static_cast<unsigned>(seconds))
+          : value;
+      this->call_ha_service_(service,
         {{
           {to_string(ha_attr_type::entity_id), entity_id},
-          {to_string(ha_attr_type::duration), value}
+          {to_string(ha_attr_type::duration), duration}
         }});
     }
   } else {
@@ -2335,6 +2406,27 @@ void NSPanelLovelace::on_entity_attribute_update_(
   auto ha_attr = to_ha_attr(attr_name);
   if (ha_attr == ha_attr_type::unknown) return;
 
+  if (ha_attr == ha_attr_type::effect_list && this->popup_is_input_select_ &&
+      !this->popup_page_current_uuid_.empty()) {
+    auto item = this->get_current_page_item_(this->popup_page_current_uuid_);
+    if (item != nullptr && item->is_type(entity_type::light) && item->get_entity() == entity) {
+      const auto previous = entity->get_effects();
+      entity->set_attribute(ha_attr, attr_value);
+      if (previous != entity->get_effects()) {
+        // v4.3.3 can replace the index list without redrawing the visible labels.
+        if (this->button_press_type_ == button_type::modeLight) {
+          this->cancel_timeout("btnpr");
+          this->button_press_timeout_set_ = false;
+          this->button_press_type_.clear();
+        }
+        this->popup_page_current_uuid_.clear();
+        this->popup_is_input_select_ = false;
+        this->render_current_page_();
+      }
+      return;
+    }
+  }
+
   if (ha_attr == ha_attr_type::state) {
     entity->set_state(attr_value);
   } else {
@@ -2347,7 +2439,16 @@ void NSPanelLovelace::on_entity_attribute_update_(
       ? entity->get_state().c_str()
       : entity->get_attribute(ha_attr).c_str());
 
-  // if (this->force_current_page_update_) return;
+  // Tilt is not shown on the tile. Refresh only the matching open cover popup.
+  if (ha_attr == ha_attr_type::current_tilt_position && entity->is_type(entity_type::cover)) {
+    if (!this->popup_page_current_uuid_.empty()) {
+      auto item = this->get_current_page_item_(this->popup_page_current_uuid_);
+      if (item != nullptr && item->get_entity_id() == entity_id) {
+        this->force_current_page_update_ = true;
+      }
+    }
+    return;
+  }
 
   // If there are lots of entity attributes that update within a short time
   // then this will queue lots of commands unnecessarily.
@@ -2361,6 +2462,12 @@ void NSPanelLovelace::on_entity_attribute_update_(
         page->is_type(page_type::screensaver)) {
       force_current_page_update_ = 
         this->screensaver_->should_render_status_update(entity_id);
+      return;
+    }
+
+    if (!this->popup_page_current_uuid_.empty()) {
+      auto item = this->get_current_page_item_(this->popup_page_current_uuid_);
+      this->force_current_page_update_ = item != nullptr && item->get_entity_id() == entity_id;
       return;
     }
 

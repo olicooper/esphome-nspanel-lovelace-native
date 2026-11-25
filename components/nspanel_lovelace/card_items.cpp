@@ -68,12 +68,7 @@ void EntitiesCardEntityItem::on_entity_attribute_change(
   if (!this->on_state_callback_) return;
 
   if (this->is_type(entity_type::cover)) {
-    if (attr == ha_attr_type::current_position) {
-      // this is a cheat/shortcut to avoid state change spamming
-      if (!value.empty() && value != "100" && value != "0") {
-        return;
-      }
-    }
+    if (attr == ha_attr_type::current_tilt_position) return;
   } else if (this->is_type(entity_type::climate)) {
     // Only these two attributes affect the visual output
     // so avoid the state callback for anything else
@@ -152,31 +147,23 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
   auto &supported_features_str = me_->get_attribute(
     ha_attr_type::supported_features);
 
-  uint8_t position = 0;
-  uint8_t supported_features = 0;
+  int position = 0;
+  int supported_features = 0;
   bool icon_up_status = false;
   bool icon_stop_status = false;
   bool icon_down_status = false;
 
   me_->value_.clear();
 
-  if (!position_str.empty()) {
-    int parsed_position = 0;
-    if (!str_to_int(position_str, parsed_position)) return;
-    position = static_cast<uint8_t>(parsed_position);
-  }
-  if (!supported_features_str.empty()) {
-    int parsed_features = 0;
-    if (!str_to_int(supported_features_str, parsed_features)) return;
-    supported_features = static_cast<uint8_t>(parsed_features);
-  }
+  const bool position_known = !position_str.empty() && str_to_percentage(position_str, position);
+  if (!str_to_int(supported_features_str, supported_features) ||
+      supported_features < 0 || supported_features > UINT16_MAX) supported_features = 0;
 
   // see: https://github.com/home-assistant/core/blob/dev/homeassistant/components/cover/__init__.py#L112
   // OPEN
   if (supported_features & 0b1) {
-    if (position != 100 && !((me_->is_state(entity_state::open) ||
-        me_->is_state(entity_state::unknown)) &&
-        position_str.empty())) {
+    if (position_known ? position != 100 : !(me_->is_state(entity_state::open) ||
+                                              me_->is_state(entity_state::unknown))) {
       icon_up_status = true;
     }
     if (cover_icons_found)
@@ -191,9 +178,8 @@ void EntitiesCardEntityItem::state_cover_fn(StatefulPageItem *me) {
   me_->value_.append(1, '|');
   // CLOSE
   if (supported_features & 0b10) {
-    if (position != 0 && !((me_->is_state(entity_state::closed) ||
-        me_->is_state(entity_state::unknown)) &&
-        position_str.empty())) {
+    if (position_known ? position != 0 : !(me_->is_state(entity_state::closed) ||
+                                            me_->is_state(entity_state::unknown))) {
       icon_down_status = true;
     }
     if (cover_icons_found)
@@ -286,46 +272,46 @@ void EntitiesCardEntityItem::state_translate_fn(StatefulPageItem *me) {
   me_->value_ = ret;
 }
 
-void EntitiesCardEntityItem::set_on_state_callback_(const char *type) {
-  if (type == entity_type::light ||
-      type == entity_type::switch_ ||
-      type == entity_type::input_boolean ||
-      type == entity_type::automation ||
-      type == entity_type::fan) {
+void EntitiesCardEntityItem::set_on_state_callback_() {
+  if (this->is_type(entity_type::light) ||
+      this->is_type(entity_type::switch_) ||
+      this->is_type(entity_type::input_boolean) ||
+      this->is_type(entity_type::automation) ||
+      this->is_type(entity_type::fan)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_on_off_fn;
   } else if (
-      type == entity_type::button ||
-      type == entity_type::input_button ||
-      type == entity_type::navigate) {
+      this->is_type(entity_type::button) ||
+      this->is_type(entity_type::input_button) ||
+      this->is_type(entity_type::navigate)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_button_fn;
-  } else if (type == entity_type::scene) {
+  } else if (this->is_type(entity_type::scene)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_scene_fn;
   } else if (
-      type == entity_type::script ||
-      type == entity_type::service) {
+      this->is_type(entity_type::script) ||
+      this->is_type(entity_type::service)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_script_fn;
-  } else if (type == entity_type::timer) {
+  } else if (this->is_type(entity_type::timer)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_timer_fn;
-  } else if (type == entity_type::cover) {
+  } else if (this->is_type(entity_type::cover)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_cover_fn;
-  } else if (type == entity_type::climate) {
+  } else if (this->is_type(entity_type::climate)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_climate_fn;
   } else if (
-      type == entity_type::number ||
-      type == entity_type::input_number) {
+      this->is_type(entity_type::number) ||
+      this->is_type(entity_type::input_number)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_number_fn;
-  } else if (type == entity_type::lock) {
+  } else if (this->is_type(entity_type::lock)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_lock_fn;
-  } else if (type == entity_type::weather) {
+  } else if (this->is_type(entity_type::weather)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_weather_fn;
-  } else if (type == entity_type::sun) {
+  } else if (this->is_type(entity_type::sun)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_sun_fn;
-  } else if (type == entity_type::vacuum) {
+  } else if (this->is_type(entity_type::vacuum)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_vacuum_fn;
   } else if (
-      type == entity_type::person ||
-      type == entity_type::alarm_control_panel ||
-      type == entity_type::binary_sensor) {
+      this->is_type(entity_type::person) ||
+      this->is_type(entity_type::alarm_control_panel) ||
+      this->is_type(entity_type::binary_sensor)) {
     this->on_state_callback_ = EntitiesCardEntityItem::state_translate_fn;
   } else {
     this->on_state_callback_ = EntitiesCardEntityItem::state_generic_fn;

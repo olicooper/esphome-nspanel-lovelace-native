@@ -187,17 +187,15 @@ protected:
   }
 
   bool process_data_();
-  const std::string &try_replace_uuid_with_entity_id_(const std::string &uuid_or_entity_id);
+  const std::string *try_replace_uuid_with_entity_id_(const std::string &internal_id);
   void process_command_(const std::string &message);
   void send_buffered_command_();
   void process_display_command_queue_();
-  void process_button_press_(std::string &entity_id,
+  void process_button_press_(const std::string &entity_id,
     const std::string &button_type,
     const std::string &value = "", bool called_from_timeout = false);
-  void set_mode_from_index_(const std::string &entity_type,
-    const std::string &entity_id, ha_attr_type attr_type,
-    ha_action_type action_type, const std::string &data_key,
-    const std::string &value);
+  std::string get_mode_from_index_(const std::string &entity_id, ha_attr_type attr_type, const std::string &value);
+  StatefulPageItem* get_current_page_item_(const std::string &uuid);
   StatefulPageItem* get_page_item_(const std::string &uuid);
   Entity* get_entity_(const std::string &entity_id);
 
@@ -209,11 +207,10 @@ protected:
   void render_popup_notify_page_(const std::string &internal_id,
     const std::string &heading, const std::string &message, uint16_t timeout = 0U,
     const std::string &btn1_text = "", const std::string &btn2_text = "");
-  void render_popup_page_(const std::string &internal_id);
-  bool render_popup_page_update_(const std::string &internal_id);
-  bool render_popup_page_update_(StatefulPageItem *entity);
+  void render_popup_page_(const std::string &detail, const std::string &internal_id);
+  bool render_popup_page_update_(StatefulPageItem *entity, bool opening = false, bool input_select = false);
   void render_light_detail_update_(StatefulPageItem *entity);
-  void render_timer_detail_update_(StatefulPageItem *entity);
+  bool render_timer_detail_update_(StatefulPageItem *item);
   void render_cover_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(StatefulPageItem *item);
   void render_climate_detail_update_(Entity *entity, const std::string &uuid = "");
@@ -270,6 +267,7 @@ protected:
 
   PageManager page_mgr_;
   std::string popup_page_current_uuid_;
+  bool popup_is_input_select_ = false;
   bool force_current_page_update_ = false;
   bool global_vertical_ui_{false};
   std::vector<std::shared_ptr<Entity>> entities_;
@@ -281,6 +279,7 @@ protected:
   CallbackManager<void(std::string)> incoming_msg_callback_;
 
   std::vector<uint8_t> buffer_;
+  uint32_t rx_last_byte_ms_ = 0;
   std::string command_buffer_;
 
 #ifdef USE_NSPANEL_TFT_UPLOAD

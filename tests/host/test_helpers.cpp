@@ -101,6 +101,16 @@ static void test_str_to_number() {
   check(str_to_double("2.25", parsed_d) && parsed_d == 2.25,
         "str_to_double: decimal value");
 
+  check(!str_to_int(std::string("0\0x", 3), parsed), "int rejects embedded NUL");
+  check(str_to_int(std::to_string(INT_MIN), parsed) && parsed == INT_MIN, "int minimum");
+  check(str_to_int(std::to_string(INT_MAX), parsed) && parsed == INT_MAX, "int maximum");
+  check(!str_to_float(std::string("1\0x", 3), parsed_f), "float rejects embedded NUL");
+  check(!str_to_double(std::string("1\0x", 3), parsed_d), "double rejects embedded NUL");
+  check(!str_to_float("1e-999", parsed_f), "float rejects underflow");
+  check(!str_to_double("1e-999", parsed_d), "double rejects underflow");
+  check(!str_to_float("nan", parsed_f), "float rejects NaN");
+  check(!str_to_double("inf", parsed_d), "double rejects infinity");
+
   // strtol saturates at LONG_MAX, but our wrapper rejects overflow so callers
   // never act on a wrapped value. ESP-IDF's std::stoi would have thrown and
   // aborted under -fno-exceptions. Pinned so a later change to allow overflow

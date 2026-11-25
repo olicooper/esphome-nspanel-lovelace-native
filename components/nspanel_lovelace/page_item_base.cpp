@@ -213,7 +213,7 @@ void StatefulPageItem::on_entity_type_change(const char *type) {
   }
   this->icon_value_overridden_ = false;
 
-  this->set_on_state_callback_(type);
+  this->set_on_state_callback_();
 
   this->set_render_invalid();
 
@@ -256,30 +256,30 @@ void StatefulPageItem::on_entity_attribute_change(ha_attr_type attr, const std::
   this->set_render_invalid();
 }
 
-void StatefulPageItem::set_on_state_callback_(const char *type) {
-  if (type == entity_type::light ||
-      type == entity_type::switch_ ||
-      type == entity_type::input_boolean ||
-      type == entity_type::automation ||
-      type == entity_type::fan) {
+void StatefulPageItem::set_on_state_callback_() {
+  if (this->is_type(entity_type::light) ||
+      this->is_type(entity_type::switch_) ||
+      this->is_type(entity_type::input_boolean) ||
+      this->is_type(entity_type::automation) ||
+      this->is_type(entity_type::fan)) {
     this->on_state_callback_ = StatefulPageItem::state_on_off_fn;
-  } else if (type == entity_type::binary_sensor) {
+  } else if (this->is_type(entity_type::binary_sensor)) {
     this->on_state_callback_ = StatefulPageItem::state_binary_sensor_fn;
-  } else if (type == entity_type::cover) {
+  } else if (this->is_type(entity_type::cover)) {
     this->on_state_callback_ = StatefulPageItem::state_cover_fn;
-  } else if (type == entity_type::climate) {
+  } else if (this->is_type(entity_type::climate)) {
     this->on_state_callback_ = StatefulPageItem::state_climate_fn;
-  } else if (type == entity_type::media_player) {
+  } else if (this->is_type(entity_type::media_player)) {
     this->on_state_callback_ = StatefulPageItem::state_media_fn;
-  } else if (type == entity_type::sun) {
+  } else if (this->is_type(entity_type::sun)) {
     this->on_state_callback_ = StatefulPageItem::state_sun_fn;
-  } else if (type == entity_type::alarm_control_panel) {
+  } else if (this->is_type(entity_type::alarm_control_panel)) {
     this->on_state_callback_ = StatefulPageItem::state_alarm_fn;
-  } else if (type == entity_type::lock) {
+  } else if (this->is_type(entity_type::lock)) {
     this->on_state_callback_ = StatefulPageItem::state_lock_fn;
-  } else if (type == entity_type::weather) {
+  } else if (this->is_type(entity_type::weather)) {
     this->on_state_callback_ = StatefulPageItem::state_weather_fn;
-  } else if (type == entity_type::timer) {
+  } else if (this->is_type(entity_type::timer)) {
     this->on_state_callback_ = StatefulPageItem::state_timer_fn;
   }
 }

@@ -11,6 +11,19 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
+class Entity;
+
+struct ThermostatControls {
+  explicit ThermostatControls(const Entity *entity);
+  bool normalize(int &low, int &high) const;
+
+  int min = INT16_MIN;
+  int max = INT16_MAX;
+  int step = 5;
+  int display_min = 0;
+  int display_max = 0;
+};
+
 struct IEntitySubscriber {
 public:
   virtual ~IEntitySubscriber() {}
@@ -47,8 +60,10 @@ public:
   // since that temporary only lives until the end of the caller's full-expression.
   std::string get_attribute(ha_attr_type attr, const std::string &default_value) const;
   void set_attribute(ha_attr_type attr, const std::string &value);
+  const std::vector<std::string> &get_effects() const { return effects_; }
 
 protected:
+  std::vector<std::string> effects_;
   std::string entity_id_;
   const char *type_ = nullptr;
   bool type_overridden_ = false;

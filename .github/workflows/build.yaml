@@ -10,7 +10,7 @@ on:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
       - "*example.yaml"
-      - "ci/*.yaml"
+      - "ci/**"
       - "tests/**"
 
   pull_request:
@@ -20,7 +20,7 @@ on:
       - "components/nspanel_lovelace/**"
       - ".github/workflows/build.yaml"
       - "*example.yaml"
-      - "ci/*.yaml"
+      - "ci/**"
       - "tests/**"
 
 jobs:
@@ -48,3 +48,22 @@ jobs:
       run: |
         cp secrets-example.yaml secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
+
+  unittest:
+    name: Test (floor)
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/esphome/esphome:2026.11.0
+    steps:
+    - uses: actions/checkout@v6
+    - name: Copy test secrets
+      run: |
+        cp secrets-example.yaml secrets.yaml
+    - name: Install pytest
+      run: python -m pip install --quiet pytest
+    - name: Run unit and codegen generation tests
+      run: python -m pytest -q tests
+    - name: Compile codegen fixture
+      run: esphome compile ci/codegen.yaml
+    - name: Compile codegen fixture (TFT upload disabled)
+      run: esphome compile ci/codegen-no-tft.yaml

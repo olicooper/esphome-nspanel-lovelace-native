@@ -80,7 +80,7 @@ uart:
 time:
   - platform: homeassistant
     id: homeassistant_time
-    timezone: Europe/London
+    timezone: America/New_York
 
 switch:
   ## Physical relay 1

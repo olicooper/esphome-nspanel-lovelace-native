@@ -43,13 +43,21 @@ The NSPanel has on-board PSRAM which this project makes use of automatically, wh
 - Icon values can be an icon name or hex value (e.g. `hex:E549`). A list of icons can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
 - Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value and convert it to a number (e.g. `#ce79` -> `52857`).
 
+### Sleep timeouts
+
+The `sleep_timeout` values (top-level and per-card) are limited to `0`-`65` seconds because the HMI firmware protocol caps the screensaver timeout at 65s. Values `66`-`120` were previously accepted for per-card timeouts but are now rejected. `0` disables the screensaver for that timeout.
+
+### Custom translations
+
+`locale.language` is either a bundled language code (e.g. `en`, `de`) or a custom translation file. Custom files are resolved **relative to the directory of the top-level YAML configuration** (e.g. `language: translations/custom.json` next to the config), or as an absolute path. If the file is not found there, the legacy working-directory path is still tried and a warning is logged — place the file next to the configuration instead. The file must be a JSON object of string keys to string values containing all the bundled translation keys (see `components/nspanel_lovelace/translations/en.json`); extra keys are allowed. Translation problems are reported at `locale.language` during `esphome config`, before compilation.
+
 
 # Help Needed!
 
 As much as I love embedded programming, I am unable to dedicate the time required to make this project great without the help of others.
 This is a **beta project** which is not fully functional yet and is subject to change without notice. It has taken a lot of time and effort to get the project to this point and it will take a lot more time to get the project past beta.
 
-There are many UI components missing and the [python build script](components/nspanel_lovelace/__init__.py) is in dire need of refactoring (I butchered it together to get it working but PRs to the ESPHome repo are required to provide more flexibility over code generation).
+There are many UI components missing. The [python build script](components/nspanel_lovelace/__init__.py) has since been hardened — stricter config validation, correct codegen and build-flag handling, with unit tests run against a pinned ESPHome floor (2026.11.0) — but it is still a single ~1000-line module: a full structural refactor (splitting validation, codegen and resource handling) is still planned, and PRs to the ESPHome repo are still required for deeper code-generation flexibility.
 
 Currently the following features work:
 - Screensaver with time, date, weather and status icon display

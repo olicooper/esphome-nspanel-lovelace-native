@@ -85,7 +85,10 @@ bool NSPanelLovelace::save_state_() {
 }
 
 void NSPanelLovelace::setup() {
+#ifdef USE_NSPANEL_TFT_UPLOAD
+  // Member is only declared when the uploader is compiled in.
   this->default_baud_rate_ = this->parent_->get_baud_rate();
+#endif
 
   this->restore_state_();
 

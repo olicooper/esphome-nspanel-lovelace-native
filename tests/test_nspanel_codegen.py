@@ -178,10 +178,13 @@ def _build_dir(tmp_path: Path, name: str) -> Path:
 
 
 def test_codegen_test_device_mode_disables_psram(tmp_path: Path) -> None:
-    """esphome.build_flags: [-DTEST_DEVICE_MODE] (the location test.yaml
-    actually uses) must skip the component's PSRAM SDK settings and defines."""
-    generate_synthetic(tmp_path, _TRANSLATION_CARD, "test-device",
-                       esphome_extra="  build_flags:\n    - -DTEST_DEVICE_MODE")
+    """esphome.build_flags (the location test.yaml uses) must skip the
+    component's PSRAM SDK settings and defines. The flag is spelled as a
+    combined entry to prove has_build_define agrees with ESPHome's
+    shell-lexing of build flags end to end."""
+    generate_synthetic(
+        tmp_path, _TRANSLATION_CARD, "test-device",
+        esphome_extra="  build_flags:\n    - -DTEST_DEVICE_MODE -DOTHER")
     build = _build_dir(tmp_path, "test-device")
     sdk = (build / "sdkconfig.test-device").read_text()
     assert "CONFIG_SPIRAM_USE_MALLOC=y" not in sdk
@@ -305,11 +308,12 @@ def test_codegen_baseline() -> None:
     ), "named tile must generate the escaped display name"
 
     # All 'hiking' tiles (two card tiles + the left status icon) share one
-    # CUSTOM_ICONS slot (ED7E) and reference it three times; built-in icons
-    # stay on the enum path.
+    # CUSTOM_ICONS slot (ED7E) and reference it four times: the left status
+    # icon uses it in its constructor (default) and in its override setter.
+    # Built-in icons stay on the enum path.
     assert src.count('u8"\\uED7E"') == 1
     assert "#define CUSTOM_ICONS_SIZE 1" in defines
-    assert src.count("CUSTOM_ICONS[0]") == 3
+    assert src.count("CUSTOM_ICONS[0]") == 4
 
     # The hidden card is marked hidden exactly once.
     assert src.count("set_hidden(true)") == 1
@@ -337,6 +341,11 @@ def test_codegen_baseline() -> None:
         src,
     )) == 1
     assert "set_alt_font(true)" in src
+    # The left icon's configured glyph and color are re-applied through the
+    # setters (override flags) after construction, so the entity type
+    # mapping and state callbacks cannot discard them at runtime.
+    assert re.search(r'\w+->set_icon_value\(CUSTOM_ICONS\[0\]\)', src)
+    assert src.count("set_icon_color(0)") == 1
 
     # Weather uses the raw entity string, not create_entity; the fixture's
     # forecast_method 'service' emits both service defines.
@@ -399,6 +408,38 @@ def test_codegen_status_icon_color_only(tmp_path: Path) -> None:
         r'nspanel_e\d+, (?:nspanel_lovelace::)?icon_t::alert_circle_outline, 300u\)',
         src,
     )) == 1
+    # The configured color is re-applied as an override so the state
+    # callbacks (which recolor known entity types) cannot discard it.
+    assert src.count("set_icon_color(300)") == 1
+    assert "set_icon_value(" not in src  # no icon configured -> no setter
+    assert_no_none_tokens(src)
+
+
+def test_codegen_status_icon_override_setters(tmp_path: Path) -> None:
+    """Explicitly configured status-icon glyph and color must be applied
+    through the setters after construction: the constructor only takes
+    defaults, and on_entity_type_change() and the state callbacks replace
+    the defaults for known entity types (light), so constructor-only values
+    are silently discarded at runtime."""
+    body = """\
+  screensaver:
+    status_icon_left:
+      entity_id: light.lamp_a
+      icon:
+        value: hiking
+        color: 0
+"""
+    src = generate_synthetic(tmp_path, body, "status-override")
+    ctor = re.search(
+        r'make_shared<nspanel_lovelace::StatusIconItem>\("[0-9]+", '
+        r'nspanel_e\d+, CUSTOM_ICONS\[\d+\], 0u\)',
+        src,
+    )
+    assert ctor, "configuring icon+color must keep the 4-arg constructor"
+    icon_setter = re.search(r'\w+->set_icon_value\(CUSTOM_ICONS\[\d+\]\)', src)
+    assert icon_setter, "configured glyph must be applied via set_icon_value"
+    assert icon_setter.start() > ctor.start(), "setter must follow construction"
+    assert src.count("set_icon_color(0)") == 1
     assert_no_none_tokens(src)
 
 

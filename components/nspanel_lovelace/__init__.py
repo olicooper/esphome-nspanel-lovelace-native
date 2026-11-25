@@ -193,27 +193,26 @@ def load_icons():
     _LOGGER.info(f"[nspanel_lovelace] Loaded {str(len(iconJson))} icons")
 
 def has_build_define(esphome_config: dict, name: str) -> bool:
-    """True when a build-flag entry is exactly ``-D<name>`` or ``-D<name>=...``.
+    """True when a build flag defines ``name``.
 
-    Checks the modern ``esphome.build_flags`` location and the legacy
-    ``platformio_options.build_flags`` location (list or scalar). A scalar is
-    a single entry (ESPHome's floor behaviour) and entries are matched
-    exactly - no substring matching.
+    Flag entries are shell-lexed the way ESPHome's floor version (2026.11.0)
+    lexes them before compiling (esphome.platformio.library.lex_build_flags):
+    one entry may hold several whitespace-separated flags, and a bare ``-D``
+    is re-glued with its argument. A lexed token defines ``name`` when it is
+    exactly ``-D<name>`` or ``-D<name>=...`` - no substring matching. Checks
+    the modern ``esphome.build_flags`` location and the legacy
+    ``platformio_options.build_flags`` location (list or scalar).
     """
-    flag = f"-D{name}"
-    def entries(value):
-        if value is None:
-            return []
-        if isinstance(value, str):
-            return [value]
-        return list(value)
+    from esphome.platformio.library import lex_build_flags
     locations = [esphome_config.get(CONF_BUILD_FLAGS)]
     pio = esphome_config.get(CONF_PLATFORMIO_OPTIONS)
     if isinstance(pio, dict):
         locations.append(pio.get("build_flags"))
     for loc in locations:
-        for entry in entries(loc):
-            if entry == flag or entry.startswith(flag + "="):
+        if not loc:
+            continue
+        for token in lex_build_flags(loc, "esphome.build_flags"):
+            if token == f"-D{name}" or token.startswith(f"-D{name}="):
                 return True
     return False
 
@@ -412,16 +411,29 @@ SCHEMA_STATUS_ICON = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
 
+def valid_screensaver_weather(config):
+    """The weather entity domain depends on forecast_method: the documented
+    legacy 'template_sensor' mode accepts a sensor (README fallback) or a
+    weather entity, while 'service' mode requires a weather entity."""
+    config = cv.Schema({
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor', 'weather']),
+        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
+    })(config)
+    if config[CONF_SCREENSAVER_FORECAST_METHOD] == "service" and \
+            not config[CONF_ENTITY_ID].startswith("weather."):
+        raise cv.Invalid(
+            "forecast_method 'service' requires a weather entity (weather.<name>)",
+            [CONF_ENTITY_ID],
+        )
+    return config
+
 SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
     cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
     cv.Optional(CONF_SCREENSAVER_DATE_FORMAT, default="%A, %d. %B %Y"): valid_clock_format('Date format'),
     cv.Optional(CONF_SCREENSAVER_TIME_FORMAT, default="%H:%M"): valid_clock_format('Time format'),
     cv.Optional(CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK, default=False): cv.boolean,
-    cv.Optional(CONF_SCREENSAVER_WEATHER): cv.Schema({
-        cv.Required(CONF_ENTITY_ID): valid_entity_id(['weather']),
-        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
-    }),
+    cv.Optional(CONF_SCREENSAVER_WEATHER): valid_screensaver_weather,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_LEFT): SCHEMA_STATUS_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
@@ -710,26 +722,38 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
 
         cg.add(card_variable.add_item(entity_class))
 
-def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, default_icon_value: str = 'alert-circle-outline'):
+def get_status_icon_statement(icon_config, icon_class: cg.MockObjClass, variable_name: str, default_icon_value: str = 'alert-circle-outline') -> cg.MockObjClass:
     entity_id = get_entity_id(icon_config.get(CONF_ENTITY_ID))
     default_icon_value = get_icon(get_icon_hex(default_icon_value))
     attrs = generate_icon_config(icon_config.get(CONF_ICON, {}))
-    # return icon_class.__call__(get_new_uuid(), entity_id, attrs["value"], attrs["color"])
-    # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
-    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
     # generate_icon_config converts a configured icon string to an expression
     # (icon_t:: enum or CUSTOM_ICONS[n]), so "configured" must be tested on
     # whether a value exists, not on its type.
     has_icon = attrs["value"] is not None
     has_color = isinstance(attrs["color"], int)
+    # todo: esphome is escaping the icon value (e.g. u8"\uE598") due to cpp_string_escape, so having to build a raw statement instead.
+    basicstr = f'{make_shared.template(icon_class)}("{get_new_uuid()}", {entity_id}'
     if has_icon and has_color:
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)')
+        stmt = f'{basicstr}, {attrs["value"]}, {attrs["color"]}u)'
     elif has_icon:
-        return cg.RawStatement(f'{basicstr}, {attrs["value"]})')
+        stmt = f'{basicstr}, {attrs["value"]})'
     elif has_color:
-        return cg.RawStatement(f'{basicstr}, {default_icon_value}, {attrs["color"]}u)')
+        stmt = f'{basicstr}, {default_icon_value}, {attrs["color"]}u)'
     else:
-        return cg.RawStatement(f'{basicstr}, {default_icon_value})')
+        stmt = f'{basicstr}, {default_icon_value})'
+    cg.add(cg.RawExpression(f"auto {variable_name} = {stmt}"))
+    variable_class = cg.global_ns.class_(variable_name)
+    variable_class.op = '->'
+    # The constructor arguments are defaults only: on_entity_type_change()
+    # replaces the glyph for known entity types and the state callbacks
+    # recolor it. Re-apply explicitly configured values through the setters,
+    # which set the *_overridden_ flags those callbacks respect, otherwise
+    # the configured values are silently discarded at runtime.
+    if has_icon:
+        cg.add(cg.RawStatement(f'{variable_name}->set_icon_value({attrs["value"]});'))
+    if has_color:
+        cg.add(variable_class.set_icon_color(attrs["color"]))
+    return variable_class
 
 async def to_code(config):
     # note: not using 'psram' dependency because our sdkconfig options conflict
@@ -860,26 +884,18 @@ async def to_code(config):
 
         if CONF_SCREENSAVER_STATUS_ICON_LEFT in screensaver_config:
             left_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_LEFT]
-            screensaver_left_icon = get_status_icon_statement(
-                left_icon_config, 
-                StatusIconItem)
             iconleft_variable = screensaver_info[0] + "_iconleft"
-            cg.add(cg.RawExpression(f"auto {iconleft_variable} = {screensaver_left_icon}"))
-            iconleft_variable_class = cg.global_ns.class_(iconleft_variable)
-            iconleft_variable_class.op = '->'
+            iconleft_variable_class = get_status_icon_statement(
+                left_icon_config, StatusIconItem, iconleft_variable)
             if left_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconleft_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_left(iconleft_variable_class))
 
         if CONF_SCREENSAVER_STATUS_ICON_RIGHT in screensaver_config:
             right_icon_config = screensaver_config[CONF_SCREENSAVER_STATUS_ICON_RIGHT]
-            screensaver_right_icon = get_status_icon_statement(
-                right_icon_config, 
-                StatusIconItem)
             iconright_variable = screensaver_info[0] + "_iconright"
-            cg.add(cg.RawExpression(f"auto {iconright_variable} = {screensaver_right_icon}"))
-            iconright_variable_class = cg.global_ns.class_(iconright_variable)
-            iconright_variable_class.op = '->'
+            iconright_variable_class = get_status_icon_statement(
+                right_icon_config, StatusIconItem, iconright_variable)
             if right_icon_config.get(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT, False):
                 cg.add(iconright_variable_class.set_alt_font(True))
             cg.add(screensaver_class.set_icon_right(iconright_variable_class))

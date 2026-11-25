@@ -57,3 +57,5 @@ jobs:
       run: python -m pytest -q tests
     - name: Compile codegen fixture
       run: esphome compile ci/codegen.yaml
+    - name: Compile codegen fixture (TFT upload disabled)
+      run: esphome compile ci/codegen-no-tft.yaml

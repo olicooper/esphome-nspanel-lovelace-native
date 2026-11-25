@@ -1,10 +1,13 @@
 """Unit tests for the nspanel_lovelace has_build_define helper.
 
-A flag is set when a build-flag entry is exactly ``-D<name>`` or
-``-D<name>=...`` (no substring matching). Both the modern
+A token defines ``name`` when it is exactly ``-D<name>`` or
+``-D<name>=...`` (no substring matching). Entries are shell-lexed the way
+ESPHome 2026.11.0 lexes them before passing to the compiler
+(esphome.platformio.library.lex_build_flags): a single entry may hold
+several whitespace-separated flags, surrounding whitespace is ignored, and
+a bare ``-D`` is re-glued with its argument. Both the modern
 ``esphome.build_flags`` location and the legacy
-``platformio_options.build_flags`` location are checked. A scalar value is
-a single entry (ESPHome's floor behaviour), not split on whitespace.
+``platformio_options.build_flags`` location are checked (list or scalar).
 
 Run inside the approved ESPHome 2026.11.0 runner image.
 """
@@ -33,8 +36,14 @@ def load_component():
     ({"build_flags": []}, "TEST_DEVICE_MODE", False),
     ({"build_flags": ""}, "TEST_DEVICE_MODE", False),
     ({"build_flags": "-DTEST_DEVICE_MODE"}, "TEST_DEVICE_MODE", True),
-    # a scalar is one entry (no whitespace splitting)
-    ({"build_flags": "-DTEST_DEVICE_MODE -DOTHER"}, "TEST_DEVICE_MODE", False),
+    # entries are shell-lexed (ESPHome 2026.11.0): a scalar or one entry may
+    # hold several flags, surrounding whitespace is ignored, and a bare -D is
+    # re-glued with its argument
+    ({"build_flags": "-DTEST_DEVICE_MODE -DOTHER"}, "TEST_DEVICE_MODE", True),
+    ({"build_flags": ["-DOTHER -DTEST_DEVICE_MODE"]}, "TEST_DEVICE_MODE", True),
+    ({"build_flags": ["-DOTHER -DTEST_DEVICE_MODE_EXTRA"]}, "TEST_DEVICE_MODE", False),
+    ({"build_flags": ["  -DTEST_DEVICE_MODE  "]}, "TEST_DEVICE_MODE", True),
+    ({"build_flags": ["-D TEST_DEVICE_MODE"]}, "TEST_DEVICE_MODE", True),
     # legacy location: platformio_options.build_flags, list or scalar
     ({"platformio_options": {"build_flags": ["-DTEST_DEVICE_MODE"]}}, "TEST_DEVICE_MODE", True),
     ({"platformio_options": {"build_flags": "-DTEST_DEVICE_MODE=1"}}, "TEST_DEVICE_MODE", True),

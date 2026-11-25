@@ -385,6 +385,33 @@ def test_entity_id_pseudo_entities_generic_tile() -> None:
         tile("delete.something")  # 'delete' is an exact sentinel
 
 
+def test_weather_entity_domain_by_forecast_mode(tmp_path: Path) -> None:
+    """The weather entity domain depends on forecast_method: the documented
+    legacy 'template_sensor' mode accepts sensor.* (README fallback) and
+    weather.* (test.yaml), while 'service' mode requires weather.*."""
+    def weather_cfg(eid: str, mode: str) -> str:
+        return f"""\
+  screensaver:
+    weather:
+      entity_id: {eid}
+      forecast_method: {mode}
+"""
+    for eid, mode in (
+        ("sensor.forecast_daily", "template_sensor"),  # documented legacy path
+        ("weather.forecast_home", "template_sensor"),  # test.yaml shape
+        ("weather.forecast_home", "service"),
+    ):
+        result = esphome_config(tmp_path, weather_cfg(eid, mode), name=f"w-ok-{mode[:4]}")
+        assert result.returncode == 0, (
+            f"{eid} + forecast_method {mode} should validate:\n{result.stdout}"
+        )
+    result = esphome_config(
+        tmp_path, weather_cfg("sensor.forecast_daily", "service"), name="w-bad"
+    )
+    assert result.returncode != 0
+    assert "weather entity" in result.stdout + result.stderr
+
+
 def test_duplicate_card_ids_rejected(tmp_path: Path) -> None:
     """A duplicate explicit card id must fail at the second id, not silently
     overwrite the card_ids entry for the first."""

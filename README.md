@@ -28,7 +28,7 @@ Thanks to [NSPanel Lovelace UI](https://github.com/joBr99/nspanel-lovelace-ui), 
 - **ESPHome 2026.11.0 or newer.** The minimum may increase as the fork moves forward; older releases are not maintained.
 - **ESP-IDF**, not Arduino. The NSPanel's PSRAM is on non-standard pins that ESP-IDF can configure.
 - **HMI TFT firmware version `52` or `53`** on the screen. See [TFT firmware and upload](docs/tft-upload.md).
-- **Home Assistant** for entity states, weather forecasts, and (with PR #12) service calls.
+- **Home Assistant** for entity states, weather forecasts, and service calls.
 
 The fork supports one or two previous monthly releases where practical, with no commitment to future releases ahead of their release. Version policy and CI coverage are in [Development and CI](docs/development.md).
 
@@ -70,7 +70,7 @@ On-board PSRAM is used automatically and configured during code generation with 
 
 - [Power Card (`cardPower`)](docs/card-power.md) — home energy overview with up to six surrounding entities.
 - [Screensaver weather](docs/screensaver-weather.md) — daily forecasts, the lost-reply limitation, and the opt-in restart workaround.
-- [Arbitrary service-call tiles](docs/service-call-tiles.md) — call any Home Assistant service from a `service.*` tile. Pending PR #12; not yet on `dev`.
+- [Arbitrary service-call tiles](docs/service-call-tiles.md) — call any Home Assistant service from a `service.*` tile.
 
 Working cards: `cardGrid`, `cardGrid2`, `cardEntities`, `cardQR`, `cardAlarm`, `cardThermo`, `cardMedia`, `cardPower`. Most entity types display on cards; lights, switches, sensors and scenes are tested, along with `popupLight` and `popupTimer`. `cardUnlock` and `cardChart` are not supported yet. See the [HMI readme](https://github.com/joBr99/nspanel-lovelace-ui/tree/main/HMI) for card details.
 

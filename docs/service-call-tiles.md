@@ -11,9 +11,7 @@ A tile with an `entity_id` in the `service.*` domain can call any Home Assistant
     command: [standby]
 ```
 
-> **Status:** this feature is added by PR #12 and is not yet available on `dev`. The worked tile in the [advanced example](../examples/advanced-example.yaml) lands with that PR.
-
-Give each distinct action its own `service.*` tile id.
+Give each distinct action its own `service.*` tile id. A worked tile is in the [advanced example](../examples/advanced-example.yaml).
 
 ## Configuration rules
 

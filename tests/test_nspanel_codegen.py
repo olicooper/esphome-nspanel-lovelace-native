@@ -718,6 +718,34 @@ def test_codegen_manual_card_entity_domains(tmp_path: Path) -> None:
         assert f'create_entity("{eid}")' in src, eid
 
 
+def test_codegen_service_tile_emits_data_maps(tmp_path: Path) -> None:
+    """A service tile must emit its service name, plain string data and
+    non-string data as a Python-literal template value; ordinary tiles emit
+    no service setter at all."""
+    body = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: remote.send_command
+          data:
+            entity_id: remote.basement_rx_v773_main_remote
+            command: [standby, volume_up]
+            label: 😀
+        - entity_id: light.kitchen
+"""
+    src = generate_synthetic(tmp_path, body, "service-tile-codegen")
+    assert src.count("set_ha_service(") == 1, src
+    assert 'nspanel_e0->set_ha_service("remote.send_command"' in src
+    assert '{"entity_id", "remote.basement_rx_v773_main_remote"}' in src
+    assert '{"command", "[\'standby\', \'volume_up\']"}' in src
+    assert '"\\360\\237\\230\\200"' in src
+    assert "\\ud83d" not in src
+    assert_no_none_tokens(src)
+
+
 def test_codegen_s3_board_override(tmp_path: Path) -> None:
     """The S3 board override from the old manual device config must still
     validate and generate code (a dropped board definition or ESP-IDF

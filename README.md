@@ -41,6 +41,21 @@ When uploading a TFT:
 
 A basic configuration can be found in the [basic example](examples/basic-example.yaml), but you'll probably also want to look at the [advanced example](examples/advanced-example.yaml) which shows the features currently available. This is loosely based on the appdaemon configuration format ([found here](https://github.com/joBr99/nspanel-lovelace-ui/blob/v4.3.3/appdaemon/apps-simple.yaml)) to make it easier to transition to this native ESPHome solution, but please don't expect this to translate exactly as it is not possible to make it work in the exact same way given the limitations of the ESP32.
 
+### Arbitrary service tiles
+
+A tile with an `entity_id` in the `service.*` domain can call any Home Assistant service when tapped:
+
+```yaml
+- entity_id: service.power_off
+  name: Standby
+  service: remote.send_command
+  data:
+    entity_id: remote.example_remote
+    command: [standby]
+```
+
+`service` is a lowercase `domain.service_name` string and is only valid on a `service.*` tile. `data` is required on those tiles and must contain a string `entity_id`. String values are sent as-is; lists, numbers and booleans are sent through HA's `data_template` as Python literals, so they arrive as their original type. This depends on the Home Assistant version parsing rendered template results; builds without that parsing deliver the literal text instead. Give each distinct action its own `service.*` tile id. See the [advanced example](examples/advanced-example.yaml) for a worked tile.
+
 ## PSRAM
 
 The NSPanel has on-board PSRAM which this project makes use of automatically, which means that the `psram` component is unavailable because the PSRAM is configured during code generation by adding specific `sdkconfig_options`. The ESP-IDF framework is required; Arduino is not supported as it is not possible to customise the PSRAM pins for the Arduino framework build.

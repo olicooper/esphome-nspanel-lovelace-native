@@ -85,6 +85,15 @@ bool Entity::remove_subscriber(const IEntitySubscriber *const target) {
 
 const std::string &Entity::get_entity_id() const { return this->entity_id_; }
 
+void Entity::set_ha_service(
+    const std::string &service,
+    const std::map<std::string, std::string> &data,
+    const std::map<std::string, std::string> &data_template) {
+  this->ha_service_ = service;
+  this->ha_service_data_ = data;
+  this->ha_service_data_template_ = data_template;
+}
+
 void Entity::set_entity_id(const std::string &entity_id) {
   if (entity_id.empty()) return;
 

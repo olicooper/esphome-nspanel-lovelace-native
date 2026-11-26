@@ -413,6 +413,13 @@ void setup() {
   //     - entities:
   //         - entity_id: light.kitchen
   //           icon: hiking
+  //         - data:
+  //             command:
+  //               - standby
+  //             entity_id: remote.basement_rx_v773_main_remote
+  //           entity_id: service.power_off
+  //           name: Power off
+  //           service: remote.send_command
   //         - entity_id: navigate.hidden_card
   //         - entity_id: delete
   //         - entity_id: iText.Hello
@@ -555,22 +562,23 @@ void setup() {
   nspanel->set_global_vertical_ui(false);
   nspanel->set_language("unknown");
   auto nspanel_e0 = nspanel->create_entity("light.kitchen");
-  auto nspanel_e1 = nspanel->create_entity("navigate.hidden_card");
-  auto nspanel_e2 = nspanel->create_entity("iText.Hello");
-  auto nspanel_e3 = nspanel->create_entity("sensor.demo_hidden");
-  auto nspanel_e4 = nspanel->create_entity("light.demo_left");
-  auto nspanel_e5 = nspanel->create_entity("binary_sensor.demo_right");
+  auto nspanel_e1 = nspanel->create_entity("service.power_off");
+  auto nspanel_e2 = nspanel->create_entity("navigate.hidden_card");
+  auto nspanel_e3 = nspanel->create_entity("iText.Hello");
+  auto nspanel_e4 = nspanel->create_entity("sensor.demo_hidden");
+  auto nspanel_e5 = nspanel->create_entity("light.demo_left");
+  auto nspanel_e6 = nspanel->create_entity("binary_sensor.demo_right");
   {
   nspanel->set_time_id(homeassistant_time);
   nspanel->set_date_format("%A, %d. %B %Y");
   nspanel->set_time_format("%H:%M");
   auto nspanel_screensaver = nspanel->create_screensaver("1");
-  auto nspanel_screensaver_iconleft = std::make_shared<nspanel_lovelace::StatusIconItem>("2", nspanel_e4, CUSTOM_ICONS[0], 0u);
+  auto nspanel_screensaver_iconleft = std::make_shared<nspanel_lovelace::StatusIconItem>("2", nspanel_e5, CUSTOM_ICONS[0], 0u);
   nspanel_screensaver_iconleft->set_icon_value(CUSTOM_ICONS[0]);
   nspanel_screensaver_iconleft->set_icon_color(0);
   nspanel_screensaver_iconleft->set_alt_font(true);
   nspanel_screensaver->set_icon_left(nspanel_screensaver_iconleft);
-  auto nspanel_screensaver_iconright = std::make_shared<nspanel_lovelace::StatusIconItem>("3", nspanel_e5, nspanel_lovelace::icon_t::alert_circle_outline);
+  auto nspanel_screensaver_iconright = std::make_shared<nspanel_lovelace::StatusIconItem>("3", nspanel_e6, nspanel_lovelace::icon_t::alert_circle_outline);
   nspanel_screensaver_iconright->set_icon_value(nspanel_lovelace::icon_t::alert_circle_outline);
   nspanel_screensaver->set_icon_right(nspanel_screensaver_iconright);
   nspanel->set_weather_entity_id("weather.demo_codegen");
@@ -652,28 +660,31 @@ void setup() {
   auto nspanel_card_1_item_1 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("11", nspanel_e0);
   nspanel_card_1_item_1->set_icon_value(CUSTOM_ICONS[0]);
   nspanel_card_1->add_item(nspanel_card_1_item_1);
-  auto nspanel_card_1_item_2 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("12", nspanel_e1);
+  auto nspanel_card_1_item_2 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("12", nspanel_e1, "Power off");
+  nspanel_e1->set_ha_service("remote.send_command", std::map<std::string, std::string>{{"entity_id", "remote.basement_rx_v773_main_remote"}}, std::map<std::string, std::string>{{"command", "['standby']"}});
   nspanel_card_1->add_item(nspanel_card_1_item_2);
-  auto nspanel_card_1_item_3 = std::make_shared<nspanel_lovelace::DeleteItem>(nspanel_lovelace::page_type::cardGrid);
+  auto nspanel_card_1_item_3 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("13", nspanel_e2);
   nspanel_card_1->add_item(nspanel_card_1_item_3);
-  auto nspanel_card_1_item_4 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("13", nspanel_e2);
+  auto nspanel_card_1_item_4 = std::make_shared<nspanel_lovelace::DeleteItem>(nspanel_lovelace::page_type::cardGrid);
   nspanel_card_1->add_item(nspanel_card_1_item_4);
+  auto nspanel_card_1_item_5 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("14", nspanel_e3);
+  nspanel_card_1->add_item(nspanel_card_1_item_5);
   }
   {
   auto nspanel_card_2 = nspanel->create_page<nspanel_lovelace::GridCard>("hidden_card", "", 10);
   nspanel_card_2->set_hidden(true);
-  auto nspanel_card_2_navhome = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("14", "1", nspanel_lovelace::icon_t::home));
+  auto nspanel_card_2_navhome = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("15", "1", nspanel_lovelace::icon_t::home));
   nspanel_card_2->set_nav_left(nspanel_card_2_navhome);
-  auto nspanel_card_2_item_1 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("15", nspanel_e3);
+  auto nspanel_card_2_item_1 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("16", nspanel_e4);
   nspanel_card_2->add_item(nspanel_card_2_item_1);
   }
   {
   auto nspanel_card_3 = nspanel->create_page<nspanel_lovelace::GridCard>("last_card", "Last", 10);
-  auto nspanel_card_3_navleft = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("16", "main_card", nspanel_lovelace::icon_t::arrow_left_bold));
+  auto nspanel_card_3_navleft = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("17", "main_card", nspanel_lovelace::icon_t::arrow_left_bold));
   nspanel_card_3->set_nav_left(nspanel_card_3_navleft);
-  auto nspanel_card_3_navright = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("17", "main_card", nspanel_lovelace::icon_t::arrow_right_bold));
+  auto nspanel_card_3_navright = std::unique_ptr<nspanel_lovelace::NavigationItem>(new nspanel_lovelace::NavigationItem("18", "main_card", nspanel_lovelace::icon_t::arrow_right_bold));
   nspanel_card_3->set_nav_right(nspanel_card_3_navright);
-  auto nspanel_card_3_item_1 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("18", nspanel_e0, "Kitchen \042Main\042 \134 west");
+  auto nspanel_card_3_item_1 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("19", nspanel_e0, "Kitchen \042Main\042 \134 west");
   nspanel_card_3_item_1->set_icon_value(CUSTOM_ICONS[0]);
   nspanel_card_3->add_item(nspanel_card_3_item_1);
   }

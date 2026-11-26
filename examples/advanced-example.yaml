@@ -75,6 +75,16 @@ nspanel_lovelace:
           name: Outer
         - entity_id: scene.front_room_all_default
           name: Default
+        # Call any HA service. The tile id must use the service.* domain and
+        # data.entity_id is required. Non-string values (like command below)
+        # are restored as their original type by HA's data_template renderer.
+        - entity_id: service.power_off
+          name: Standby
+          icon: power
+          service: remote.send_command
+          data:
+            entity_id: remote.example_remote
+            command: [standby]
 
     - type: cardGrid
       sleep_timeout: 10

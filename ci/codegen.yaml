@@ -46,6 +46,12 @@ nspanel_lovelace:
       entities:
         - entity_id: light.kitchen
           icon: hiking
+        - entity_id: service.power_off
+          name: Power off
+          service: remote.send_command
+          data:
+            entity_id: remote.basement_rx_v773_main_remote
+            command: [standby]
         - entity_id: navigate.hidden_card
         - entity_id: delete
         - entity_id: iText.Hello

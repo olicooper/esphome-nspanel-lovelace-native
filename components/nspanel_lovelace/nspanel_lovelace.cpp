@@ -1910,6 +1910,14 @@ void NSPanelLovelace::process_button_press_(
       if (!dispatch_now()) return;
       this->call_ha_service_(
         entity_type, ha_action_type::turn_on, entity_id);
+    } else if (entity_type == entity_type::service) {
+      auto entity = this->get_entity_(entity_id);
+      if (entity == nullptr || entity->get_ha_service().empty()) return;
+      if (!dispatch_now()) return;
+      this->call_ha_service_(
+        entity->get_ha_service(),
+        entity->get_ha_service_data(),
+        entity->get_ha_service_data_template());
     } else if (
         entity_type == entity_type::light ||
         entity_type == entity_type::switch_ ||

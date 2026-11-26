@@ -480,6 +480,7 @@ PowerCard::PowerCard(const std::string &uuid,
     Card(page_type::cardPower, uuid),
     home_entity_(home_entity) {
   home_entity_->add_subscriber(this);
+  this->update_home_value_();
 }
 
 PowerCard::PowerCard(const std::string &uuid,
@@ -488,6 +489,7 @@ PowerCard::PowerCard(const std::string &uuid,
     Card(page_type::cardPower, uuid, title),
     home_entity_(home_entity) {
   home_entity_->add_subscriber(this);
+  this->update_home_value_();
 }
 
 PowerCard::PowerCard(const std::string &uuid,
@@ -496,6 +498,7 @@ PowerCard::PowerCard(const std::string &uuid,
     Card(page_type::cardPower, uuid, title, sleep_timeout),
     home_entity_(home_entity) {
   home_entity_->add_subscriber(this);
+  this->update_home_value_();
 }
 
 PowerCard::~PowerCard() {
@@ -525,11 +528,11 @@ void PowerCard::update_home_value_() {
     return;
   }
   float val = 0.0f;
-  char *end = nullptr;
-  val = std::strtof(state.c_str(), &end);
-  if (end == state.c_str() || *end != '\0') {
+  if (!str_to_float(state, val)) {
+    // Non-numeric state (off/idle, or inf/nan from a broken sensor): show raw and
+    // treat as inactive, matching the surrounding power tiles.
     this->home_value_str_ = state;
-    this->home_is_active_ = true;
+    this->home_is_active_ = false;
     return;
   }
   float abs_val = val < 0.0f ? -val : val;

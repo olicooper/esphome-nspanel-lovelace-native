@@ -378,9 +378,8 @@ void PowerCardItem::state_power_fn(StatefulPageItem *me) {
   }
 
   float val = 0.0f;
-  char *end = nullptr;
-  val = std::strtof(state.c_str(), &end);
-  if (end == state.c_str() || *end != '\0') {
+  if (!str_to_float(state, val)) {
+    // Non-numeric state (off/idle, or inf/nan from a broken sensor): show raw, no flow.
     me_->value_str_ = state;
     me_->speed_ = 0;
     me_->is_active_ = false;

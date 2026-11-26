@@ -147,19 +147,19 @@ protected:
 
 
 /*
- * =============== AlarmIconItem ===============
+ * =============== DeleteItem ===============
  */
 
 class DeleteItem : public PageItem {
 public:
-  DeleteItem(page_type page_type);
+  DeleteItem(page_type type);
   DeleteItem(uint8_t separator_quantity);
   // virtual ~DeleteItem() {}
 
   void accept(PageItemVisitor& visitor) override;
 
 protected:
-  // output: delete~ (seperator quantity varies based on page_type/separator_quantity)
+  // output: delete~ (separator quantity varies with page type / separator_quantity)
   std::string &render_(std::string &buffer) override;
 };
 

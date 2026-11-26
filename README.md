@@ -48,7 +48,8 @@ The NSPanel has on-board PSRAM which this project makes use of automatically, wh
 ### Icons
 
 - Icon values can be an icon name or hex value (e.g. `hex:E549`). A list of icons can be found here: https://docs.nspanel.pky.eu/icon-cheatsheet.html
-- Icon colours need to be a 16-bit number (0-65535) representing a `rgb565` colour code. This website can be used to select your colour https://chrishewett.com/blog/true-rgb565-colour-picker/ - then you take the rgb565 hex value and convert it to a number (e.g. `#ce79` -> `52857`).
+- Icon colours accept an RGB565 number (`0`-`65535`), a quoted 24-bit hex string (`"#RRGGBB"` or `"RRGGBB"`), or an `[r, g, b]` list (each `0`-`255`). An [RGB565 picker](https://chrishewett.com/blog/true-rgb565-colour-picker/) shows a 4-digit RGB565 code such as `#ce79`; use its decimal value `52857` (the short hex form itself is not a colour input).
+- Screensaver weather icons use their condition's default colour. To pin them to one colour, set `screensaver.weather.icon_color` to any of the formats above; it applies to the main icon and all four forecast icons.
 
 ### Sleep timeouts
 
@@ -90,7 +91,7 @@ The power card is designed to display a home energy overview. A central home ent
 
 Each entry in `entities` supports the options `entity_id`, `name`, `icon`, and `icon_color`.
 
-> **Note:** Don't list `entity_id: delete` placeholders for `cardPower`. Unused slots around the home entity are padded automatically. (A power tile renders more fields than the `cardGrid`/`cardEntities` delete placeholder, so an explicit `delete` is misaligned — use the automatic padding instead.)
+> **Note:** Unused slots around the home entity are padded automatically. Explicit `entity_id: delete` placeholders are also supported and now render with the correct 7-field `cardPower` layout; automatic padding is still the simpler choice.
 
 ### Colours
 
@@ -163,6 +164,7 @@ More info on the issue can be [found here](https://github.com/olicooper/esphome-
         weather:
           entity_id: weather.home # Change this to your weather entity
           forecast_method: service
+          icon_color: "#FF8800" # Optional: pin the weather icons to one colour
     ```
 2. Add an automation to Home Assistant to push the forecast:
     ```yaml

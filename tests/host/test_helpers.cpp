@@ -136,6 +136,53 @@ static void test_value_or_default() {
         "value_or_default(unsigned): empty string returns the default");
 }
 
+static void test_replace_first() {
+  // Long weekday/month names are tried first; a successful replacement must
+  // suppress the short-name pass, or "Monday" -> "Montag" becomes "Mo tag".
+  std::string s = "Monday";
+  if (!replace_first(s, "Monday", "Montag"))
+    replace_first(s, "Mon", "Mo");
+  check(s == "Montag", "replace_first: long name wins over short name");
+
+  s = "Mon";
+  check(!replace_first(s, "Monday", "Montag"),
+        "replace_first: reports a missing long name");
+  check(replace_first(s, "Mon", "Mo"),
+        "replace_first: reports a short-name match");
+  check(s == "Mo", "replace_first: short name used when long name absent");
+}
+
+static void test_translate_date_name_pair() {
+  std::string s = "Monday Mon";
+  translate_date_name_pair(s, "Monday", "Montag", "Mon", "Mo");
+  check(s == "Montag Mo",
+        "translate_date_name_pair: mixed long then short translates both names");
+
+  s = "Mon Monday";
+  translate_date_name_pair(s, "Monday", "Montag", "Mon", "Mo");
+  check(s == "Mo Montag",
+        "translate_date_name_pair: mixed short then long translates both names");
+
+  s = "January Jan";
+  translate_date_name_pair(s, "January", "Janvier", "Jan", "Janv.");
+  check(s == "Janvier Janv.",
+        "translate_date_name_pair: mixed month names translate both forms");
+
+  s = "May May";
+  translate_date_name_pair(s, "May", "Mai", "May", "Mai");
+  check(s == "Mai Mai",
+        "translate_date_name_pair: May has no distinct short name");
+
+  s = "Monday";
+  translate_date_name_pair(s, "Monday", "Montag", "Mon", "Mo");
+  check(s == "Montag",
+        "translate_date_name_pair: short pass cannot corrupt translated long name");
+
+  s = "Mon";
+  translate_date_name_pair(s, "Monday", "Montag", "Mon", "Mo");
+  check(s == "Mo", "translate_date_name_pair: short-only format still works");
+}
+
 static void test_convert_python_arr_str() {
   check(convert_python_arr_str("") == "", "convert_python_arr_str: empty input");
   check(convert_python_arr_str("['a','b']") == "a,b",
@@ -158,6 +205,8 @@ int main() {
   test_split_str();
   test_str_to_number();
   test_value_or_default();
+  test_replace_first();
+  test_translate_date_name_pair();
   test_convert_python_arr_str();
 
   printf("\n%s (%d failure%s)\n", failures ? "FAILED" : "all passed", failures,

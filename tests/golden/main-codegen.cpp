@@ -529,7 +529,12 @@ void setup() {
   nspanel_screensaver_iconright->set_icon_value(nspanel_lovelace::icon_t::alert_circle_outline);
   nspanel_screensaver->set_icon_right(nspanel_screensaver_iconright);
   nspanel->set_weather_entity_id("weather.demo_codegen");
-  nspanel_screensaver->add_item_range({std::make_shared<nspanel_lovelace::WeatherItem>("4"), std::make_shared<nspanel_lovelace::WeatherItem>("5"), std::make_shared<nspanel_lovelace::WeatherItem>("6"), std::make_shared<nspanel_lovelace::WeatherItem>("7"), std::make_shared<nspanel_lovelace::WeatherItem>("8")});
+  auto nspanel_screensaver_weather_0 = std::make_shared<nspanel_lovelace::WeatherItem>("4");
+  auto nspanel_screensaver_weather_1 = std::make_shared<nspanel_lovelace::WeatherItem>("5");
+  auto nspanel_screensaver_weather_2 = std::make_shared<nspanel_lovelace::WeatherItem>("6");
+  auto nspanel_screensaver_weather_3 = std::make_shared<nspanel_lovelace::WeatherItem>("7");
+  auto nspanel_screensaver_weather_4 = std::make_shared<nspanel_lovelace::WeatherItem>("8");
+  nspanel_screensaver->add_item_range({nspanel_screensaver_weather_0, nspanel_screensaver_weather_1, nspanel_screensaver_weather_2, nspanel_screensaver_weather_3, nspanel_screensaver_weather_4});
   }
   {
   auto nspanel_card_1 = nspanel->create_page<nspanel_lovelace::GridCard>("main_card", "Main", 65);

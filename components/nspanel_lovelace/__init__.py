@@ -8,6 +8,7 @@ from typing import Union
 from pathlib import Path
 
 from esphome.components import uart, time, esp32
+from esphome.components.color import hex_color
 from esphome.const import (
     CONF_ID,
     CONF_TRIGGER_ID,
@@ -126,6 +127,7 @@ CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
 CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
 CONF_SCREENSAVER_FORECAST_METHOD = "forecast_method"
+CONF_SCREENSAVER_WEATHER_ICON_COLOR = "icon_color"
 
 CONF_CARDS = "cards"
 CONF_CARD_TYPE = "type"
@@ -292,11 +294,29 @@ SCHEMA_LOCALE = cv.Schema({
     cv.Optional(CONF_LANGUAGE, default='en'): cv.string_strict,
 })
 
+def valid_color(value):
+    """RGB565 int, [r, g, b] list or hex string ("#RRGGBB" / "RRGGBB"), returned as RGB565."""
+    if isinstance(value, bool):
+        raise cv.Invalid("Color must be a number, [r, g, b] list or hex string")
+    if isinstance(value, list):
+        if len(value) != 3:
+            raise cv.Invalid("RGB color must have 3 values, e.g. [255, 255, 255]")
+        r, g, b = (cv.uint8_t(v) for v in value)
+    elif isinstance(value, str):
+        if re.fullmatch(r"#?[0-9A-Fa-f]{6}", value):
+            r, g, b = hex_color(value.lstrip("#"))
+        else:
+            # Quoted RGB565 decimal, e.g. "52857" from the colour picker docs.
+            return cv.int_range(0, 65535)(value)
+    else:
+        return cv.int_range(0, 65535)(value)
+    return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
+
 SCHEMA_ICON = cv.Any(
     valid_icon_value, # icon name
     cv.Schema({
         cv.Optional(CONF_ICON_VALUE): valid_icon_value,
-        cv.Optional(CONF_ICON_COLOR): cv.int_range(0, 65535),
+        cv.Optional(CONF_ICON_COLOR): valid_color,
     })
 )
 
@@ -315,6 +335,7 @@ def valid_screensaver_weather(config):
     config = cv.Schema({
         cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor', 'weather']),
         cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
+        cv.Optional(CONF_SCREENSAVER_WEATHER_ICON_COLOR): valid_color,
     })(config)
     if config[CONF_SCREENSAVER_FORECAST_METHOD] == "service" and \
             not config[CONF_ENTITY_ID].startswith("weather."):
@@ -818,10 +839,19 @@ async def emit_screensaver(nspanel, config, ctx) -> Union[str, None]:
                         "forecast_method 'template_sensor' is deprecated (attribute-based weather mode). "
                         "Please use forecast_method 'service' instead (see the README for the required HA automation template)."
                     )
+            icon_color = weather_config.get(CONF_SCREENSAVER_WEATHER_ICON_COLOR, None)
             screensaver_items = []
             # 1 main weather item + 4 forecast items
-            for i in range(0,5):
-                screensaver_items.append(make_shared.template(screensaver_info[3]).__call__(ctx.new_uuid()))
+            for i in range(0, 5):
+                item_variable = f"{screensaver_info[0]}_weather_{i}"
+                cg.add(cg.RawExpression(
+                    f"auto {item_variable} = "
+                    f"{make_shared.template(screensaver_info[3]).__call__(ctx.new_uuid())}"))
+                item_class = cg.global_ns.class_(item_variable)
+                item_class.op = '->'
+                if icon_color is not None:
+                    cg.add(item_class.set_icon_color(cg.RawExpression(f'{icon_color}u')))
+                screensaver_items.append(item_class)
             cg.add(screensaver_class.add_item_range(screensaver_items))
 
         cg.add(cg.RawStatement("}"))

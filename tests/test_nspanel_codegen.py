@@ -271,6 +271,33 @@ def test_codegen_weather_template_sensor_default(tmp_path: Path) -> None:
     assert "will be removed" not in out, out
 
 
+def test_codegen_weather_icon_color(tmp_path: Path) -> None:
+    """Screensaver weather icon_color accepts "#RRGGBB" and [r,g,b]; codegen
+    applies it to all five weather items. Runtime recolour protection needs a panel."""
+    cards = """\
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    body = """\
+  screensaver:
+    weather:
+      entity_id: weather.demo
+      icon_color: {color}
+""" + cards
+    for name, color in (("weather-icon-hex", '"#FF8800"'),
+                        ("weather-icon-rgb", "[255, 136, 0]")):
+        src = generate_synthetic(
+            tmp_path, body.format(color=color), name)
+        # #FF8800 == RGB565 64576; five weather items each get the override.
+        assert src.count("set_icon_color(64576u)") == 5, name
+        assert src.count("auto nspanel_screensaver_weather_") == 5, name
+        assert_no_none_tokens(src)
+
+
 def assert_no_none_tokens(src: str) -> None:
     """No Python None token may leak into generated C++ (string literals are
     legitimate, e.g. the translation value "None", so they are stripped)."""

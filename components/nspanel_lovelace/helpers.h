@@ -23,13 +23,14 @@ namespace esphome {
 namespace nspanel_lovelace {
 
 // see: https://stackoverflow.com/a/13890501/2634818
-inline void replace_first(
+inline bool replace_first(
     std::string &s, std::string const &toReplace,
     std::string const &replaceWith) {
   std::size_t pos = s.find(toReplace);
   if (pos == std::string::npos)
-    return;
+    return false;
   s.replace(pos, toReplace.length(), replaceWith);
+  return true;
 }
 
 // see: https://stackoverflow.com/a/13890501/2634818
@@ -62,6 +63,19 @@ inline void replace_all(StringT &s, const char oldChar, const char newChar) {
   for (size_t pos = 0; (pos = s.find(oldChar, pos)) != StringT::npos; ++pos) {
     s[pos] = newChar;
   }
+}
+
+// Mixed formats such as "%A %a" render both names. Mark the long name before
+// translating the short one so the short pass cannot corrupt the translation.
+inline void translate_date_name_pair(
+    std::string &s, const char *long_name, const char *long_translation,
+    const char *short_name, const char *short_translation) {
+  const std::string long_marker(1, '\x01');
+  const std::string short_marker(1, '\x02');
+  replace_first(s, long_name, long_marker);
+  replace_first(s, short_name, short_marker);
+  replace_first(s, long_marker, long_translation);
+  replace_first(s, short_marker, short_translation);
 }
 
 inline const char* value_or_empty(const char* s) {

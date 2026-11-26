@@ -135,7 +135,8 @@ void WeatherItem::accept(PageItemVisitor& visitor) { visitor.visit(*this); }
 void WeatherItem::set_icon_by_weather_condition(const std::string &condition) {
   Icon icon{};
   if (!try_get_value(WEATHER_ICON_MAP, icon, condition)) return;
-  this->icon_color_ = icon.color;
+  if (!this->icon_color_overridden_)
+    this->icon_color_ = icon.color;
   this->icon_value_ = icon.value;
   this->set_render_invalid();
 }
@@ -196,11 +197,11 @@ std::string &AlarmIconItem::render_(std::string &buffer) {
  * =============== DeleteItem ===============
  */
 
-DeleteItem::DeleteItem(page_type page_type) :
+DeleteItem::DeleteItem(page_type type) :
     PageItem(entity_type::delete_) {
   // Currently all page_types that accept delete entities
-  // have the same separator quantity
-  this->uuid_.append(5, SEPARATOR);
+  // have the same separator quantity except cardPower
+  this->uuid_.append(type == page_type::cardPower ? 6 : 5, SEPARATOR);
 }
 
 DeleteItem::DeleteItem(uint8_t separator_quantity) :

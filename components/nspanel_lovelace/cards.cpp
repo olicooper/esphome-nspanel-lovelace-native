@@ -593,9 +593,10 @@ std::string &PowerCard::render(std::string &buffer) {
   for (auto& item : this->items_) {
     buffer.append(1, SEPARATOR).append(item->render());
   }
-  // Pad remaining outer slots with delete placeholders
-  // Format must match PowerCardItem::render_: text~entityId~icon~iconColor~displayName~valueStr~speed
-  // The TFT firmware hides a slot when entityId == "delete"
+  // Pad remaining outer slots with delete placeholders.
+  // PowerCardItem::render_ emits 7 fields: ignored~ignored~icon~iconColor~displayName~value~speed;
+  // it leaves the first two empty because the firmware ignores them. The firmware
+  // hides a slot when the second field is "delete", so that is all padding needs.
   for (size_t i = item_count; i < 6; i++) {
     buffer.append(1, SEPARATOR);
     buffer.append(entity_render_type::text).append(1, SEPARATOR)

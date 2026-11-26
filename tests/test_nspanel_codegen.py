@@ -783,7 +783,7 @@ def test_display_schedule_fixed_time_codegen(tmp_path: Path) -> None:
         - entity_id: light.lamp
 """
     src = generate_synthetic(tmp_path, body, "disp-fixed")
-    assert "set_display_dim_defaults(100, 50)" in src
+    assert "set_display_dim_defaults(100, 50, true)" in src
     assert "set_display_inactive_dim(0)" in src
     assert "set_display_inactive_dim(8)" in src
     assert "add_hours" in src
@@ -825,7 +825,7 @@ sun:
   time_id: codegen_time
 """
     src = generate_synthetic(tmp_path, body, "disp-sun", extra_yaml=extra)
-    assert "set_display_dim_defaults(100, 50)" in src
+    assert "set_display_dim_defaults(100, 50, true)" in src
     assert "set_display_inactive_dim(8)" in src
     assert "set_display_inactive_dim(0)" in src
     assert "set_sunrise(true)" in src

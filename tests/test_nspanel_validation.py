@@ -1043,3 +1043,199 @@ def test_display_schedule_brightness_out_of_range(tmp_path: Path, bad: int) -> N
 """
     result = esphome_config(tmp_path, body, name="display-sched-range")
     assert result.returncode != 0, f"schedule brightness {bad} should be rejected"
+
+
+def test_display_schedule_autodetects_screensaver_time(tmp_path: Path) -> None:
+    body = """\
+  screensaver:
+    time_id: validation_time
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-autodetect-ss-time")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_display_schedule_autodetects_single_global_time(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-autodetect-time")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_display_schedule_autodetects_single_global_sun(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: sunrise
+        inactive_brightness: 8
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    cfg = tmp_path / "display-autodetect-sun.yaml"
+    cfg.write_text(BASE_CONFIG.format(
+        name="display-autodetect-sun",
+        components=str(COMPONENTS_DIR),
+        nspanel_body=body,
+    ) + "\nsun:\n  id: validation_sun\n  latitude: 48.8584\n  longitude: 2.2945\n  time_id: validation_time\n")
+    result = subprocess.run(
+        ["esphome", "config", str(cfg)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_display_schedule_ambiguous_time_requires_explicit_id(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    cfg = tmp_path / "display-ambiguous-time.yaml"
+    cfg.write_text(f"""\
+esphome:
+  name: display-ambiguous-time
+  comment: "synthetic validation fixture"
+  build_path: ./build/display-ambiguous-time
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: {COMPONENTS_DIR}
+    components: [nspanel_lovelace]
+
+nspanel_lovelace:
+{body}
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'VALIDATION_SSID'
+  password: 'VALIDATION_PASSWORD'
+
+api: {{}}
+
+uart:
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: time_one
+  - platform: homeassistant
+    id: time_two
+""")
+    result = subprocess.run(
+        ["esphome", "config", str(cfg)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)
+    assert result.returncode != 0, "ambiguous time should be rejected"
+    assert "time_id" in result.stdout + result.stderr
+
+
+def test_display_schedule_ambiguous_sun_requires_explicit_id(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: sunrise
+        inactive_brightness: 8
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    cfg = tmp_path / "display-ambiguous-sun.yaml"
+    cfg.write_text(f"""\
+esphome:
+  name: display-ambiguous-sun
+  comment: "synthetic validation fixture"
+  build_path: ./build/display-ambiguous-sun
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: {COMPONENTS_DIR}
+    components: [nspanel_lovelace]
+
+nspanel_lovelace:
+{body}
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'VALIDATION_SSID'
+  password: 'VALIDATION_PASSWORD'
+
+api: {{}}
+
+uart:
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+
+time:
+  - platform: homeassistant
+    id: validation_time
+
+sun:
+  - id: sun_one
+    latitude: 48.8584
+    longitude: 2.2945
+    time_id: validation_time
+  - id: sun_two
+    latitude: 40.7128
+    longitude: -74.0060
+    time_id: validation_time
+""")
+    result = subprocess.run(
+        ["esphome", "config", str(cfg)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)
+    assert result.returncode != 0, "ambiguous sun should be rejected"
+    assert "sun_id" in result.stdout + result.stderr

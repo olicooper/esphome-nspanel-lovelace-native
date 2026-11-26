@@ -11,7 +11,7 @@ source = (component / 'nspanel_lovelace.cpp').read_text()
 methods = '''NSPanelLovelace loop on_entity_attribute_update_ create_entity on_page_item_added_callback set_display_timeout process_data_ process_command_
 render_popup_page_ render_popup_page_update_ render_cover_detail_update_ render_timer_detail_update_ render_fan_detail_update_ render_light_detail_update_ render_input_select_detail_update_
 try_replace_uuid_with_entity_id_ get_mode_from_index_ get_current_page_item_ process_button_press_ get_page_item_
-get_entity_ call_ha_service_ send_buffered_command_ set_display_dim set_display_active_dim set_display_inactive_dim'''.split()
+get_entity_ call_ha_service_ send_buffered_command_ set_display_dim set_display_active_dim set_display_inactive_dim restore_state_ save_state_'''.split()
 # Native weather production paths: dispatch/timeout, reply guards, blank
 # rendering and expiry. apply_weather_forecast consumes ArduinoJson and is
 # only extracted when the caller passes 'yes' as argv[3] (the JSON-gated

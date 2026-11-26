@@ -243,10 +243,10 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
-  void set_display_dim_defaults(uint8_t active, uint8_t inactive) {
+  void set_display_dim_defaults(uint8_t active, uint8_t inactive, bool authoritative = true) {
     this->display_active_dim_ = active;
     this->display_inactive_dim_ = inactive;
-    this->display_defaults_configured_ = true;
+    this->display_defaults_configured_ = authoritative;
   }
 #ifdef USE_NSPANEL_NATIVE_WEATHER
   void set_weather_forecast_action(uint8_t slot, api::HomeAssistantServiceCallAction<> *action) {

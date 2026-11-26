@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstdarg>
+#include <cstring>
 #include <cstdio>
 #include <ctime>
 #include <deque>
@@ -45,7 +46,32 @@ namespace esphome {
 using std::optional;
 using std::to_string;
 using StringRef = std::string;
-struct ESPPreferenceObject {};
+struct ESPPreferenceObject {
+  bool *loaded{nullptr};
+  void *data{nullptr};
+  size_t len{0};
+  template<typename T> bool load(T *dest) {
+    if (loaded != nullptr && !*loaded) return false;
+    if (data != nullptr && len == sizeof(T)) {
+      memcpy(dest, data, sizeof(T));
+      return true;
+    }
+    return loaded != nullptr ? *loaded : false;
+  }
+  template<typename T> bool save(T *src) {
+    if (data != nullptr && len == sizeof(T)) memcpy(data, src, sizeof(T));
+    return true;
+  }
+};
+struct ESPPreferences {
+  bool loaded{false};
+  uint8_t stored[64]{};
+  template<typename T> ESPPreferenceObject make_preference(uint32_t) {
+    return ESPPreferenceObject{&loaded, stored, sizeof(T)};
+  }
+};
+static ESPPreferences host_prefs;
+static ESPPreferences *global_preferences = &host_prefs;
 struct ESPTime {
   static HostLocalTime from_epoch_local(time_t epoch) { return host_local_time(epoch); }
   time_t timestamp = 0;
@@ -172,8 +198,6 @@ static std::vector<std::string> display;
 void NSPanelLovelace::setup() {}
 void NSPanelLovelace::render_item_update_() { display.emplace_back("tile update"); }
 void NSPanelLovelace::dump_config() {}
-bool NSPanelLovelace::save_state_() { return true; }
-bool NSPanelLovelace::restore_state_() { return false; }
 void NSPanelLovelace::update_datetime(datetime_mode, const char *, const char *) {}
 void NSPanelLovelace::render_page_(render_page_option) {}
 void NSPanelLovelace::render_current_page_() { display.emplace_back("current page"); }

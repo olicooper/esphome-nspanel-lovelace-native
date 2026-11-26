@@ -13,7 +13,7 @@ status=0
 # The weather panel tests compare production date keys against localtime under
 # a known timezone.
 export TZ=UTC
-for test in test_helpers test_process_command test_weather_forecast test_weather_panel; do
+for test in test_helpers test_display_dim test_process_command test_weather_forecast test_weather_panel; do
   echo "--- $test ---"
   want_json=no
   json_flags=""
@@ -23,7 +23,7 @@ for test in test_helpers test_process_command test_weather_forecast test_weather
   fi
   python3 "$here/panel_sources.py" "$component" "$out" "$want_json"
   set --
-  if [ "$test" = test_process_command ] || [ "$test" = test_weather_panel ]; then
+  if [ "$test" = test_display_dim ] || [ "$test" = test_process_command ] || [ "$test" = test_weather_panel ]; then
     for file in config entity page_item_base page_base page_items pages card_base card_items cards page_manager page_item_visitor; do
       set -- "$@" "$component/$file.cpp"
     done

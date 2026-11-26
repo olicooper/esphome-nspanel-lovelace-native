@@ -546,7 +546,6 @@ def validate_config(config):
                 f"display.active_brightness ({active})",
                 [CONF_DISPLAY, CONF_INACTIVE_BRIGHTNESS])
         schedule = display.get(CONF_SCHEDULE, [])
-        has_fixed = any(not isinstance(item[CONF_AT], str) for item in schedule)
         has_sun = any(isinstance(item[CONF_AT], str) for item in schedule)
         if schedule:
             time_id = display.get(CONF_TIME_ID)
@@ -1323,10 +1322,11 @@ async def emit_display(nspanel, config):
     if display is None:
         return
 
-    cg.add(nspanel.set_display_dim_defaults(
-        display[CONF_ACTIVE_BRIGHTNESS], display[CONF_INACTIVE_BRIGHTNESS]))
-
     schedule = display.get(CONF_SCHEDULE, [])
+    cg.add(nspanel.set_display_dim_defaults(
+        display[CONF_ACTIVE_BRIGHTNESS], display[CONF_INACTIVE_BRIGHTNESS],
+        bool(schedule)))
+
     if not schedule:
         return
 

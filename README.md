@@ -60,7 +60,7 @@ On-board PSRAM is used automatically and configured during code generation with 
 
 ### Sleep timeouts
 
-`sleep_timeout` (top-level and per-card) is limited to `0`–`65` seconds because the HMI protocol caps the screensaver timeout at 65s. Values `66`–`120` were previously accepted for per-card timeouts but are now rejected. `0` disables the screensaver for that timeout.
+`sleep_timeout` (top-level and per-card) accepts `0`–`65535` seconds. Up to `65s` the TFT's own `timeout~N` command is used; above `65s` the component sends `timeout~0`, times the idle period on the ESP32, then sends `timeout~1` at the deadline so the TFT still dims and emits `sleepReached`. `0` disables the screensaver for that timeout. The long-timeout path is not hardware-verified yet: the TFT must still dim and report sleep after the one-second hand-off.
 
 ### Custom translations
 

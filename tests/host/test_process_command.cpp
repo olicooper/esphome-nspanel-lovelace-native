@@ -796,9 +796,53 @@ static void test_service_tile() {
   check(calls.empty(), "service tile without configured action is ignored");
 }
 
+static void test_long_sleep_timeout() {
+  Panel panel;
+  const uint64_t start = 10000;
+  host_millis = start;
+
+  display.clear();
+  panel.set_display_timeout(10);
+  check(display == std::vector<std::string>{"timeout~10"}, "timeout <=65 stays under TFT control");
+
+  display.clear();
+  panel.set_display_timeout(600);
+  check(display == std::vector<std::string>{"timeout~0"}, "long timeout disables the TFT timer");
+
+  display.clear();
+  host_millis = start + 599000;
+  panel.loop();
+  check(display.empty(), "ESP32 timer does not fire before the configured deadline");
+
+  // A touch restarts the idle countdown even when it does not change the page.
+  panel.frame("event,buttonPress2,none,button");
+  display.clear();
+  host_millis = start + 600000;
+  panel.loop();
+  check(display.empty(), "touch resets the ESP32 idle countdown");
+
+  host_millis = start + 1198999;
+  panel.loop();
+  check(display.empty(), "reset countdown still holds one millisecond before expiry");
+  host_millis = start + 1199000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "expiry hands sleep back to the TFT with a one-second timer");
+
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "expiry fires only once");
+
+  display.clear();
+  panel.set_display_timeout(600);
+  panel.frame("event,sleepReached,cardGrid");
+  host_millis = start + 1799000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~0"}, "sleepReached cancels the ESP32 timer");
+}
+
 int main() {
   test_uart_recovery();
   test_service_tile();
+  test_long_sleep_timeout();
   test_wire();
   test_button_validation();
   test_popup_selection();

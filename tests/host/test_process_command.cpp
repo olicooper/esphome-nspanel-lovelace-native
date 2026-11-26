@@ -831,12 +831,42 @@ static void test_long_sleep_timeout() {
   panel.loop();
   check(display == std::vector<std::string>{"timeout~1"}, "expiry fires only once");
 
+  // A touch before sleepReached must retain the configured 600 s, not leave the TFT at 1 s.
+  display.clear();
+  panel.frame("event,buttonPress2,none,button");
+  check(display == std::vector<std::string>{"timeout~0"}, "hand-off touch stops the TFT countdown");
+  host_millis = start + 1798999;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~0"}, "hand-off touch re-arms the full timeout");
+  host_millis = start + 1799000;
+  panel.loop();
+  check(display.back() == "timeout~1", "re-armed timeout expires 600 s after the touch");
+
   display.clear();
   panel.set_display_timeout(600);
   panel.frame("event,sleepReached,cardGrid");
-  host_millis = start + 1799000;
+  host_millis = start + 2399000;
   panel.loop();
   check(display == std::vector<std::string>{"timeout~0"}, "sleepReached cancels the ESP32 timer");
+
+  // Malformed button frames are not user activity.
+  display.clear();
+  panel.set_display_timeout(600);
+  host_millis = start + 2399000;
+  panel.frame("event,buttonPress2,,");
+  display.clear();
+  host_millis = start + 2999000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "invalid button frame does not reset the timer");
+
+  // A shorter popup timeout cancels the long one.
+  display.clear();
+  panel.set_display_timeout(600);
+  display.clear();
+  panel.set_display_timeout(10);
+  host_millis = start + 3599000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~10"}, "popup timeout cancels the long timer");
 }
 
 int main() {

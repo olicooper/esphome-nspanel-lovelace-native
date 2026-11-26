@@ -430,6 +430,8 @@ protected:
   // Non-zero while an idle period longer than the TFT's 65 s limit is timed here.
   uint32_t esp_sleep_timeout_ms_{0};
   uint32_t esp_sleep_start_ms_{0};
+  // True after handing sleep to the TFT's one-second timer, before sleepReached.
+  bool esp_sleep_handoff_pending_{false};
 
   bool button_press_timeout_set_ = false;
   std::string button_press_uuid_;

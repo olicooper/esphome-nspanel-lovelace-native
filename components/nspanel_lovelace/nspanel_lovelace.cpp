@@ -2501,6 +2501,13 @@ void NSPanelLovelace::on_entity_attribute_update_(
       force_current_page_update_ = true;
       return;
     }
+    // PowerCard renders its home_entity_id inline (not as a tile item), so the item
+    // loop above never matches it; refresh when the home sensor updates.
+    else if (entity_type == entity_type::sensor &&
+        page->is_type(page_type::cardPower)) {
+      force_current_page_update_ = true;
+      return;
+    }
     
     // todo: implement popup page checks too
     // if (this->popup_page_current_uuid_ == item->get_uuid()) {

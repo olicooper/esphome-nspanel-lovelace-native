@@ -80,10 +80,12 @@ The power card is designed to display a home energy overview. A central home ent
 | `type` | Yes | Must be `cardPower` |
 | `home_entity_id` | Yes | A `sensor` entity representing whole-home power consumption/generation |
 | `title` | No | Card title. Also used as the label for the home entity (defaults to `Home` if not set) |
-| `sleep_timeout` | No | Seconds before returning to the screensaver (default: global setting) |
+| `sleep_timeout` | No | Seconds before returning to the screensaver (default: `10`) |
 | `entities` | No | Up to 6 power sensor entities displayed around the home entity |
 
-Each entry in `entities` supports the same options as other card types (`entity_id`, `name`, `icon`, `icon_color`).
+Each entry in `entities` supports the options `entity_id`, `name`, `icon`, and `icon_color`.
+
+> **Note:** Don't list `entity_id: delete` placeholders for `cardPower`. Unused slots around the home entity are padded automatically. (A power tile renders more fields than the `cardGrid`/`cardEntities` delete placeholder, so an explicit `delete` is misaligned — use the automatic padding instead.)
 
 ### Colours
 

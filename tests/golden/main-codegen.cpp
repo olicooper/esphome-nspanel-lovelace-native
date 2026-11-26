@@ -151,6 +151,46 @@ constexpr FrozenCharMap<const char *, TRANSLATION_MAP_SIZE> esphome::nspanel_lov
   {nspanel_lovelace::translation_item::dow_sat, "Sat"},
   {"codegen_extra", "codegen_extra_value"},
 }};
+alignas(api::HomeAssistantServiceCallAction<>) static unsigned char api__nspanel_weather_action_3_0__pstorage[sizeof(api::HomeAssistantServiceCallAction<>)];
+static api::HomeAssistantServiceCallAction<> *const nspanel_weather_action_3_0 = reinterpret_cast<api::HomeAssistantServiceCallAction<> *>(api__nspanel_weather_action_3_0__pstorage);
+alignas(StatelessLambdaAction<std::string>) static unsigned char esphome__nspanel_weather_error_lambda_3_0__pstorage[sizeof(StatelessLambdaAction<std::string>)];
+static StatelessLambdaAction<std::string> *const nspanel_weather_error_lambda_3_0 = reinterpret_cast<StatelessLambdaAction<std::string> *>(esphome__nspanel_weather_error_lambda_3_0__pstorage);
+alignas(Automation<std::string>) static unsigned char esphome__nspanel_weather_error_3_0__pstorage[sizeof(Automation<std::string>)];
+static Automation<std::string> *const nspanel_weather_error_3_0 = reinterpret_cast<Automation<std::string> *>(esphome__nspanel_weather_error_3_0__pstorage);
+alignas(StatelessLambdaAction<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_lambda_3_0__pstorage[sizeof(StatelessLambdaAction<ArduinoJson::JsonObjectConst>)];
+static StatelessLambdaAction<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_lambda_3_0 = reinterpret_cast<StatelessLambdaAction<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_lambda_3_0__pstorage);
+alignas(Automation<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_3_0__pstorage[sizeof(Automation<ArduinoJson::JsonObjectConst>)];
+static Automation<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_3_0 = reinterpret_cast<Automation<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_3_0__pstorage);
+alignas(api::HomeAssistantServiceCallAction<>) static unsigned char api__nspanel_weather_action_3_1__pstorage[sizeof(api::HomeAssistantServiceCallAction<>)];
+static api::HomeAssistantServiceCallAction<> *const nspanel_weather_action_3_1 = reinterpret_cast<api::HomeAssistantServiceCallAction<> *>(api__nspanel_weather_action_3_1__pstorage);
+alignas(StatelessLambdaAction<std::string>) static unsigned char esphome__nspanel_weather_error_lambda_3_1__pstorage[sizeof(StatelessLambdaAction<std::string>)];
+static StatelessLambdaAction<std::string> *const nspanel_weather_error_lambda_3_1 = reinterpret_cast<StatelessLambdaAction<std::string> *>(esphome__nspanel_weather_error_lambda_3_1__pstorage);
+alignas(Automation<std::string>) static unsigned char esphome__nspanel_weather_error_3_1__pstorage[sizeof(Automation<std::string>)];
+static Automation<std::string> *const nspanel_weather_error_3_1 = reinterpret_cast<Automation<std::string> *>(esphome__nspanel_weather_error_3_1__pstorage);
+alignas(StatelessLambdaAction<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_lambda_3_1__pstorage[sizeof(StatelessLambdaAction<ArduinoJson::JsonObjectConst>)];
+static StatelessLambdaAction<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_lambda_3_1 = reinterpret_cast<StatelessLambdaAction<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_lambda_3_1__pstorage);
+alignas(Automation<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_3_1__pstorage[sizeof(Automation<ArduinoJson::JsonObjectConst>)];
+static Automation<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_3_1 = reinterpret_cast<Automation<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_3_1__pstorage);
+alignas(api::HomeAssistantServiceCallAction<>) static unsigned char api__nspanel_weather_action_3_2__pstorage[sizeof(api::HomeAssistantServiceCallAction<>)];
+static api::HomeAssistantServiceCallAction<> *const nspanel_weather_action_3_2 = reinterpret_cast<api::HomeAssistantServiceCallAction<> *>(api__nspanel_weather_action_3_2__pstorage);
+alignas(StatelessLambdaAction<std::string>) static unsigned char esphome__nspanel_weather_error_lambda_3_2__pstorage[sizeof(StatelessLambdaAction<std::string>)];
+static StatelessLambdaAction<std::string> *const nspanel_weather_error_lambda_3_2 = reinterpret_cast<StatelessLambdaAction<std::string> *>(esphome__nspanel_weather_error_lambda_3_2__pstorage);
+alignas(Automation<std::string>) static unsigned char esphome__nspanel_weather_error_3_2__pstorage[sizeof(Automation<std::string>)];
+static Automation<std::string> *const nspanel_weather_error_3_2 = reinterpret_cast<Automation<std::string> *>(esphome__nspanel_weather_error_3_2__pstorage);
+alignas(StatelessLambdaAction<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_lambda_3_2__pstorage[sizeof(StatelessLambdaAction<ArduinoJson::JsonObjectConst>)];
+static StatelessLambdaAction<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_lambda_3_2 = reinterpret_cast<StatelessLambdaAction<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_lambda_3_2__pstorage);
+alignas(Automation<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_3_2__pstorage[sizeof(Automation<ArduinoJson::JsonObjectConst>)];
+static Automation<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_3_2 = reinterpret_cast<Automation<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_3_2__pstorage);
+alignas(api::HomeAssistantServiceCallAction<>) static unsigned char api__nspanel_weather_action_3_3__pstorage[sizeof(api::HomeAssistantServiceCallAction<>)];
+static api::HomeAssistantServiceCallAction<> *const nspanel_weather_action_3_3 = reinterpret_cast<api::HomeAssistantServiceCallAction<> *>(api__nspanel_weather_action_3_3__pstorage);
+alignas(StatelessLambdaAction<std::string>) static unsigned char esphome__nspanel_weather_error_lambda_3_3__pstorage[sizeof(StatelessLambdaAction<std::string>)];
+static StatelessLambdaAction<std::string> *const nspanel_weather_error_lambda_3_3 = reinterpret_cast<StatelessLambdaAction<std::string> *>(esphome__nspanel_weather_error_lambda_3_3__pstorage);
+alignas(Automation<std::string>) static unsigned char esphome__nspanel_weather_error_3_3__pstorage[sizeof(Automation<std::string>)];
+static Automation<std::string> *const nspanel_weather_error_3_3 = reinterpret_cast<Automation<std::string> *>(esphome__nspanel_weather_error_3_3__pstorage);
+alignas(StatelessLambdaAction<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_lambda_3_3__pstorage[sizeof(StatelessLambdaAction<ArduinoJson::JsonObjectConst>)];
+static StatelessLambdaAction<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_lambda_3_3 = reinterpret_cast<StatelessLambdaAction<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_lambda_3_3__pstorage);
+alignas(Automation<ArduinoJson::JsonObjectConst>) static unsigned char esphome__nspanel_weather_success_3_3__pstorage[sizeof(Automation<ArduinoJson::JsonObjectConst>)];
+static Automation<ArduinoJson::JsonObjectConst> *const nspanel_weather_success_3_3 = reinterpret_cast<Automation<ArduinoJson::JsonObjectConst> *>(esphome__nspanel_weather_success_3_3__pstorage);
 constexpr std::array<const esphome::nspanel_lovelace::icon_char_t*, CUSTOM_ICONS_SIZE> CUSTOM_ICONS {{u8"\uED7E"}};
 #include <tuple>
 static auto esphome_controllers() { return std::tuple{api_apiserver_id}; }
@@ -182,6 +222,11 @@ const LogString *component_source_lookup(uint8_t index) {
     progmem_read_ptr(&COMP_SRC_TABLE[index - 1]));
 }
 }  // namespace esphome
+static constexpr api::HomeAssistantField<> ha_action_fields[] PROGMEM = {
+  {nullptr, "weather.get_forecasts", nullptr},
+  {"entity_id", "weather.demo_codegen", nullptr},
+  {"type", "daily", nullptr},
+};
 // ========== AUTO GENERATED INCLUDE BLOCK END ==========="
 
 void setup() {
@@ -412,7 +457,7 @@ void setup() {
   //     time_id: homeassistant_time
   //     weather:
   //       entity_id: weather.demo_codegen
-  //       forecast_method: service
+  //       restart_after_forecast_stall: 1800000ms
   //   sleep_timeout: 10
   //   uart_id: uart_idfuartcomponent_id
   new(nspanel) nspanel_lovelace::NSPanelLovelace();
@@ -529,12 +574,74 @@ void setup() {
   nspanel_screensaver_iconright->set_icon_value(nspanel_lovelace::icon_t::alert_circle_outline);
   nspanel_screensaver->set_icon_right(nspanel_screensaver_iconright);
   nspanel->set_weather_entity_id("weather.demo_codegen");
+  nspanel->set_weather_forecast_stall_restart(1800000);
+  new(nspanel_weather_action_3_0) api::HomeAssistantServiceCallAction<>(api_apiserver_id, false, ha_action_fields, 2, 0, 0);
+  nspanel_weather_action_3_0->set_wants_status();
+  new(nspanel_weather_error_lambda_3_0) StatelessLambdaAction<std::string>([](std::string error) -> void {
+      nspanel->handle_weather_forecast_error(error, 0u);
+  });
+  new(nspanel_weather_error_3_0) Automation<std::string>(nspanel_weather_action_3_0->get_error_trigger());
+  nspanel_weather_error_3_0->add_action(nspanel_weather_error_lambda_3_0);
+  nspanel_weather_action_3_0->set_wants_status();
+  nspanel_weather_action_3_0->set_wants_response();
+  new(nspanel_weather_success_lambda_3_0) StatelessLambdaAction<ArduinoJson::JsonObjectConst>([](ArduinoJson::JsonObjectConst response) -> void {
+      nspanel->apply_weather_forecast(response, 0u);
+  });
+  new(nspanel_weather_success_3_0) Automation<ArduinoJson::JsonObjectConst>(nspanel_weather_action_3_0->get_success_trigger_with_response());
+  nspanel_weather_success_3_0->add_action(nspanel_weather_success_lambda_3_0);
+  nspanel->set_weather_forecast_action(0, nspanel_weather_action_3_0);
+  new(nspanel_weather_action_3_1) api::HomeAssistantServiceCallAction<>(api_apiserver_id, false, ha_action_fields, 2, 0, 0);
+  nspanel_weather_action_3_1->set_wants_status();
+  new(nspanel_weather_error_lambda_3_1) StatelessLambdaAction<std::string>([](std::string error) -> void {
+      nspanel->handle_weather_forecast_error(error, 1u);
+  });
+  new(nspanel_weather_error_3_1) Automation<std::string>(nspanel_weather_action_3_1->get_error_trigger());
+  nspanel_weather_error_3_1->add_action(nspanel_weather_error_lambda_3_1);
+  nspanel_weather_action_3_1->set_wants_status();
+  nspanel_weather_action_3_1->set_wants_response();
+  new(nspanel_weather_success_lambda_3_1) StatelessLambdaAction<ArduinoJson::JsonObjectConst>([](ArduinoJson::JsonObjectConst response) -> void {
+      nspanel->apply_weather_forecast(response, 1u);
+  });
+  new(nspanel_weather_success_3_1) Automation<ArduinoJson::JsonObjectConst>(nspanel_weather_action_3_1->get_success_trigger_with_response());
+  nspanel_weather_success_3_1->add_action(nspanel_weather_success_lambda_3_1);
+  nspanel->set_weather_forecast_action(1, nspanel_weather_action_3_1);
+  new(nspanel_weather_action_3_2) api::HomeAssistantServiceCallAction<>(api_apiserver_id, false, ha_action_fields, 2, 0, 0);
+  nspanel_weather_action_3_2->set_wants_status();
+  new(nspanel_weather_error_lambda_3_2) StatelessLambdaAction<std::string>([](std::string error) -> void {
+      nspanel->handle_weather_forecast_error(error, 2u);
+  });
+  new(nspanel_weather_error_3_2) Automation<std::string>(nspanel_weather_action_3_2->get_error_trigger());
+  nspanel_weather_error_3_2->add_action(nspanel_weather_error_lambda_3_2);
+  nspanel_weather_action_3_2->set_wants_status();
+  nspanel_weather_action_3_2->set_wants_response();
+  new(nspanel_weather_success_lambda_3_2) StatelessLambdaAction<ArduinoJson::JsonObjectConst>([](ArduinoJson::JsonObjectConst response) -> void {
+      nspanel->apply_weather_forecast(response, 2u);
+  });
+  new(nspanel_weather_success_3_2) Automation<ArduinoJson::JsonObjectConst>(nspanel_weather_action_3_2->get_success_trigger_with_response());
+  nspanel_weather_success_3_2->add_action(nspanel_weather_success_lambda_3_2);
+  nspanel->set_weather_forecast_action(2, nspanel_weather_action_3_2);
+  new(nspanel_weather_action_3_3) api::HomeAssistantServiceCallAction<>(api_apiserver_id, false, ha_action_fields, 2, 0, 0);
+  nspanel_weather_action_3_3->set_wants_status();
+  new(nspanel_weather_error_lambda_3_3) StatelessLambdaAction<std::string>([](std::string error) -> void {
+      nspanel->handle_weather_forecast_error(error, 3u);
+  });
+  new(nspanel_weather_error_3_3) Automation<std::string>(nspanel_weather_action_3_3->get_error_trigger());
+  nspanel_weather_error_3_3->add_action(nspanel_weather_error_lambda_3_3);
+  nspanel_weather_action_3_3->set_wants_status();
+  nspanel_weather_action_3_3->set_wants_response();
+  new(nspanel_weather_success_lambda_3_3) StatelessLambdaAction<ArduinoJson::JsonObjectConst>([](ArduinoJson::JsonObjectConst response) -> void {
+      nspanel->apply_weather_forecast(response, 3u);
+  });
+  new(nspanel_weather_success_3_3) Automation<ArduinoJson::JsonObjectConst>(nspanel_weather_action_3_3->get_success_trigger_with_response());
+  nspanel_weather_success_3_3->add_action(nspanel_weather_success_lambda_3_3);
+  nspanel->set_weather_forecast_action(3, nspanel_weather_action_3_3);
   auto nspanel_screensaver_weather_0 = std::make_shared<nspanel_lovelace::WeatherItem>("4");
   auto nspanel_screensaver_weather_1 = std::make_shared<nspanel_lovelace::WeatherItem>("5");
   auto nspanel_screensaver_weather_2 = std::make_shared<nspanel_lovelace::WeatherItem>("6");
   auto nspanel_screensaver_weather_3 = std::make_shared<nspanel_lovelace::WeatherItem>("7");
   auto nspanel_screensaver_weather_4 = std::make_shared<nspanel_lovelace::WeatherItem>("8");
   nspanel_screensaver->add_item_range({nspanel_screensaver_weather_0, nspanel_screensaver_weather_1, nspanel_screensaver_weather_2, nspanel_screensaver_weather_3, nspanel_screensaver_weather_4});
+  nspanel->init_weather_forecast_slots();
   }
   {
   auto nspanel_card_1 = nspanel->create_page<nspanel_lovelace::GridCard>("main_card", "Main", 65);

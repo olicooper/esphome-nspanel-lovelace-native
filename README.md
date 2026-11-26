@@ -152,113 +152,66 @@ The TFT owns the 30-second inactivity timeout so local touches, including timer 
 
 The host test verifies that a 24-hour active timer is sent as 1,440 minutes and 0 seconds, without wrapping at 60 minutes. That verifies the payload, not how it fits or renders on a physical panel. The on-screen 24-hour display and touch timeout have not been verified on hardware.
 
-### 1. Weather forecast is not displayed on the screensaver when using Home Assistant 2024.4 or later
+# Screensaver weather
 
-This issue is due to the `forecast` attribute being removed from weather entities. There is currently no alternative way to fetch this data with the current ESPHome functionality but I hope to get this fixed (see [this feature request](https://github.com/esphome/feature-requests/issues/2703)).
-More info on the issue can be [found here](https://github.com/olicooper/esphome-nspanel-lovelace-native/issues/8).
-
-**Solution**: Use the `service` forecast method to manually push weather data to the panel.
-1. Update your ESPHome configuration:
-    ```yaml
-      screensaver:
-        weather:
-          entity_id: weather.home # Change this to your weather entity
-          forecast_method: service
-          icon_color: "#FF8800" # Optional: pin the weather icons to one colour
-    ```
-2. Add an automation to Home Assistant to push the forecast:
-    ```yaml
-    alias: NSPanel Lovelace Weather Forecast Sync
-    description: >-
-      This automation fetches the weather forecast and pushes only the upcoming
-      entries to the NSPanel. It filters the forecast to only include entries
-      starting from the current hour, keeping only datetime, condition, and
-      temperature as these are the only attributes used by the nspanel.
-    triggers:
-      - minutes: /30
-        trigger: time_pattern
-      - entity_id: weather.home # Change this to your weather entity
-        trigger: state
-      ## NOTE: This makes sure the forecast is sent when the panel is turned on
-      - trigger: state
-        entity_id:
-          - switch.nspanel_screen_power # Change this to your NSPanel 'screen_power' entity_id
-        for:
-          hours: 0
-          minutes: 0
-          seconds: 2
-        to:
-          - "on"
-        alias: When nspanel becomes available
-    conditions: []
-    actions:
-      - target:
-          entity_id: weather.home # Change this to your weather entity
-        data:
-          type: hourly # or daily/twice_daily
-        response_variable: forecast_data
-        action: weather.get_forecasts
-      - variables:
-          forecast: >-
-            {% set forecast = (forecast_data.values() | first).forecast %}
-            {% set ns = namespace(items=[]) %}
-            {% for item in forecast if as_timestamp(item.datetime) >= as_timestamp(now()) %}
-              {% if (ns.items | length) < 5 %}
-                {% set ns.items = ns.items + [{
-                  "datetime": item.datetime | as_datetime | as_timestamp | timestamp_custom('%Y-%m-%dT%H:%M:%S'),
-                  "condition": item.condition,
-                  "temperature": item.temperature | float(1)
-                }] %}
-              {% endif %}
-            {% endfor %}
-            {{- ns.items }}
-      - action: esphome.nspanel_set_weather_forecast_data # Change this to your NSPanel 'set_weather_forecast_data' action/service name. This can be found in HA developer tools > actions (after the nspanel has been re-configured to use the 'service' forecast_method and has connected to HA).
-        data:
-          forecast: "{{ forecast }}"
-    mode: single
-    ```
-
-**Alternative Workaround (deprecated)**: Add a template sensor to your Home Assistant configuration (changing `weather.home` to your actual weather entity_id) then update the `weather` `entity_id` in your esphome config to the `unique_id` seen below (i.e. `sensor.weather_forecast_daily`).
+Configure one Home Assistant weather entity. The component calls
+`weather.get_forecasts` with `type: daily` and renders the earliest four
+upcoming days in the screensaver, while current conditions (state,
+temperature and unit) continue to come from the same entity.
 
 ```yaml
-template:
-  - trigger:
-      - platform: time_pattern
-        minutes: /30
-      - platform: homeassistant
-        event: start
-      - platform: event
-        event_type: event_template_reloaded
-    action:
-      - service: weather.get_forecasts
-        data:
-          type: daily
-        target:
-          entity_id: weather.home # Change this to your weather entity
-        response_variable: data
-    sensor:
-      - name: Weather Forecast Daily
-        unique_id: weather_forecast_daily # Use this id in your esphome config (screensaver -> weather -> entity_id)
-        state: "{{ states('weather.home') }}" # Change this to your weather entity
-        attributes:
-          temperature: "{{ state_attr('weather.home', 'temperature') }}" # Change this to your weather entity
-          temperature_unit: "{{ state_attr('weather.home', 'temperature_unit') }}" # Change this to your weather entity
-          # Change 'weather.home' below to your weather entity
-          forecast: >
-            {%- with ns = namespace(arr=[],obj={}) -%}
-            {%- for n in data['weather.home'].forecast[:5] -%}
-              {%- for k, v in n | items -%}
-                {%- if k == "datetime" -%}
-                  {%- set ns.obj = dict(ns.obj | items, **{k: as_datetime(v, "0" | as_datetime) | as_local | as_timestamp | timestamp_custom('%Y-%m-%dT%H:%M:%S')}) -%}
-                {%- elif k == "condition" or k == "temperature" -%}
-                  {%- set ns.obj = dict(ns.obj | items, **{k: v}) -%}
-                {%- endif -%}
-              {%- endfor -%}
-              {%- if (ns.obj.items() | length) == 3 and ns.obj.datetime -%}
-                {%- set ns.arr = ns.arr + [ns.obj] -%}
-              {%- endif -%}
-            {%- endfor %}{{ns.arr}}{% endwith -%}
+screensaver:
+  time_id: homeassistant_time
+  weather:
+    entity_id: weather.home
 ```
+
+The provider must support daily forecasts. If the reply is unsupported or
+fails, current conditions stay intact and the forecast slots are blanked with
+a rate-limited diagnostic. No Home Assistant automation, template sensor or
+provider credential is needed. The panel uses its normal API action permission
+to call `weather.get_forecasts`.
+
+**Known limitation (ESPHome 2026.11.0 and 2026.11.1):** Four forecast requests
+that never receive a reply can stop forecast updates until the panel restarts.
+The losses do not have to be consecutive. A panel-side timeout or a Home
+Assistant reconnect does not remove those pending requests from ESPHome.
+The four-request cap prevents them from accumulating indefinitely. This does
+not change the current-conditions subscription or require extra Home Assistant
+setup. See [the ESPHome upgrade check](AGENTS.md#native-weather-upgrade-check)
+for what needs to be fixed.
+
+**Optional restart workaround:** To opt in, set a delay under `weather`:
+
+```yaml
+screensaver:
+  time_id: homeassistant_time
+  weather:
+    entity_id: weather.home
+    restart_after_forecast_stall: 30min
+```
+
+Omit the option or use `0s` to keep the existing polling behavior. When
+opted in, the panel can try the remaining free slot after the existing
+30-minute backoff without waiting for a reconnect. A timely, valid reply
+restores forecasts without restarting. The restart delay starts only when a
+fetch fills the fourth slot. Any processed success or error that frees a
+slot, even a late reply, cancels it.
+
+After the delay, restart still requires four occupied slots, no active
+forecast response window, no TFT upload or reparse, and at least 30 seconds
+of continuously observed Home Assistant state-subscription readiness. An
+observed disconnect restarts that 30-second window, not the stall countdown.
+On ESPHome 2026.11.0 and 2026.11.1 a closing connection can still look ready,
+and a reply can be waiting to be processed, so an unnecessary restart is
+possible. Once restart is committed, the panel rejects new TFT uploads.
+The panel is briefly unavailable during restart, and a persistent fault can
+cause another restart after a fresh stall on each boot. This is a workaround,
+not a fix; recheck supported outbound callback cleanup when upgrading ESPHome.
+
+Migration from older releases: remove `forecast_method`, replace any
+`sensor.*` weather entity with `weather.*`, and disable the old forecast-push
+automation only after the upgraded panel has been verified.
 
 # License
 

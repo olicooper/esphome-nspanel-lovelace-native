@@ -6,8 +6,9 @@ import re
 import logging
 from typing import Union
 from pathlib import Path
+from fractions import Fraction
 
-from esphome.components import uart, time, esp32
+from esphome.components import uart, time, esp32, api as esphome_api
 from esphome.components.color import hex_color
 from esphome.const import (
     CONF_ID,
@@ -122,11 +123,11 @@ CONF_MODEL = "model"
 CONF_SCREENSAVER_DATE_FORMAT = "date_format"
 CONF_SCREENSAVER_TIME_FORMAT = "time_format"
 CONF_SCREENSAVER_WEATHER = "weather"
+CONF_SCREENSAVER_WEATHER_RESTART_AFTER_STALL = "restart_after_forecast_stall"
 CONF_SCREENSAVER_STATUS_ICON_LEFT = "status_icon_left"
 CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
 CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
-CONF_SCREENSAVER_FORECAST_METHOD = "forecast_method"
 CONF_SCREENSAVER_WEATHER_ICON_COLOR = "icon_color"
 
 CONF_CARDS = "cards"
@@ -328,22 +329,59 @@ SCHEMA_STATUS_ICON = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })
 
+_RESTART_DURATION_UNITS = {
+    "ns": "nanoseconds", "us": "microseconds", "\u00b5s": "microseconds",
+    "ms": "milliseconds", "s": "seconds", "sec": "seconds", "min": "minutes",
+    "h": "hours", "d": "days",
+}
+_RESTART_DURATION_MS = {
+    "nanoseconds": Fraction(1, 1000000), "microseconds": Fraction(1, 1000),
+    "milliseconds": 1, "seconds": 1000, "minutes": 60000,
+    "hours": 3600000, "days": 86400000,
+}
+
+
+def valid_weather_stall_restart(value):
+    # ESPHome's TimePeriod rounds each unit before carrying its fraction to
+    # the next unit. Keep the input exact until the final millisecond check.
+    if isinstance(value, str):
+        match = re.fullmatch(r"([+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+))\s*(\w+)", value)
+        if match:
+            amount, unit = match.groups()
+            parts = {_RESTART_DURATION_UNITS.get(unit, unit): amount}
+        else:
+            clock = value.split(":")
+            parts = dict(zip(("hours", "minutes", "seconds"), clock)) if len(clock) in (2, 3) and all(
+                re.fullmatch(r"[+-]?[0-9]+", part) for part in clock
+            ) else {}
+    else:
+        parts = value if isinstance(value, dict) else {}
+    try:
+        if not parts:
+            raise ValueError
+        amounts = []
+        for unit, amount in parts.items():
+            # YAML floats have already lost their original decimal precision.
+            if not re.fullmatch(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)", str(amount)) or isinstance(amount, float):
+                raise ValueError
+            amounts.append((Fraction(str(amount)), _RESTART_DURATION_MS[unit]))
+    except (ValueError, KeyError, OverflowError, ZeroDivisionError) as err:
+        raise cv.Invalid("Expected a forecast stall restart duration with a time unit") from err
+    milliseconds = sum(amount * scale for amount, scale in amounts)
+    if any(amount < 0 for amount, _ in amounts) or milliseconds > 0xFFFFFFFF:
+        raise cv.Invalid("Forecast stall restart duration must be between 0 and 4294967295 ms")
+    if milliseconds != int(milliseconds):
+        raise cv.Invalid("Forecast stall restart duration must use whole milliseconds")
+    return core.TimePeriodMilliseconds(milliseconds=int(milliseconds))
+
+
 def valid_screensaver_weather(config):
-    """The weather entity domain depends on forecast_method: the documented
-    legacy 'template_sensor' mode accepts a sensor (README fallback) or a
-    weather entity, while 'service' mode requires a weather entity."""
-    config = cv.Schema({
-        cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor', 'weather']),
-        cv.Optional(CONF_SCREENSAVER_FORECAST_METHOD, default="template_sensor"): cv.one_of("template_sensor", "service"),
+    """Native weather retrieval needs one Home Assistant weather entity."""
+    return cv.Schema({
+        cv.Required(CONF_ENTITY_ID): valid_entity_id(['weather']),
+        cv.Optional(CONF_SCREENSAVER_WEATHER_RESTART_AFTER_STALL, default="0s"): valid_weather_stall_restart,
         cv.Optional(CONF_SCREENSAVER_WEATHER_ICON_COLOR): valid_color,
     })(config)
-    if config[CONF_SCREENSAVER_FORECAST_METHOD] == "service" and \
-            not config[CONF_ENTITY_ID].startswith("weather."):
-        raise cv.Invalid(
-            "forecast_method 'service' requires a weather entity (weather.<name>)",
-            [CONF_ENTITY_ID],
-        )
-    return config
 
 SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
@@ -830,16 +868,61 @@ async def emit_screensaver(nspanel, config, ctx) -> Union[str, None]:
             weather_config = screensaver_config[CONF_SCREENSAVER_WEATHER]
             if CONF_ENTITY_ID in weather_config:
                 cg.add(nspanel.set_weather_entity_id(weather_config[CONF_ENTITY_ID]))
-            if CONF_SCREENSAVER_FORECAST_METHOD in weather_config:
-                if weather_config[CONF_SCREENSAVER_FORECAST_METHOD] == "service":
-                    cg.add_define("USE_API_CUSTOM_SERVICES")
-                    cg.add_define("USE_NSPANEL_WEATHER_SERVICE")
-                else:
-                    _LOGGER.warning(
-                        "forecast_method 'template_sensor' is deprecated (attribute-based weather mode). "
-                        "Please use forecast_method 'service' instead (see the README for the required HA automation template)."
-                    )
             icon_color = weather_config.get(CONF_SCREENSAVER_WEATHER_ICON_COLOR, None)
+            restart_delay = weather_config[CONF_SCREENSAVER_WEATHER_RESTART_AFTER_STALL].total_milliseconds
+            if restart_delay:
+                cg.add(nspanel.set_weather_forecast_stall_restart(restart_delay))
+
+            # Native daily-forecast retrieval replaces both legacy forecast modes.
+            # One action per slot lets each callback carry its slot number, so a
+            # late reply from a timed-out dispatch cannot be mistaken for the
+            # current one. Explicit IDs avoid unnamed inline-action collisions.
+            cg.add_define("USE_NSPANEL_NATIVE_WEATHER")
+            component_id = str(config[CONF_ID])
+            for slot in range(4):
+                suffix = f"{ctx.uuid_index}_{slot}"
+                action_id = cg.unique_global_id(
+                    f"nspanel_weather_action_{suffix}",
+                    esphome_api.HomeAssistantServiceCallAction)
+                success_id = cg.unique_global_id(
+                    f"nspanel_weather_success_{suffix}", automation.Automation)
+                success_trigger_id = cg.unique_global_id(
+                    f"nspanel_weather_success_trigger_{suffix}", automation.Trigger)
+                success_lambda_id = cg.unique_global_id(
+                    f"nspanel_weather_success_lambda_{suffix}", automation.LambdaAction)
+                error_id = cg.unique_global_id(
+                    f"nspanel_weather_error_{suffix}", automation.Automation)
+                error_trigger_id = cg.unique_global_id(
+                    f"nspanel_weather_error_trigger_{suffix}", automation.Trigger)
+                error_lambda_id = cg.unique_global_id(
+                    f"nspanel_weather_error_lambda_{suffix}", automation.LambdaAction)
+                action_cfg = {
+                    CONF_ID: core.CORE.config[esphome_api.DOMAIN][CONF_ID],
+                    "action": "weather.get_forecasts",
+                    "data": {
+                        "entity_id": weather_config[CONF_ENTITY_ID],
+                        "type": "daily",
+                    },
+                    "capture_response": True,
+                    "on_success": {
+                        automation.CONF_TRIGGER_ID: success_trigger_id,
+                        automation.CONF_AUTOMATION_ID: success_id,
+                        "then": [{"lambda": core.Lambda(
+                            f"id({component_id}).apply_weather_forecast(response, {slot}u);"),
+                            "type_id": success_lambda_id}],
+                    },
+                    "on_error": {
+                        automation.CONF_TRIGGER_ID: error_trigger_id,
+                        automation.CONF_AUTOMATION_ID: error_id,
+                        "then": [{"lambda": core.Lambda(
+                            f"id({component_id}).handle_weather_forecast_error(error, {slot}u);"),
+                            "type_id": error_lambda_id}],
+                    },
+                }
+                validated = esphome_api.HOMEASSISTANT_ACTION_ACTION_SCHEMA(action_cfg)
+                weather_action = await esphome_api.homeassistant_service_to_code(
+                    validated, action_id, cg.TemplateArguments(), [])
+                cg.add(nspanel.set_weather_forecast_action(slot, weather_action))
             screensaver_items = []
             # 1 main weather item + 4 forecast items
             for i in range(0, 5):
@@ -853,6 +936,9 @@ async def emit_screensaver(nspanel, config, ctx) -> Union[str, None]:
                     cg.add(item_class.set_icon_color(cg.RawExpression(f'{icon_color}u')))
                 screensaver_items.append(item_class)
             cg.add(screensaver_class.add_item_range(screensaver_items))
+            # Forecast slots render blank until the first accepted reply; the
+            # current-condition item (index 0) is not touched.
+            cg.add(nspanel.init_weather_forecast_slots())
 
         cg.add(cg.RawStatement("}"))
     return screensaver_uuid

@@ -233,48 +233,6 @@ def test_codegen_tft_upload_build_flag(tmp_path: Path) -> None:
     assert "-DUSE_NSPANEL_TFT_UPLOAD" in cmake
 
 
-def test_codegen_weather_template_sensor_default(tmp_path: Path) -> None:
-    """forecast_method 'template_sensor' (the default) emits no service
-    defines, and its deprecation warning must not promise a removal
-    version (the 2026.6 promise is stale - 2026.11.0 is the floor)."""
-    body = """\
-  screensaver:
-    weather:
-      entity_id: weather.demo
-  cards:
-    - type: cardGrid
-      id: main_card
-      sleep_timeout: 0
-      entities:
-        - entity_id: light.lamp
-"""
-    cfg = tmp_path / "weather-legacy.yaml"
-    cfg.write_text(SYNTHETIC_CONFIG.format(
-        name="weather-legacy",
-        components=str(REPO_ROOT / "components"),
-        nspanel_body=body,
-        esphome_extra="",
-        board="esp32dev",
-    ))
-    result = subprocess.run(
-        ["esphome", "compile", "--only-generate", str(cfg)],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
-    assert result.returncode == 0, (
-        f"template_sensor weather should still build:\n"
-        f"{result.stdout[-4000:]}\n{result.stderr[-4000:]}")
-    defines = (_build_dir(tmp_path, "weather-legacy")
-               / "src" / "esphome" / "core" / "defines.h").read_text()
-    assert "#define USE_NSPANEL_WEATHER_SERVICE" not in defines
-    assert "#define USE_API_CUSTOM_SERVICES" not in defines
-    out = result.stdout + result.stderr
-    assert "forecast_method 'template_sensor' is deprecated" in out, out
-    assert "will be removed" not in out, out
-
-
 def test_codegen_weather_icon_color(tmp_path: Path) -> None:
     """Screensaver weather icon_color accepts "#RRGGBB" and [r,g,b]; codegen
     applies it to all five weather items. Runtime recolour protection needs a panel."""
@@ -323,6 +281,41 @@ def normalize_main_cpp(src: str) -> str:
             continue
         out.append(line)
     return "".join(out)
+
+
+def test_native_weather_codegen(tmp_path: Path) -> None:
+    """Weather emits one native daily response request; omitted weather emits none."""
+    result = run_esphome("compile", "--only-generate", str(CODEGEN_YAML))
+    assert result.returncode == 0, result.stdout + result.stderr
+    enabled = MAIN_CPP.read_text()
+    omitted = generate_synthetic(tmp_path, "  screensaver: {}\n", "weather-omitted")
+
+    assert enabled.count('"weather.get_forecasts"') == 1
+    assert enabled.count('set_weather_forecast_action(') == 4
+    assert '{"entity_id", "weather.demo_codegen", nullptr}' in enabled
+    assert '{"type", "daily", nullptr}' in enabled
+    assert 'set_wants_response()' in enabled
+    assert 'StatelessLambdaAction<ArduinoJson::JsonObjectConst>' in enabled
+    for slot in range(4):
+        assert f'apply_weather_forecast(response, {slot}u)' in enabled
+        assert f'handle_weather_forecast_error(error, {slot}u)' in enabled
+
+    assert 'weather.get_forecasts' not in omitted
+    assert 'set_wants_response()' not in omitted
+    assert 'apply_weather_forecast(response' not in omitted
+
+
+def test_native_weather_stall_restart_codegen(tmp_path: Path) -> None:
+    for option, calls in (("", 0), ("0s", 0), ("30min", 1)):
+        body = "  screensaver:\n    weather:\n      entity_id: weather.lab\n"
+        if option:
+            body += f"      restart_after_forecast_stall: {option}\n"
+        generated = generate_synthetic(tmp_path, body, "weather-stall")
+        assert generated.count("set_weather_forecast_stall_restart(") == calls
+        if calls:
+            assert "set_weather_forecast_stall_restart(1800000);" in generated
+        assert generated.count('"weather.get_forecasts"') == 1
+        assert generated.count("set_weather_forecast_action(") == 4
 
 
 def test_codegen_baseline() -> None:
@@ -397,11 +390,12 @@ def test_codegen_baseline() -> None:
     assert re.search(r'\w+->set_icon_value\(CUSTOM_ICONS\[0\]\)', src)
     assert src.count("set_icon_color(0)") == 1
 
-    # Weather uses the raw entity string, not create_entity; the fixture's
-    # forecast_method 'service' emits both service defines.
+    # Weather uses the raw entity string, not create_entity. Native daily
+    # retrieval is the only forecast mode.
     assert 'set_weather_entity_id("weather.demo_codegen")' in src
-    assert "#define USE_NSPANEL_WEATHER_SERVICE" in defines
-    assert "#define USE_API_CUSTOM_SERVICES" in defines
+    assert "#define USE_NSPANEL_NATIVE_WEATHER" in defines
+    assert "#define USE_NSPANEL_WEATHER_SERVICE" not in defines
+    assert "#define USE_API_CUSTOM_SERVICES" not in defines
 
     # The api states/services defines are emitted unconditionally (the
     # pre-2025.8 version guard is gone; the floor is 2026.11.0).

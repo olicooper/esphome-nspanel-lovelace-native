@@ -196,11 +196,11 @@ std::string &AlarmIconItem::render_(std::string &buffer) {
  * =============== DeleteItem ===============
  */
 
-DeleteItem::DeleteItem(page_type page_type) :
+DeleteItem::DeleteItem(page_type type) :
     PageItem(entity_type::delete_) {
   // Currently all page_types that accept delete entities
-  // have the same separator quantity
-  this->uuid_.append(5, SEPARATOR);
+  // have the same separator quantity except cardPower
+  this->uuid_.append(type == page_type::cardPower ? 6 : 5, SEPARATOR);
 }
 
 DeleteItem::DeleteItem(uint8_t separator_quantity) :

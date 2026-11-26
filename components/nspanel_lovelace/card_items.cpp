@@ -335,7 +335,7 @@ uint16_t EntitiesCardEntityItem::get_render_buffer_reserve_() const {
 
 PowerCardItem::PowerCardItem(
     const std::string &uuid, std::shared_ptr<Entity> entity) :
-    CardItem(uuid, std::move(entity)) {
+    CardItem(uuid, std::move(entity)), PageItem_Value(this) {
   this->icon_default_value_ = icon_t::flash;
   this->icon_value_ = icon_t::flash;
   this->on_entity_type_change(this->get_type());
@@ -345,7 +345,7 @@ PowerCardItem::PowerCardItem(
 PowerCardItem::PowerCardItem(
     const std::string &uuid, std::shared_ptr<Entity> entity,
     const std::string &display_name) :
-    CardItem(uuid, std::move(entity), display_name) {
+    CardItem(uuid, std::move(entity), display_name), PageItem_Value(this) {
   this->icon_default_value_ = icon_t::flash;
   this->icon_value_ = icon_t::flash;
   this->on_entity_type_change(this->get_type());
@@ -358,7 +358,7 @@ void PowerCardItem::on_entity_attribute_change(
     ha_attr_type attr, const psram_string &value) {
   StatefulPageItem::on_entity_attribute_change(attr, value);
   if (attr == ha_attr_type::unit_of_measurement) {
-    this->ha_unit_.assign(value.c_str(), value.size());
+    this->value_postfix_.assign(value);
     if (this->on_state_callback_) {
       this->on_state_callback_(this);
       this->set_render_invalid();
@@ -371,7 +371,7 @@ void PowerCardItem::state_power_fn(StatefulPageItem *me) {
   const auto &state = me_->get_state();
 
   if (state == entity_state::unknown || state == entity_state::unavailable) {
-    me_->value_str_ = "-";
+    me_->value_ = "-";
     me_->speed_ = 0;
     me_->is_active_ = false;
     return;
@@ -380,7 +380,7 @@ void PowerCardItem::state_power_fn(StatefulPageItem *me) {
   float val = 0.0f;
   if (!str_to_float(state, val)) {
     // Non-numeric state (off/idle, or inf/nan from a broken sensor): show raw, no flow.
-    me_->value_str_ = state;
+    me_->value_ = state;
     me_->speed_ = 0;
     me_->is_active_ = false;
     return;
@@ -390,24 +390,24 @@ void PowerCardItem::state_power_fn(StatefulPageItem *me) {
   me_->is_active_ = (abs_val >= 1.0f);
 
   char buf[16];
-  if (me_->ha_unit_ == "W") {
+  // prefix match; starts_with() is C++20 and the host harness compiles C++17
+  if (me_->value_postfix_.rfind("W", 0) == 0) {
     if (abs_val >= 1000.0f) {
       snprintf(buf, sizeof(buf), "%.1f", val / 1000.0f);
-      me_->value_str_ = std::string(buf) + "kW";
+      me_->value_.assign(buf).append(1, 'k');
     } else {
       snprintf(buf, sizeof(buf), "%.0f", val);
-      me_->value_str_ = std::string(buf) + "W";
+      me_->value_.assign(buf);
     }
     int16_t speed = static_cast<int16_t>(val / 20.0f);
     me_->speed_ = speed > 120 ? 120 : (speed < -120 ? -120 : speed);
-  } else if (me_->ha_unit_ == "kW") {
+  } else if (me_->value_postfix_.rfind("kW", 0) == 0) {
     snprintf(buf, sizeof(buf), "%.2f", val);
-    me_->value_str_ = std::string(buf) + "kW";
+    me_->value_.assign(buf);
     int16_t speed = static_cast<int16_t>(val * 50.0f);
     me_->speed_ = speed > 120 ? 120 : (speed < -120 ? -120 : speed);
   } else {
-    me_->value_str_ = state;
-    if (!me_->ha_unit_.empty()) me_->value_str_ += me_->ha_unit_;
+    me_->value_ = state;
     me_->speed_ = 0;
     me_->is_active_ = (abs_val >= 1.0f);
   }
@@ -418,22 +418,36 @@ void PowerCardItem::set_on_state_callback_() {
 }
 
 std::string &PowerCardItem::render_(std::string &buffer) {
-  // format: text~entityId~icon~iconColor~displayName~valueStr~speed
-  buffer.assign(entity_render_type::text).append(1, SEPARATOR);
-  buffer.append(this->entity_->get_entity_id()).append(1, SEPARATOR);
-  buffer.append(CHAR8_CAST(this->icon_value_)).append(1, SEPARATOR);
-  // Grey out the icon when inactive (power == 0 or unavailable), Tesla-card style
-  uint16_t color = this->is_active_ ? this->icon_color_ : COLOR_INACTIVE;
-  buffer.append(std::to_string(color)).append(1, SEPARATOR);
-  buffer.append(this->display_name_).append(1, SEPARATOR);
-  buffer.append(this->value_str_).append(1, SEPARATOR);
+  // format: text~internalName~icon~iconColor~displayName~optionalValue~speed
+  // skip: type,internalName (ignored)
+  buffer.append(2, SEPARATOR);
+  uint16_t color = this->icon_color_;
+  if (!this->is_active_) {
+    this->icon_color_ = COLOR_INACTIVE;
+  }
+  PageItem_Icon::render_(buffer).append(1, SEPARATOR);
+  // todo: temporary, use PageItem_Icon::icon_default_color_ and reset_icon_color() instead?
+  if (!this->is_active_) {
+    this->icon_color_ = color;
+  }
+  PageItem_DisplayName::render_(buffer).append(1, SEPARATOR);
+  PageItem_Value::render_(buffer).append(1, SEPARATOR);
   buffer.append(std::to_string(this->speed_));
   return buffer;
+
+  // buffer.assign(entity_render_type::text).append(1, SEPARATOR);
+  // buffer.append(this->get_uuid()).append(1, SEPARATOR);
+  // buffer.append(CHAR8_CAST(this->icon_value_)).append(1, SEPARATOR);
+  // // Grey out the icon when inactive (power == 0 or unavailable), Tesla-card style
+  // buffer.append(std::to_string(color)).append(1, SEPARATOR);
+  // buffer.append(this->display_name_).append(1, SEPARATOR);
+  // buffer.append(this->value_str_).append(1, SEPARATOR);
+  // buffer.append(std::to_string(this->speed_));
+  // return buffer;
 }
 
 uint16_t PowerCardItem::get_render_buffer_reserve_() const {
-  return CardItem::get_render_buffer_reserve_() +
-         this->value_str_.length() + 10;
+  return CardItem::get_render_buffer_reserve_() + 26;
 }
 
 } // namespace nspanel_lovelace

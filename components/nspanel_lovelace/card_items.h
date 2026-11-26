@@ -72,7 +72,9 @@ protected:
  * =============== PowerCardItem ===============
  */
 
-class PowerCardItem : public CardItem {
+class PowerCardItem :
+    public CardItem,
+    public PageItem_Value {
 public:
   PowerCardItem(const std::string &uuid, std::shared_ptr<Entity> entity);
   PowerCardItem(
@@ -89,8 +91,6 @@ public:
   static constexpr uint16_t COLOR_INACTIVE = 33808u; // #808080
 
 protected:
-  std::string value_str_;
-  std::string ha_unit_;
   int16_t speed_ = 0;
   bool is_active_ = false;
 

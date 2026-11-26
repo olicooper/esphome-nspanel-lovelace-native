@@ -575,6 +575,23 @@ def test_status_icon_requires_entity_id(tmp_path: Path) -> None:
     assert "entity_id" in out, out
 
 
+def test_status_icon_accepts_lock_entity(tmp_path: Path) -> None:
+    """Screensaver status icons can watch lock entities directly."""
+    body = """\
+  screensaver:
+    status_icon_right:
+      entity_id: lock.front_door
+      alt_font: true
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="status-icon-lock")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
     """Top-level sleep_timeout is 0..65535; >65 is timed on the ESP32."""
     def body(timeout: int) -> str:

@@ -529,6 +529,16 @@ static void test_tile_callbacks() {
   check(grid_cover.get_icon_color() == 64909, "grid cover callback sets open color");
   cover->set_state("closed");
   check(grid_cover.get_icon_color() == 17299, "grid cover callback sets closed color");
+
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.test", lock_type.c_str());
+  StatusIconItem status_lock("status-lock", lock);
+  lock->set_state("locked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock)) == 0,
+        "lock status icon is a closed padlock while locked");
+  lock->set_state("unlocked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock_open)) == 0,
+        "lock status icon opens when unlocked");
 }
 
 static void test_numeric_render() {
@@ -869,10 +879,28 @@ static void test_long_sleep_timeout() {
   check(display == std::vector<std::string>{"timeout~10"}, "popup timeout cancels the long timer");
 }
 
+static void test_single_status_icon() {
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.front_door", lock_type.c_str());
+  const auto right = std::make_shared<StatusIconItem>("status-right", lock);
+  lock->set_state("unlocked");
+
+  Screensaver screensaver("screensaver");
+  screensaver.set_icon_right(right);
+  check(screensaver.should_render_status_update(), "single status icon requests an update");
+
+  std::string buffer;
+  screensaver.render_status_update(buffer);
+  check(buffer.rfind("statusUpdate~~~", 0) == 0 &&
+        buffer.find(CHAR8_CAST(icon_t::lock_open)) != std::string::npos,
+        "single right status icon renders with a blank left side");
+}
+
 int main() {
   test_uart_recovery();
   test_service_tile();
   test_long_sleep_timeout();
+  test_single_status_icon();
   test_wire();
   test_button_validation();
   test_popup_selection();

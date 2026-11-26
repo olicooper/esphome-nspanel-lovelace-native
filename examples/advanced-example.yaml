@@ -60,6 +60,10 @@ nspanel_lovelace:
     #   icon:
     #     value: robot-outline
     #     color: 200
+    # Lock entities work directly; locked/unlocked glyphs are selected automatically:
+    # status_icon_right:
+    #   entity_id: lock.front_door
+    #   alt_font: true
   cards:
     - type: cardGrid
       id: front_room

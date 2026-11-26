@@ -376,7 +376,7 @@ SCHEMA_ICON = cv.Any(
 SCHEMA_STATUS_ICON = cv.Schema({
     # The StatusIconItem constructors all require an entity, so a provided
     # status icon block without an entity_id is a config error, not a codegen one.
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light','lock']),
     cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })

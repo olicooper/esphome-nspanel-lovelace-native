@@ -136,6 +136,22 @@ static void test_value_or_default() {
         "value_or_default(unsigned): empty string returns the default");
 }
 
+static void test_replace_first() {
+  // Long weekday/month names are tried first; a successful replacement must
+  // suppress the short-name pass, or "Monday" -> "Montag" becomes "Mo tag".
+  std::string s = "Monday";
+  if (!replace_first(s, "Monday", "Montag"))
+    replace_first(s, "Mon", "Mo");
+  check(s == "Montag", "replace_first: long name wins over short name");
+
+  s = "Mon";
+  check(!replace_first(s, "Monday", "Montag"),
+        "replace_first: reports a missing long name");
+  check(replace_first(s, "Mon", "Mo"),
+        "replace_first: reports a short-name match");
+  check(s == "Mo", "replace_first: short name used when long name absent");
+}
+
 static void test_convert_python_arr_str() {
   check(convert_python_arr_str("") == "", "convert_python_arr_str: empty input");
   check(convert_python_arr_str("['a','b']") == "a,b",
@@ -158,6 +174,7 @@ int main() {
   test_split_str();
   test_str_to_number();
   test_value_or_default();
+  test_replace_first();
   test_convert_python_arr_str();
 
   printf("\n%s (%d failure%s)\n", failures ? "FAILED" : "all passed", failures,

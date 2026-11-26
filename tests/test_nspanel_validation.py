@@ -193,6 +193,33 @@ def test_load_translations_valid() -> None:
     assert all(isinstance(v, str) for v in data.values())
 
 
+@pytest.mark.parametrize(
+    "path", sorted((COMPONENTS_DIR / "nspanel_lovelace" / "translations").glob("*.json")),
+    ids=lambda p: p.stem,
+)
+def test_bundled_translations_all_valid(path: Path) -> None:
+    """Every bundled locale, not just the English fallback, must load."""
+    nsl = load_component()
+    data = nsl.load_translations(path)
+    assert data == json.loads(path.read_text(encoding="utf-8"))
+    assert all(isinstance(v, str) for v in data.values())
+
+
+def test_valid_color_formats() -> None:
+    """Documented colour forms stay accepted; malformed forms are rejected."""
+    nsl = load_component()
+    assert nsl.valid_color(52857) == 52857
+    assert nsl.valid_color("52857") == 52857
+    for value in (0, 65535):
+        assert nsl.valid_color(value) == value
+    for value in ("#FF0000", "FF0000", [255, 0, 0]):
+        assert nsl.valid_color(value) == 63488, value
+    assert nsl.valid_color("123456") == 4522  # six digits stay hex, not decimal
+    for value in ("#ce79", "##FF0000", True, -1, 65536, [256, 0, 0]):
+        with pytest.raises(nsl.cv.Invalid):
+            nsl.valid_color(value)
+
+
 def test_load_translations_missing_file(tmp_path: Path) -> None:
     nsl = load_component()
     missing = tmp_path / "nope.json"

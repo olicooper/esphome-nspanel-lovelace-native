@@ -272,8 +272,8 @@ def test_codegen_weather_template_sensor_default(tmp_path: Path) -> None:
 
 
 def test_codegen_weather_icon_color(tmp_path: Path) -> None:
-    """Screensaver weather icon_color accepts "#RRGGBB" and [r,g,b], and is
-    re-applied on all five weather items so weather updates cannot recolor it."""
+    """Screensaver weather icon_color accepts "#RRGGBB" and [r,g,b]; codegen
+    applies it to all five weather items. Runtime recolour protection needs a panel."""
     cards = """\
   cards:
     - type: cardGrid

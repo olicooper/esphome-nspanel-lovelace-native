@@ -296,12 +296,18 @@ SCHEMA_LOCALE = cv.Schema({
 
 def valid_color(value):
     """RGB565 int, [r, g, b] list or hex string ("#RRGGBB" / "RRGGBB"), returned as RGB565."""
+    if isinstance(value, bool):
+        raise cv.Invalid("Color must be a number, [r, g, b] list or hex string")
     if isinstance(value, list):
         if len(value) != 3:
             raise cv.Invalid("RGB color must have 3 values, e.g. [255, 255, 255]")
         r, g, b = (cv.uint8_t(v) for v in value)
     elif isinstance(value, str):
-        r, g, b = hex_color(value.lstrip("#"))
+        if re.fullmatch(r"#?[0-9A-Fa-f]{6}", value):
+            r, g, b = hex_color(value.lstrip("#"))
+        else:
+            # Quoted RGB565 decimal, e.g. "52857" from the colour picker docs.
+            return cv.int_range(0, 65535)(value)
     else:
         return cv.int_range(0, 65535)(value)
     return ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)

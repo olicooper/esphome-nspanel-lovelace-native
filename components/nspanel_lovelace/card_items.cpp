@@ -434,16 +434,6 @@ std::string &PowerCardItem::render_(std::string &buffer) {
   PageItem_Value::render_(buffer).append(1, SEPARATOR);
   buffer.append(std::to_string(this->speed_));
   return buffer;
-
-  // buffer.assign(entity_render_type::text).append(1, SEPARATOR);
-  // buffer.append(this->get_uuid()).append(1, SEPARATOR);
-  // buffer.append(CHAR8_CAST(this->icon_value_)).append(1, SEPARATOR);
-  // // Grey out the icon when inactive (power == 0 or unavailable), Tesla-card style
-  // buffer.append(std::to_string(color)).append(1, SEPARATOR);
-  // buffer.append(this->display_name_).append(1, SEPARATOR);
-  // buffer.append(this->value_str_).append(1, SEPARATOR);
-  // buffer.append(std::to_string(this->speed_));
-  // return buffer;
 }
 
 uint16_t PowerCardItem::get_render_buffer_reserve_() const {

@@ -87,7 +87,7 @@ public:
 
   int16_t get_speed() const { return this->speed_; }
 
-  // rgb565 grey shown when power == 0; active color comes from icon_color (set via YAML)
+  // rgb565 grey shown when inactive (zero/unavailable); active color comes from icon_color (set via YAML)
   static constexpr uint16_t COLOR_INACTIVE = 33808u; // #808080
 
 protected:
@@ -97,7 +97,7 @@ protected:
   static void state_power_fn(StatefulPageItem *me);
   void set_on_state_callback_() override;
 
-  // output: text~entityId~icon~iconColor~displayName~valueStr~speed
+  // output: ignored~ignored~icon~iconColor~displayName~value~speed
   std::string &render_(std::string &buffer) override;
   uint16_t get_render_buffer_reserve_() const override;
 };

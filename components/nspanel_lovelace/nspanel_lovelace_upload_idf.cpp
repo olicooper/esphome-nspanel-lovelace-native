@@ -216,6 +216,12 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
 }
 
 bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/) {
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+  if (this->weather_stall_restart_committed_) {
+    ESP_LOGW(TAG, "TFT upload refused: forecast stall restart committed");
+    return false;
+  }
+#endif
   ESP_LOGI(TAG, "Nextion TFT upload requested");
   ESP_LOGD(TAG, "URL: %s", url.c_str());
 

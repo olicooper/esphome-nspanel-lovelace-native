@@ -32,3 +32,11 @@ This is the PhiKapJames fork of `olicooper/esphome-nspanel-lovelace-native`. For
 ## Validation boundary
 
 `tests/host/run.sh`, pytest in the 2026.11.0 image, and `esphome config` / `compile` for `ci/basic.yaml` and `ci/advanced.yaml` prove code correctness only. TFT field layout, PSRAM allocation, upload baud/timing and HMI behaviour need a real panel. Transfer, build, OTA and flashing each require separate owner approval.
+
+## Native weather upgrade check
+
+When evaluating an ESPHome upgrade, check the candidate version's release notes and public API or source for supported cancellation, expiry, or disconnect cleanup of **outbound Home Assistant action-response callbacks**. On ESPHome 2026.11.0 and 2026.11.1, a panel-side timeout or reconnect does not clear those callbacks. Four permanently lost replies, even across reconnects, can stop forecast updates until the panel restarts.
+
+Keep direct `weather.*` retrieval without requiring a Home Assistant template sensor or automation. Until supported cleanup is verified, retain the four-slot cap: do not reuse an occupied slot or allow unbounded callback growth. Automatic panel restarts are permitted only as the owner's opt-in `restart_after_forecast_stall` workaround, not as a fix. Omitted or `0s` leaves polling unchanged; opting in lets a free slot be tried after the existing 30-minute backoff without a reconnect. Restart is a best-effort fallback only after filling four slots and observing at least 30 seconds of HA state-subscription readiness. A restart briefly interrupts the panel and can recur after a fresh stall on a later boot. An inbound action timeout or a guard that only ignores stale replies does not free outbound callbacks.
+
+If the candidate offers supported cleanup, verify in an isolated lab that a new forecast fetch succeeds after four deliberately lost replies without a panel restart, late replies cannot overwrite newer data, and pending callback storage stays bounded over repeated loss and reconnect cycles. Record the exact version and evidence before changing the slot policy. If no supported solution is found, record the version checked and leave this follow-up open.

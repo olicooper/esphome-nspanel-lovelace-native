@@ -394,31 +394,88 @@ def test_entity_id_pseudo_entities_generic_tile() -> None:
         tile("delete.something")  # 'delete' is an exact sentinel
 
 
-def test_weather_entity_domain_by_forecast_mode(tmp_path: Path) -> None:
-    """The weather entity domain depends on forecast_method: the documented
-    legacy 'template_sensor' mode accepts sensor.* (README fallback) and
-    weather.* (test.yaml), while 'service' mode requires weather.*."""
-    def weather_cfg(eid: str, mode: str) -> str:
-        return f"""\
+def _weather_body(entity_id: str, extra: str = "") -> str:
+    return f"""\
   screensaver:
     weather:
-      entity_id: {eid}
-      forecast_method: {mode}
-"""
-    for eid, mode in (
-        ("sensor.forecast_daily", "template_sensor"),  # documented legacy path
-        ("weather.forecast_home", "template_sensor"),  # test.yaml shape
-        ("weather.forecast_home", "service"),
-    ):
-        result = esphome_config(tmp_path, weather_cfg(eid, mode), name=f"w-ok-{mode[:4]}")
-        assert result.returncode == 0, (
-            f"{eid} + forecast_method {mode} should validate:\n{result.stdout}"
-        )
+      entity_id: {entity_id}
+{extra}"""
+
+
+def test_weather_entity_without_method_valid(tmp_path: Path) -> None:
+    """One weather entity is the complete native-weather configuration."""
     result = esphome_config(
-        tmp_path, weather_cfg("sensor.forecast_daily", "service"), name="w-bad"
+        tmp_path, _weather_body("weather.forecast_home"), name="native-weather-ok"
     )
-    assert result.returncode != 0
-    assert "weather entity" in result.stdout + result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(("options", "milliseconds"), [
+    ({}, 0),
+    ({"restart_after_forecast_stall": "0s"}, 0),
+    ({"restart_after_forecast_stall": "30min"}, 1800000),
+    ({"restart_after_forecast_stall": "0.0005min"}, 30),
+    ({"restart_after_forecast_stall": "0.000005h"}, 18),
+    ({"restart_after_forecast_stall": "4294967.295s"}, 4294967295),
+    ({"restart_after_forecast_stall": "4294967295ms"}, 4294967295),
+])
+def test_weather_stall_restart_duration(options, milliseconds) -> None:
+    weather = load_component().valid_screensaver_weather({"entity_id": "weather.home", **options})
+    assert weather["restart_after_forecast_stall"].total_milliseconds == milliseconds
+
+
+@pytest.mark.parametrize("duration", [
+    "soon", "-1ms", "-0.0005ms", "4294967296ms", "4294967295.0005ms", "0.1ms", "0.000001h",
+])
+def test_weather_stall_restart_rejects_invalid_duration(duration) -> None:
+    nsl = load_component()
+    with pytest.raises(nsl.cv.Invalid):
+        nsl.valid_screensaver_weather({"entity_id": "weather.home", "restart_after_forecast_stall": duration})
+
+
+def test_weather_stall_restart_requires_weather_block(tmp_path: Path) -> None:
+    result = esphome_config(tmp_path, "  screensaver:\n    restart_after_forecast_stall: 30min\n",
+                            name="weather-stall-misplaced")
+    assert result.returncode != 0 and "restart_after_forecast_stall" in result.stdout + result.stderr
+
+
+def test_omitted_weather_valid(tmp_path: Path) -> None:
+    """Weather stays optional; a screensaver without weather still validates."""
+    result = esphome_config(
+        tmp_path, "  screensaver:\n    id: no_weather\n", name="native-weather-omitted"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_sensor_weather_rejected(tmp_path: Path) -> None:
+    """A template sensor is not a weather entity and must be rejected."""
+    result = esphome_config(
+        tmp_path, _weather_body("sensor.forecast_daily"), name="native-weather-sensor"
+    )
+    assert result.returncode != 0, "sensor.* must not be accepted as weather"
+    assert "weather" in result.stdout + result.stderr
+
+
+def test_forecast_method_service_rejected(tmp_path: Path) -> None:
+    """The old service mode option must no longer be accepted."""
+    result = esphome_config(
+        tmp_path,
+        _weather_body("weather.forecast_home", "      forecast_method: service\n"),
+        name="native-weather-service-mode",
+    )
+    assert result.returncode != 0, "forecast_method: service must be rejected"
+    assert "forecast_method" in result.stdout + result.stderr
+
+
+def test_forecast_method_template_sensor_rejected(tmp_path: Path) -> None:
+    """The old template-sensor mode option must no longer be accepted."""
+    result = esphome_config(
+        tmp_path,
+        _weather_body("weather.forecast_home", "      forecast_method: template_sensor\n"),
+        name="native-weather-template-mode",
+    )
+    assert result.returncode != 0, "forecast_method: template_sensor must be rejected"
+    assert "forecast_method" in result.stdout + result.stderr
 
 
 def test_duplicate_card_ids_rejected(tmp_path: Path) -> None:

@@ -56,6 +56,11 @@ jobs:
       run: |
         cp examples/secrets-example.yaml examples/secrets.yaml
     - run: esphome compile ci/${{ matrix.variant }}.yaml
+    - name: Test weather with managed ArduinoJson
+      if: matrix.version == '2026.11.0' && matrix.variant == 'codegen'
+      run: |
+        test -f ci/.esphome/build/ci-codegen/managed_components/bblanchon__arduinojson/src/ArduinoJson.h
+        ARDUINOJSON_DIR="$PWD/ci/.esphome/build/ci-codegen/managed_components/bblanchon__arduinojson/src" tests/host/run.sh
 
   # Single floor-pinned host-test job: the pytest suite runs once (it does not
   # multiply across the firmware matrix) and needs no secrets -- the synthetic

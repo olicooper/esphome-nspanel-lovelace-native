@@ -2,9 +2,16 @@
 
 #include "defines.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
 #include <functional>
 #include <memory>
 #include <map>
+#include <optional>
 #include <queue>
 #include <stdint.h>
 #include <utility>
@@ -20,6 +27,9 @@
 #include "esphome/core/version.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/api/custom_api_device.h"
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+#include "esphome/components/api/homeassistant_service.h"
+#endif
 
 #include <driver/gpio.h>
 #include "esphome/components/uart/uart_component_esp_idf.h"
@@ -48,6 +58,120 @@ PACK(struct NSPanelRestoreState {
   uint8_t display_active_dim_ = 100;
   uint8_t display_inactive_dim_ = 50;
 });
+
+// BEGIN WEATHER SLOT LOGIC
+// Pure daily-forecast selection. Parsed entries carry a panel-local date key
+// and weekday; no JSON, ESPHome or device types appear here so the same code
+// is compiled by the firmware and the host renderer test.
+struct WeatherForecastSlotData {
+  std::string date_key;  // panel-local "YYYY-MM-DD"
+  uint8_t weekday{7};     // 0=Sunday..6=Saturday, 7=invalid
+  std::string condition;
+  float temperature{0.0f};
+  bool valid{false};
+};
+
+struct WeatherForecastOutputSlot {
+  std::string date_key;
+  uint8_t weekday{7};
+  std::string condition;
+  std::string temperature;
+  bool filled{false};
+};
+
+static constexpr size_t WEATHER_FORECAST_SLOT_COUNT = 4;
+
+inline bool is_weather_date_key_valid(const std::string &key) {
+  if (key.size() != 10 || key[4] != '-' || key[7] != '-') return false;
+  for (size_t i = 0; i < key.size(); ++i) {
+    if (i == 4 || i == 7) continue;
+    if (key[i] < '0' || key[i] > '9') return false;
+  }
+  return true;
+}
+
+// Portable UTC epoch from a parsed broken-down time (no timegm on ESP-IDF).
+inline time_t weather_tm_to_utc_epoch(const tm &parsed) {
+  const unsigned month = static_cast<unsigned>(parsed.tm_mon + 1);
+  const int year = parsed.tm_year + 1900 - (month <= 2);
+  const int era = (year >= 0 ? year : year - 399) / 400;
+  const unsigned yoe = static_cast<unsigned>(year - era * 400);
+  const unsigned doy =
+      (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 +
+      static_cast<unsigned>(parsed.tm_mday) - 1;
+  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  const long long days =
+      static_cast<long long>(era) * 146097 + static_cast<int>(doe) - 719468;
+  return static_cast<time_t>(
+      days * 86400 + parsed.tm_hour * 3600 + parsed.tm_min * 60 + parsed.tm_sec);
+}
+
+// Convert an HA ISO-8601 daily timestamp using ESPHome's configured timezone.
+inline bool weather_datetime_to_local_day(const char *datetime, std::string &date_key,
+                                          uint8_t &weekday) {
+  if (datetime == nullptr) return false;
+  tm parsed{};
+  const char *end = strptime(datetime, "%Y-%m-%dT%H:%M:%S", &parsed);
+  if (end == nullptr) return false;
+  int offset_seconds = 0;
+  if (*end == '.') {
+    const char *fraction = ++end;
+    end += strspn(end, "0123456789");
+    if (end == fraction) return false;
+  }
+  if (*end == 'Z') {
+    ++end;
+  } else if (*end == '+' || *end == '-') {
+    const int sign = *end == '+' ? 1 : -1;
+    tm offset{};
+    end = strptime(end + 1, "%H:%M", &offset);
+    if (end == nullptr || offset.tm_hour > 23 || offset.tm_min > 59) return false;
+    offset_seconds = sign * (offset.tm_hour * 3600 + offset.tm_min * 60);
+  } else {
+    return false;
+  }
+  if (*end != '\0') return false;
+  const time_t utc = weather_tm_to_utc_epoch(parsed) - offset_seconds;
+  if (utc == static_cast<time_t>(-1)) return false;
+  const auto local = ESPTime::from_epoch_local(utc);
+  char buffer[16] = {};
+  snprintf(buffer, sizeof(buffer), "%04u-%02u-%02u", local.year, local.month, local.day_of_month);
+  date_key = buffer;
+  weekday = static_cast<uint8_t>(local.day_of_week - 1);
+  return true;
+}
+
+inline size_t build_weather_forecast_slots(
+    const std::vector<WeatherForecastSlotData> &entries,
+    const std::string &today_date_key,
+    std::array<WeatherForecastOutputSlot, WEATHER_FORECAST_SLOT_COUNT> &out) {
+  out = {};
+  std::vector<const WeatherForecastSlotData *> valid;
+  valid.reserve(entries.size());
+  for (const auto &entry : entries) {
+    if (!entry.valid || entry.weekday > 6 || entry.condition.empty() ||
+        !is_weather_date_key_valid(entry.date_key) || std::isnan(entry.temperature))
+      continue;
+    // Expire days already past in panel-local time; a transient error must not
+    // leave yesterday's forecast on the panel.
+    if (!today_date_key.empty() && entry.date_key < today_date_key) continue;
+    valid.push_back(&entry);
+  }
+  std::stable_sort(valid.begin(), valid.end(),
+                   [](const auto *a, const auto *b) { return a->date_key < b->date_key; });
+  const size_t count = std::min(valid.size(), WEATHER_FORECAST_SLOT_COUNT);
+  for (size_t i = 0; i < count; ++i) {
+    char buffer[16] = {};
+    snprintf(buffer, sizeof(buffer), "%.1f", valid[i]->temperature);
+    out[i].date_key = valid[i]->date_key;
+    out[i].weekday = valid[i]->weekday;
+    out[i].condition = valid[i]->condition;
+    out[i].temperature = buffer;
+    out[i].filled = true;
+  }
+  return count;
+}
+// END WEATHER SLOT LOGIC
 
 class NSPanelLovelace : public Component, public uart::UARTDevice, public api::CustomAPIDevice {
 public:
@@ -119,8 +243,16 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
-#ifdef USE_NSPANEL_WEATHER_SERVICE
-  void set_weather_forecast_data(std::string forecast_json);
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+  void set_weather_forecast_action(uint8_t slot, api::HomeAssistantServiceCallAction<> *action) {
+    this->weather_forecast_actions_[slot] = action;
+  }
+  void set_weather_forecast_stall_restart(uint32_t delay_ms) { this->weather_stall_restart_delay_ms_ = delay_ms; }
+  void apply_weather_forecast(ArduinoJson::JsonObjectConst response, uint8_t slot);
+  void handle_weather_forecast_error(const std::string &error, uint8_t slot);
+  // Called from codegen after the screensaver items exist: the four forecast
+  // slots start blank until the first accepted reply fills them.
+  void init_weather_forecast_slots();
 #endif
   void set_weather_entity_id(const std::string &weather_entity_id) { this->weather_entity_id_ = weather_entity_id; }
 
@@ -252,8 +384,43 @@ protected:
   void on_weather_state_update_(const std::string &entity_id, esphome::StringRef state);
   void on_weather_temperature_update_(const std::string &entity_id, esphome::StringRef temperature);
   void on_weather_temperature_unit_update_(const std::string &entity_id, esphome::StringRef temperature_unit);
-  void on_weather_forecast_update_(const std::string &entity_id, esphome::StringRef forecast_json);
   void send_weather_update_command_();
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+  void check_weather_forecast_();
+  bool weather_forecast_slots_full_() const;
+  void observe_weather_restart_ha_();
+  bool weather_stall_restart_ready_() const;
+  void check_weather_forecast_stall_();
+  bool clear_weather_forecast_(uint8_t slot);
+  void log_weather_forecast_diagnostic_(const char *reason);
+  void publish_weather_slots_(const std::array<WeatherForecastOutputSlot, WEATHER_FORECAST_SLOT_COUNT> &slots);
+  void expire_weather_slots_();
+  std::string weather_today_date_key_();
+
+  static constexpr uint8_t WEATHER_ACTION_SLOTS = 4;
+  api::HomeAssistantServiceCallAction<> *weather_forecast_actions_[WEATHER_ACTION_SLOTS]{};
+  bool weather_slot_used_[WEATHER_ACTION_SLOTS]{};
+  uint8_t weather_last_slot_{WEATHER_ACTION_SLOTS - 1};
+  uint8_t weather_pending_slot_{WEATHER_ACTION_SLOTS};
+  uint32_t weather_next_fetch_ms_{0};
+  uint32_t weather_response_deadline_ms_{0};
+  uint32_t weather_last_diagnostic_ms_{0};
+  bool weather_diagnostic_logged_{false};
+  uint32_t weather_last_expire_ms_{0};
+  uint8_t weather_unanswered_{0};
+  bool weather_api_ready_{false};
+  bool weather_in_flight_{false};
+  uint32_t weather_stall_restart_delay_ms_{0};
+  std::optional<uint64_t> weather_stall_restart_deadline_ms_;
+  std::optional<uint64_t> weather_restart_ha_ready_since_ms_;
+  bool weather_stall_restart_queued_{false};
+#ifdef USE_NSPANEL_TFT_UPLOAD
+  bool weather_stall_restart_committed_{false};
+#endif
+  std::string weather_forecast_json_;
+  bool weather_forecast_valid_{false};
+  std::string weather_slot_dates_[WEATHER_FORECAST_SLOT_COUNT];
+#endif
   std::string weather_entity_id_;
   std::string language_;
 

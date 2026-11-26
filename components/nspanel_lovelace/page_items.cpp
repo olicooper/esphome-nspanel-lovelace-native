@@ -138,6 +138,7 @@ void WeatherItem::set_icon_by_weather_condition(const std::string &condition) {
   if (!this->icon_color_overridden_)
     this->icon_color_ = icon.color;
   this->icon_value_ = icon.value;
+  this->blank_ = false;
   this->set_render_invalid();
 }
 
@@ -145,11 +146,22 @@ bool WeatherItem::set_value(const std::string &value) {
   if (sscanf(value.c_str(), "%f", &this->float_value_) != 1)
     return false;
   this->value_ = value;
+  this->blank_ = false;
   this->render_invalid_ = true;
   return true;
 }
 
+void WeatherItem::set_forecast_blank() {
+  this->blank_ = true;
+  this->render_invalid_ = true;
+}
+
 std::string &WeatherItem::render_(std::string &buffer) {
+  if (this->blank_) {
+    // Blank forecast slot: every field, including icon, day label and the
+    // formatted temperature with its unit, stays empty.
+    return buffer.append(5, SEPARATOR);
+  }
   // skip: type,internalName
   buffer.append(2, SEPARATOR);
   PageItem_Icon::render_(buffer).append(1, SEPARATOR);

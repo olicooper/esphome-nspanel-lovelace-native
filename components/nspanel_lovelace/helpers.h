@@ -105,35 +105,6 @@ inline double value_or_default(const StringT &str, double default_value) {
     ? default_value : strtod(str.c_str(), nullptr);
 }
 
-inline bool iso8601_to_tm(const char* iso8601_string, tm &t) {
-  if (iso8601_string == nullptr) return false;
-  
-	// note: don't need to know the timezone
-	static constexpr const char* format = "%d-%d-%dT%d:%d:%d";// "%d-%d-%dT%d:%d:%d+%d:%d";
-
-	uint8_t parseCount = std::sscanf(iso8601_string, format, 
-		&t.tm_year, &t.tm_mon, &t.tm_mday, 
-		&t.tm_hour, &t.tm_min, &t.tm_sec
-		//&tz_hr, &tz_min
-	);
-	
-	if (parseCount < 3) {
-		return false;
-	}
-	
-	t.tm_year -= 1900;
-	t.tm_mon -= 1;
-
-  const time_t time_temp = mktime(&t);
-	if (time_temp == -1) {
-		return false;
-	}
-  // convert to utc
-  t = *gmtime(&time_temp);
-
-	return true;
-}
-
 inline uint16_t rgb_dec565(uint8_t red, uint8_t green, uint8_t blue) {
   // if type(rgb_color) is str:
   //     rgb_color = apis.ha_api.render_template(rgb_color)

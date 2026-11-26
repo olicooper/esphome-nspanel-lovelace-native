@@ -1,0 +1,86 @@
+# Task 1 evidence-only probe (native weather implementation plan).
+#
+# Purpose: verify the ESPHome native API action-response contract
+# (homeassistant.action + weather.get_forecasts + capture_response) at the
+# supported floor (2026.11.0) and the stable release (2026.11.1).
+#
+# This is a SYNTHETIC LAB FIXTURE, not a production config:
+# - No panel hardware, no nspanel_lovelace component, no display code.
+# - Manually triggered: the two api services below are each called once by an
+#   operator from an isolated Home Assistant. There is no periodic request loop.
+# - weather.demo is the built-in synthetic demo weather platform (supports
+#   daily forecasts); weather.lab_nonexistent is a deliberately invalid target
+#   to exercise the explicit HA error path.
+# - Dummy credentials only. Do not flash to any real device.
+
+esphome:
+  name: weather-native-probe
+  comment: "Task 1 evidence-only probe. Synthetic lab fixture. Do not flash."
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'WEATHER_PROBE_SSID'
+  password: 'WEATHER_PROBE_PASSWORD'
+
+api:
+  services:
+    # Manual success-path trigger: one native homeassistant.action with a fresh
+    # call_id per invocation. on_success receives the captured reply as a
+    # borrowed JsonObjectConst view; it must be consumed before return.
+    - service: weather_probe_success
+      then:
+        - homeassistant.action:
+            action: weather.get_forecasts
+            data:
+              entity_id: weather.demo
+              type: daily
+            capture_response: true
+            on_success:
+              - lambda: |-
+                  // Shape + payload-size evidence only; no forecast values are logged.
+                  // Consume the borrowed view before returning (the reply protobuf
+                  // frame lives on the API server's stack until this returns).
+                  JsonVariantConst inner = response["response"];
+                  JsonVariantConst entity = inner["weather.demo"];
+                  JsonVariantConst forecast = entity["forecast"];
+                  ESP_LOGI("weather-probe",
+                           "SUCCESS: response[\"response\"] %s, [\"weather.demo\"] %s, "
+                           "[\"forecast\"] %s, forecast.size=%u, payload_bytes=%u",
+                           inner.is<JsonObject>() ? "object" : "MISSING",
+                           entity.is<JsonObject>() ? "object" : "MISSING",
+                           forecast.is<JsonArray>() ? "array" : "MISSING",
+                           (unsigned)(forecast.is<JsonArray>() ? forecast.as<JsonArrayConst>().size() : 0),
+                           (unsigned)measureJson(response));
+                  if (forecast.is<JsonArray>() && forecast.as<JsonArrayConst>().size() > 0) {
+                    JsonObjectConst first = forecast.as<JsonArrayConst>()[0].as<JsonObjectConst>();
+                    for (JsonPairConst kv : first) {
+                      ESP_LOGI("weather-probe", "SUCCESS: forecast[0] key: %s", kv.key().c_str());
+                    }
+                  }
+            on_error:
+              - lambda: |-
+                  ESP_LOGW("weather-probe", "ERROR(success-service): %s", error.c_str());
+
+    # Manual error-path trigger: an explicit HA service error must reach on_error
+    # and must not alter any captured-forecast state.
+    - service: weather_probe_error
+      then:
+        - homeassistant.action:
+            action: weather.get_forecasts
+            data:
+              entity_id: weather.lab_nonexistent
+              type: daily
+            capture_response: true
+            on_success:
+              - lambda: |-
+                  ESP_LOGW("weather-probe", "UNEXPECTED success for invalid entity");
+            on_error:
+              - lambda: |-
+                  ESP_LOGW("weather-probe", "ERROR(expected): %s", error.c_str());

@@ -28,7 +28,7 @@ nspanel_lovelace:
     time_id: homeassistant_time
     weather:
       entity_id: weather.demo_codegen
-      forecast_method: service
+      restart_after_forecast_stall: 30min
     status_icon_left:
       entity_id: light.demo_left
       icon:

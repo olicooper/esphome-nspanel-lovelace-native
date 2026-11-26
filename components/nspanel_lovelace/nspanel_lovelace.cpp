@@ -29,39 +29,20 @@
 namespace esphome {
 namespace nspanel_lovelace {
 
-// Use PSRAM for ArduinoJson (if available, otherwise use normal malloc)
-struct SpiRamAllocator
- : ArduinoJson::Allocator
-{
-  void* allocate(size_t size)
-  override
-  {
-   if (psram_available())
-     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
-   else
-     return malloc(size);
-  }
-
-  void deallocate(void* pointer)
-  override
-  {
-    if (psram_available())
-      heap_caps_free(pointer);
-    else
-      return free(pointer);
-  }
-
-  void* reallocate(void* ptr, size_t new_size)
-  override
-  {
-    if (psram_available())
-      return heap_caps_realloc(ptr, new_size, MALLOC_CAP_SPIRAM);
-    else
-      return realloc(ptr, new_size);
-  }
-};
-
 static const char *const TAG = "nspanel_lovelace";
+
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+// Component-side bounds for the accepted native callback leak. ESPHome has no
+// pending-callback removal path, so these stop new dispatches rather than
+// claiming cleanup.
+static constexpr uint32_t WEATHER_FETCH_INTERVAL_MS = 30 * 60 * 1000;
+static constexpr uint32_t WEATHER_CONNECT_DELAY_MS = 2000;
+static constexpr uint32_t WEATHER_RESPONSE_TIMEOUT_MS = 30000;
+static constexpr uint32_t WEATHER_DIAGNOSTIC_INTERVAL_MS = 60000;
+static constexpr uint8_t WEATHER_MAX_UNANSWERED = 3;
+static constexpr uint64_t WEATHER_STALL_HA_STABLE_MS = 30000;
+static constexpr char WEATHER_STALL_RESTART_TIMER[] = "nspanel_forecast_restart";
+#endif
 
 NSPanelLovelace::NSPanelLovelace() {
   command_buffer_.reserve(1024);
@@ -117,17 +98,7 @@ void NSPanelLovelace::setup() {
     this->subscribe_homeassistant_state(
         &NSPanelLovelace::on_weather_temperature_unit_update_,
         this->weather_entity_id_, to_string(ha_attr_type::temperature_unit));
-
-    #ifndef USE_NSPANEL_WEATHER_SERVICE
-        this->subscribe_homeassistant_state(
-            &NSPanelLovelace::on_weather_forecast_update_,
-            this->weather_entity_id_, to_string(ha_attr_type::forecast));
-    #endif
   }
-
-  #ifdef USE_NSPANEL_WEATHER_SERVICE
-    this->register_service(&NSPanelLovelace::set_weather_forecast_data, "set_weather_forecast_data", {"forecast"});
-  #endif
 
   for (auto &entity : this->entities_) {
     auto &entity_id = entity->get_entity_id();
@@ -351,9 +322,20 @@ void NSPanelLovelace::setup() {
 }
 
 void NSPanelLovelace::loop() {
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+  this->observe_weather_restart_ha_();
+#endif
 #ifdef USE_NSPANEL_TFT_UPLOAD
   if (this->is_updating_ || this->reparse_mode_) {
     return;
+  }
+#endif
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+  this->check_weather_forecast_();
+  this->check_weather_forecast_stall_();
+  if (millis() - this->weather_last_expire_ms_ >= 60000U) {
+    this->weather_last_expire_ms_ = millis();
+    this->expire_weather_slots_();
   }
 #endif
 
@@ -2544,158 +2526,296 @@ void NSPanelLovelace::on_weather_temperature_unit_update_(
   this->send_weather_update_command_();
 }
 
-#ifdef USE_NSPANEL_WEATHER_SERVICE
-void NSPanelLovelace::set_weather_forecast_data(std::string forecast_json) {
-  this->on_weather_forecast_update_(this->weather_entity_id_,
-    esphome::StringRef(forecast_json)
-  );
+#ifdef USE_NSPANEL_NATIVE_WEATHER
+void NSPanelLovelace::log_weather_forecast_diagnostic_(const char *reason) {
+  const uint32_t now = millis();
+  if (this->weather_diagnostic_logged_ &&
+      static_cast<uint32_t>(now - this->weather_last_diagnostic_ms_) < WEATHER_DIAGNOSTIC_INTERVAL_MS)
+    return;
+  this->weather_diagnostic_logged_ = true;
+  this->weather_last_diagnostic_ms_ = now;
+  ESP_LOGW(TAG, "Native weather: %s", reason);
 }
-#endif
 
+void NSPanelLovelace::check_weather_forecast_() {
+  if (this->weather_entity_id_.empty()) return;
 
-void NSPanelLovelace::on_weather_forecast_update_(
-    const std::string &entity_id, esphome::StringRef forecast_json
-) {
-  ESP_LOGV(TAG, "Weather forecast update (%u): %zu %s",
-    this->screensaver_ == nullptr, forecast_json.size(), forecast_json.c_str());
-  if (this->screensaver_ == nullptr) return;
-  // todo: check if we are on the screensaver otherwise don't update
-  // todo: implement color updates: "color~background~tTime~timeAMPM~tDate~tMainText~tForecast1~tForecast2~tForecast3~tForecast4~tForecast1Val~tForecast2Val~tForecast3Val~tForecast4Val~bar~tMainTextAlt2~tTimeAdd"
-  ArduinoJson::JsonDocument filter;
-  filter[0]["datetime"] = true;
-  filter[0]["condition"] = true;
-  filter[0]["temperature"] = true;
-
-  if (filter.overflowed()) {
-    ESP_LOGW(TAG, "Weather unparsable: filter overflowed");
-    return;
-  }
-  
-  // Note: Unfortunately the json received is nearly 6KB!
-  //       We filter the variables to consume less but it is still a lot,
-  //       so we need to allocate an appropriate amount of memory to read it.
-  static SpiRamAllocator allocator;
-  JsonDocument doc(&allocator);
-  ArduinoJson::DeserializationError error = ArduinoJson::deserializeJson(
-    doc, forecast_json.c_str(), DeserializationOption::Filter(filter));
-  App.feed_wdt();
-
-  if (error || doc.overflowed()) {
-    ESP_LOGW(TAG, "Weather unparsable: %s %zu '%s'", error ? error.c_str() : "doc overflow",
-      forecast_json.size(), forecast_json.c_str());
-    return;
-  }
-
-  this->command_buffer_.clear();
-
-  ArduinoJson::JsonArray docArr;
-  if (doc.is<ArduinoJson::JsonArray>()) {
-    docArr = doc.as<ArduinoJson::JsonArray>();
-  } else if (doc.is<ArduinoJson::JsonObject>() && doc["forecast"].is<ArduinoJson::JsonArray>()) {
-    docArr = doc["forecast"].as<ArduinoJson::JsonArray>();
-  } else {
-    ESP_LOGW(
-        TAG,
-        "Weather forecast JSON is not an array or object with 'forecast' key");
-    return;
-  }
-
-  ESP_LOGV(TAG, "Weather forecast update s=%u", docArr.size());
-
-  // check if forecast is hourly or daily
-  auto weather_entity_is_hourly = false;
-
-  if (docArr.size() > 1) {
-    const char *date1 = docArr[0]["datetime"];
-    const char *date2 = docArr[1]["datetime"];
-    tm t{};
-    if (iso8601_to_tm(date1, t)) {
-      uint8_t hr = t.tm_hour;
-      if (iso8601_to_tm(date2, t) && t.tm_hour != hr) {
-        weather_entity_is_hourly = true;
-      }
-    }
-  }
-
-  char buff[16] = {};
-  uint8_t index = 1, item_count = this->screensaver_->get_items().size();
-
-  for (const ArduinoJson::JsonObject &item : docArr) {
-    // can only display the first 4 items (minus 1 for the current weather)
-    if (index >= item_count)
-      break;
-
-    auto weatherItem = this->screensaver_->get_item<WeatherItem>(index);
-    ++index;
-
-    if (weatherItem == nullptr)
-      continue;
-
-    weatherItem->set_icon_by_weather_condition(
-        item["condition"].as<std::string>());
-
-    // icon displayName
-    // todo: import temperature symbol from config
-    tm t{};
-    // Parse date e.g. 2023-08-22T21:00:00+00:00
-    if (!iso8601_to_tm(item["datetime"].as<const char *>(), t)) {
-      ESP_LOGW(TAG, "Weather 'datetime' unparsable: %s", item["datetime"].as<const char *>());
-      // return;
-      t = { 
-        // second, minute, hour
-        0,0,0,
-        // monthday, month, year
-        0,0,100,
-        // weekday, yearday, isdst
-        0,0,0
-      };
-    }
-
-    if (weather_entity_is_hourly) {
-      // ESPTime now; now.strftime(datefmt);
-      strftime(buff, sizeof(buff), this->time_format_.c_str(), &t);
-      weatherItem->set_display_name(buff);
+  // A state subscriber is the only verified signal that the API client is HA
+  // rather than a logger-only connection. Actions sent before that subscriber
+  // attaches are dropped by ESPHome while still registering a callback.
+  const bool ready = api::global_api_server != nullptr &&
+    api::global_api_server->is_connected_with_state_subscription();
+  if (ready != this->weather_api_ready_) {
+    this->weather_api_ready_ = ready;
+    this->weather_in_flight_ = false;
+    this->weather_pending_slot_ = WEATHER_ACTION_SLOTS;
+    if (ready) {
+      this->weather_unanswered_ = 0;
+      this->weather_next_fetch_ms_ = millis() + WEATHER_CONNECT_DELAY_MS;
     } else {
-      switch(t.tm_wday) {
-        case 0:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_sun));
-          break;
-        case 1:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_mon));
-          break;
-        case 2:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_tue));
-          break;
-        case 3:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_wed));
-          break;
-        case 4:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_thu));
-          break;
-        case 5:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_fri));
-          break;
-        case 6:
-          weatherItem->set_display_name(
-            get_translation(translation_item::dow_sat));
-          break;
-        default:
-          weatherItem->set_display_name("DOW_UNK");
-          break;
-      }
+      this->weather_next_fetch_ms_ = 0;
     }
-    
-    snprintf(buff, sizeof(buff), "%.1f", item["temperature"].as<float>());
-    weatherItem->set_value(buff);
+    return;
+  }
+  if (!ready) return;
+
+  if (this->weather_in_flight_) {
+    if (static_cast<int32_t>(millis() - this->weather_response_deadline_ms_) >= 0) {
+      this->weather_in_flight_ = false;
+      this->weather_pending_slot_ = WEATHER_ACTION_SLOTS;
+      if (this->weather_unanswered_ < WEATHER_MAX_UNANSWERED) ++this->weather_unanswered_;
+      this->weather_next_fetch_ms_ = millis() + WEATHER_FETCH_INTERVAL_MS;
+      this->log_weather_forecast_diagnostic_("no forecast reply before self-timeout");
+    }
+    return;
+  }
+
+  // Opt in to another bounded try after backoff, but only in a free callback slot.
+  if (!this->weather_stall_restart_delay_ms_ && this->weather_unanswered_ >= WEATHER_MAX_UNANSWERED) return;
+  if (static_cast<int32_t>(millis() - this->weather_next_fetch_ms_) < 0) return;
+
+  uint8_t slot = WEATHER_ACTION_SLOTS;
+  for (uint8_t i = 0; i < WEATHER_ACTION_SLOTS; ++i) {
+    const uint8_t candidate = (this->weather_last_slot_ + 1 + i) % WEATHER_ACTION_SLOTS;
+    if (!this->weather_slot_used_[candidate] &&
+        this->weather_forecast_actions_[candidate] != nullptr) {
+      slot = candidate;
+      break;
+    }
+  }
+  if (slot == WEATHER_ACTION_SLOTS) {
+    this->weather_next_fetch_ms_ = millis() + WEATHER_DIAGNOSTIC_INTERVAL_MS;
+    this->log_weather_forecast_diagnostic_("all forecast slots hold unanswered replies");
+    return;
+  }
+
+  this->weather_slot_used_[slot] = true;
+  this->weather_pending_slot_ = slot;
+  this->weather_last_slot_ = slot;
+  this->weather_in_flight_ = true;
+  this->weather_response_deadline_ms_ = millis() + WEATHER_RESPONSE_TIMEOUT_MS;
+  // Only dispatch can transition from a free slot to full occupancy.
+  if (this->weather_stall_restart_delay_ms_ && this->weather_forecast_slots_full_()) {
+    this->weather_stall_restart_deadline_ms_ = millis_64() + this->weather_stall_restart_delay_ms_;
+    ESP_LOGI(TAG, "All forecast callback slots occupied; restart armed");
+  }
+  this->weather_forecast_actions_[slot]->play();
+}
+
+bool NSPanelLovelace::weather_forecast_slots_full_() const {
+  for (bool used : this->weather_slot_used_) {
+    if (!used) return false;
+  }
+  return true;
+}
+
+void NSPanelLovelace::observe_weather_restart_ha_() {
+  if (!this->weather_stall_restart_delay_ms_ || this->weather_entity_id_.empty()) return;
+  // The public predicate cannot rule out a closing connection or an unprocessed reply.
+  if (api::global_api_server == nullptr || !api::global_api_server->is_connected_with_state_subscription()) {
+    this->weather_restart_ha_ready_since_ms_.reset();
+  } else if (!this->weather_restart_ha_ready_since_ms_.has_value()) {
+    this->weather_restart_ha_ready_since_ms_ = millis_64();
+  }
+}
+
+bool NSPanelLovelace::weather_stall_restart_ready_() const {
+#ifdef USE_NSPANEL_TFT_UPLOAD
+  if (this->is_updating_ || this->reparse_mode_) return false;
+#endif
+  return this->weather_stall_restart_deadline_ms_.has_value() &&
+         millis_64() >= *this->weather_stall_restart_deadline_ms_ &&
+         !this->weather_in_flight_ && this->weather_forecast_slots_full_() &&
+         this->weather_restart_ha_ready_since_ms_.has_value() &&
+         millis_64() - *this->weather_restart_ha_ready_since_ms_ >= WEATHER_STALL_HA_STABLE_MS;
+}
+
+void NSPanelLovelace::check_weather_forecast_stall_() {
+  if (this->weather_stall_restart_queued_ || !this->weather_stall_restart_ready_()) return;
+  this->weather_stall_restart_queued_ = true;
+  // Run the safe shutdown lifecycle outside the component loop.
+  this->set_timeout(WEATHER_STALL_RESTART_TIMER, 0, [this]() {
+    this->weather_stall_restart_queued_ = false;
+    this->observe_weather_restart_ha_();
+    if (!this->weather_stall_restart_ready_()) return;
+    this->weather_stall_restart_deadline_ms_.reset();
+#ifdef USE_NSPANEL_TFT_UPLOAD
+    // API teardown can dispatch a TFT upload after safe shutdown starts.
+    this->weather_stall_restart_committed_ = true;
+#endif
+    ESP_LOGW(TAG, "Forecast callback slots still occupied; restarting panel");
+    App.safe_reboot();
+  });
+}
+
+bool NSPanelLovelace::clear_weather_forecast_(uint8_t slot) {
+  if (slot >= WEATHER_ACTION_SLOTS) return false;
+  if (this->weather_slot_used_[slot] && this->weather_stall_restart_deadline_ms_.has_value()) {
+    this->weather_stall_restart_deadline_ms_.reset();
+    if (this->weather_stall_restart_queued_) {
+      this->cancel_timeout(WEATHER_STALL_RESTART_TIMER);
+      this->weather_stall_restart_queued_ = false;
+    }
+    ESP_LOGI(TAG, "Forecast callback slot freed; restart cancelled");
+  }
+  this->weather_slot_used_[slot] = false;
+  if (!this->weather_in_flight_ || slot != this->weather_pending_slot_) {
+    this->log_weather_forecast_diagnostic_("late forecast reply ignored");
+    return false;
+  }
+  const uint32_t now = millis();
+  const bool timely = static_cast<int32_t>(now - this->weather_response_deadline_ms_) < 0;
+  this->weather_in_flight_ = false;
+  this->weather_pending_slot_ = WEATHER_ACTION_SLOTS;
+  this->weather_next_fetch_ms_ = now + WEATHER_FETCH_INTERVAL_MS;
+  if (timely) {
+    this->weather_unanswered_ = 0;
+  } else {
+    if (this->weather_unanswered_ < WEATHER_MAX_UNANSWERED) ++this->weather_unanswered_;
+    this->log_weather_forecast_diagnostic_("late forecast reply ignored");
+  }
+  return timely;
+}
+
+void NSPanelLovelace::apply_weather_forecast(
+    ArduinoJson::JsonObjectConst response, uint8_t slot
+) {
+  if (!this->clear_weather_forecast_(slot)) return;
+
+  bool accepted = false;
+  const auto outer = response["response"].as<ArduinoJson::JsonObjectConst>();
+  if (!outer.isNull()) {
+    const auto entity = outer[this->weather_entity_id_.c_str()]
+      .as<ArduinoJson::JsonObjectConst>();
+    const auto forecast = entity["forecast"].as<ArduinoJson::JsonArrayConst>();
+    if (!forecast.isNull() && forecast.size() != 0) {
+      // JsonObjectConst is borrowed for this callback only; copy to owned
+      // storage before returning so the renderer can consume it later.
+      // JsonObjectConst is borrowed for this callback only; copy the daily
+      // array into owned storage before returning, then validate and render
+      // from that copy exactly once.
+      this->weather_forecast_json_.clear();
+      serializeJson(forecast, this->weather_forecast_json_);
+      this->weather_forecast_valid_ = !this->weather_forecast_json_.empty();
+      accepted = this->weather_forecast_valid_;
+    }
+  }
+
+  std::array<WeatherForecastOutputSlot, WEATHER_FORECAST_SLOT_COUNT> slots{};
+  if (accepted) {
+    ArduinoJson::JsonDocument doc;
+    if (ArduinoJson::deserializeJson(doc, this->weather_forecast_json_) ||
+        doc.overflowed() || !doc.is<ArduinoJson::JsonArray>()) {
+      accepted = false;
+    } else {
+      std::vector<WeatherForecastSlotData> entries;
+      for (const auto &item : doc.as<ArduinoJson::JsonArray>()) {
+        WeatherForecastSlotData entry;
+        const char *datetime = item["datetime"];
+        const char *condition = item["condition"];
+        if (datetime == nullptr || condition == nullptr) continue;
+        if (!weather_datetime_to_local_day(datetime, entry.date_key, entry.weekday))
+          continue;
+        entry.condition = condition;
+        entry.temperature = item["temperature"] | std::nanf("");
+        entry.valid = true;
+        entries.push_back(std::move(entry));
+      }
+      build_weather_forecast_slots(entries, this->weather_today_date_key_(), slots);
+    }
+  }
+  if (!accepted) {
+    this->weather_forecast_json_.clear();
+    this->weather_forecast_valid_ = false;
+    this->log_weather_forecast_diagnostic_("daily forecast unavailable");
+  }
+  // A failed/unsupported daily forecast blanks the forecast slots but never
+  // touches the current-condition item or its subscriptions.
+  this->publish_weather_slots_(slots);
+}
+
+void NSPanelLovelace::handle_weather_forecast_error(
+    const std::string &error, uint8_t slot
+) {
+  if (this->clear_weather_forecast_(slot)) {
+    // The forecast the panel was showing has no fresh data: drop the stored
+    // payload and blank the forecast slots only; the current-condition item
+    // keeps its last state and subscriptions.
+    this->weather_forecast_json_.clear();
+    this->weather_forecast_valid_ = false;
+    std::array<WeatherForecastOutputSlot, WEATHER_FORECAST_SLOT_COUNT> slots{};
+    this->publish_weather_slots_(slots);
+  }
+  this->log_weather_forecast_diagnostic_(error.c_str());
+}
+
+void NSPanelLovelace::init_weather_forecast_slots() {
+  if (this->screensaver_ == nullptr) return;
+  for (size_t i = 0; i < WEATHER_FORECAST_SLOT_COUNT; ++i) {
+    auto item = this->screensaver_->get_item<WeatherItem>(i + 1);
+    if (item != nullptr)
+      item->set_forecast_blank();
+    this->weather_slot_dates_[i].clear();
+  }
+}
+
+std::string NSPanelLovelace::weather_today_date_key_() {
+  const auto local = ESPTime::from_epoch_local(::time(nullptr));
+  char buffer[16] = {};
+  snprintf(buffer, sizeof(buffer), "%04u-%02u-%02u", local.year, local.month, local.day_of_month);
+  return buffer;
+}
+
+void NSPanelLovelace::publish_weather_slots_(
+    const std::array<WeatherForecastOutputSlot, WEATHER_FORECAST_SLOT_COUNT> &slots
+) {
+  if (this->screensaver_ == nullptr) return;
+  for (size_t i = 0; i < WEATHER_FORECAST_SLOT_COUNT; ++i) {
+    auto item = this->screensaver_->get_item<WeatherItem>(i + 1);
+    if (item == nullptr) continue;
+    const auto &slot = slots[i];
+    if (!slot.filled) {
+      // WeatherItem::set_forecast_blank serializes every field empty, so no
+      // cached icon, day label or 0.0 temperature can linger on the TFT.
+      item->set_forecast_blank();
+      this->weather_slot_dates_[i].clear();
+      continue;
+    }
+    item->set_icon_by_weather_condition(slot.condition);
+    switch (slot.weekday) {
+      case 0: item->set_display_name(get_translation(translation_item::dow_sun)); break;
+      case 1: item->set_display_name(get_translation(translation_item::dow_mon)); break;
+      case 2: item->set_display_name(get_translation(translation_item::dow_tue)); break;
+      case 3: item->set_display_name(get_translation(translation_item::dow_wed)); break;
+      case 4: item->set_display_name(get_translation(translation_item::dow_thu)); break;
+      case 5: item->set_display_name(get_translation(translation_item::dow_fri)); break;
+      case 6: item->set_display_name(get_translation(translation_item::dow_sat)); break;
+      default: item->set_display_name("DOW_UNK"); break;
+    }
+    item->set_value(slot.temperature);
+    this->weather_slot_dates_[i] = slot.date_key;
   }
   this->send_weather_update_command_();
 }
+
+void NSPanelLovelace::expire_weather_slots_() {
+  if (this->screensaver_ == nullptr) return;
+  const std::string today = this->weather_today_date_key_();
+  if (today.empty()) return;
+  bool changed = false;
+  for (size_t i = 0; i < WEATHER_FORECAST_SLOT_COUNT; ++i) {
+    if (this->weather_slot_dates_[i].empty() ||
+        this->weather_slot_dates_[i] >= today)
+      continue;
+    this->weather_slot_dates_[i].clear();
+    auto item = this->screensaver_->get_item<WeatherItem>(i + 1);
+    if (item != nullptr)
+      item->set_forecast_blank();
+    changed = true;
+  }
+  if (changed) this->send_weather_update_command_();
+}
+#endif
 
 } // namespace nspanel_lovelace
 } // namespace esphome

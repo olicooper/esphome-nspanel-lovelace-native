@@ -96,11 +96,16 @@ public:
   void set_icon_by_weather_condition(const std::string &condition);
   bool set_value(const std::string &value) override;
 
+  // Blank a daily-forecast slot for serialization: the TFT receives empty
+  // fields, so no cached icon, day label or temperature can linger.
+  void set_forecast_blank();
+
   // The temperature unit all weather items will use
   static std::string temperature_unit;
 
 protected:
   float float_value_;
+  bool blank_{false};
 
   // output: ~~icon~iconColor~displayName~value
   std::string &render_(std::string &buffer) override;

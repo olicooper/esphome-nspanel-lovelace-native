@@ -227,6 +227,8 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   }
 
   this->is_updating_ = true;
+  // Start each attempt from the first-block probe so the retry script is deterministic
+  this->upload_first_chunk_sent_ = false;
 
   std::string recv_res;
   if (Configuration::get_model() != nspanel_model_t::unknown) {
@@ -456,6 +458,7 @@ bool NSPanelLovelace::upload_end_(bool successful) {
       uint8_t c;
       while (this->available() && this->read_byte(&c)) {
         recv_string += static_cast<char>(c);
+        if (recv_string.size() > 4096) break;  // bound DRAM on a noisy line; we only need "startup"
       }
       vTaskDelay(pdMS_TO_TICKS(50));  // NOLINT
       App.feed_wdt();

@@ -75,6 +75,9 @@ script:
       - repeat:
           count: 3
           then:
+            # Power-cycle the display so a blank / interrupted screen recovers before each attempt
+            - switch.turn_off: screen_power
+            - delay: 1s
             - switch.turn_on: screen_power
             - delay: 2s
             # a successful upload reboots the device, so this only continues on failure

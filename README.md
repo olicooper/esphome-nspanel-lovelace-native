@@ -1,19 +1,3 @@
-> [!NOTE]
-> **About this branch.** This is [olicooper/esphome-nspanel-lovelace-native](https://github.com/olicooper/esphome-nspanel-lovelace-native) (`dev`) with fixes that make TFT uploads through `upload_tft` work. They are proposed upstream in [#77](https://github.com/olicooper/esphome-nspanel-lovelace-native/pull/77) and [#82](https://github.com/olicooper/esphome-nspanel-lovelace-native/pull/82). Everything else is unchanged.
->
-> Without them, an upload can stall or corrupt after the first 4 KiB, time out while the display rewrites its flash, leave the display on "System data ERROR!", or reboot the ESP mid-upload when the network stalls.
->
-> To use it, point `external_components` at this branch:
->
-> ```yaml
-> external_components:
->   - source:
->       type: git
->       url: https://github.com/santibur06/esphome-nspanel-lovelace-native
->       ref: fix/tft-upload-finish
->     components: [nspanel_lovelace]
-> ```
-
 # ESPHome Native Component for NSPanel (beta)
 
 This project is designed to utilise the UI provided by [NSPanel Lovelace UI](https://github.com/joBr99/nspanel-lovelace-ui), but use a native [ESPHome](https://github.com/esphome/esphome) component for the backend. My core goals for the project were to:
@@ -51,7 +35,7 @@ If you don't have the custom HMI TFT firmware installed already you will need to
 When uploading a TFT:
 - Serve the file from a server that supports HTTP Range requests, which the uploader uses for every block. Home Assistant's `/local` folder (`config/www`) does.
 - An upload takes a few minutes. When it finishes, the display restarts by itself and the ESP reboots once the display has started. Don't cut the power before then.
-- The [basic example](examples/basic-example.yaml) retries a failed upload up to 3 times. If an upload is interrupted, the display stays blank until it is flashed again; turning it off and on with the `Screen Power` switch and uploading again recovers it.
+- The [basic example](examples/basic-example.yaml) tries the upload up to 3 times in total, power-cycling the display before each attempt. If an upload is interrupted, the display stays blank until it is flashed again; turning it off and on with the `Screen Power` switch and uploading again recovers it.
 
 # Configuration
 

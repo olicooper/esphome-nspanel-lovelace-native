@@ -529,6 +529,16 @@ static void test_tile_callbacks() {
   check(grid_cover.get_icon_color() == 64909, "grid cover callback sets open color");
   cover->set_state("closed");
   check(grid_cover.get_icon_color() == 17299, "grid cover callback sets closed color");
+
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.test", lock_type.c_str());
+  StatusIconItem status_lock("status-lock", lock);
+  lock->set_state("locked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock)) == 0,
+        "lock status icon is a closed padlock while locked");
+  lock->set_state("unlocked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock_open)) == 0,
+        "lock status icon opens when unlocked");
 }
 
 static void test_numeric_render() {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -69,12 +70,22 @@ public:
   void set_attribute(ha_attr_type attr, const std::string &value);
   const std::vector<std::string> &get_effects() const { return effects_; }
 
+  void set_ha_service(const std::string &service,
+                      const std::map<std::string, std::string> &data,
+                      const std::map<std::string, std::string> &data_template);
+  const std::string &get_ha_service() const { return ha_service_; }
+  const std::map<std::string, std::string> &get_ha_service_data() const { return ha_service_data_; }
+  const std::map<std::string, std::string> &get_ha_service_data_template() const { return ha_service_data_template_; }
+
 protected:
   std::vector<std::string> effects_;
   std::string entity_id_;
   const char *type_ = nullptr;
   bool type_overridden_ = false;
   std::string state_;
+  std::string ha_service_;
+  std::map<std::string, std::string> ha_service_data_;
+  std::map<std::string, std::string> ha_service_data_template_;
   // One slot per attribute type. The slot table itself is allocated in PSRAM
   // (when available) so it doesn't take up internal RAM for every entity.
   psram_vector<psram_string> attributes_ =

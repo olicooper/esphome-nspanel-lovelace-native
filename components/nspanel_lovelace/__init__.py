@@ -2,14 +2,16 @@ from esphome import automation
 import esphome.config_validation as cv
 import esphome.codegen as cg
 import esphome.core as core
-import re
 import logging
+import math
+import re
 from typing import Union
 from pathlib import Path
 from fractions import Fraction
 
 from esphome.components import uart, time, esp32, api as esphome_api
 from esphome.components.color import hex_color
+from esphome.cpp_generator import StringLiteral
 from esphome.const import (
     CONF_ID,
     CONF_TRIGGER_ID,
@@ -68,12 +70,14 @@ NSPanelLovelaceMsgIncomingTrigger = nspanel_lovelace_ns.class_(
 # Real HA entity id format: [domain].[name]. The pseudo-entities 'delete',
 # 'iText.[text]' and 'navigate.[card id]' are handled separately in valid_entity_id.
 ENTITY_ID_RE = re.compile(r"^[\w]+[A-Za-z0-9]\.[\w]+[A-Za-z0-9]$")
+SERVICE_RE = re.compile(r"^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$")
 ## The list of currently supported entity domains (exact match)
 ENTITY_TYPES = [
     'sensor','binary_sensor','light','switch','scene','timer','weather',
     'alarm_control_panel','input_boolean','button','input_button','cover','fan',
     'automation','script','climate','media_player','select','input_select',
-    'number','input_number','text','input_text','lock','sun','person','vacuum'
+    'number','input_number','text','input_text','lock','sun','person','vacuum',
+    'service'
 ]
 BUILTIN_ICON_MAP: list = [
     ["E003",icon_t.account],["F098",icon_t.air_humidifier],["E027",icon_t.alert_circle],["E5D5",icon_t.alert_circle_outline],
@@ -136,6 +140,8 @@ CONF_CARD_HIDDEN = "hidden"
 CONF_CARD_TITLE = "title"
 CONF_CARD_ENTITIES = "entities"
 CONF_CARD_ENTITIES_NAME = "name"
+CONF_SERVICE = "service"
+CONF_DATA = "data"
 
 CARD_ENTITIES="cardEntities"
 CARD_GRID="cardGrid"
@@ -264,6 +270,52 @@ def valid_entity_id(entity_type_allowlist: list[str] | None = None, *,
             f"entity type '{domain}' is not allowed here. Allowed types are: {allowed}"
         )
     return validator
+
+def valid_service_name(value):
+    """HA service names are lowercase dotted domain.service strings."""
+    value = cv.string_strict(value)
+    if not SERVICE_RE.fullmatch(value):
+        raise cv.Invalid('service must match "domain.service_name"')
+    return value
+
+def valid_service_data(value):
+    """Allow only values that can be sent through the HA action API."""
+    if not isinstance(value, dict):
+        raise cv.Invalid("data values must be scalars or lists/dicts of scalars")
+
+    def check(item):
+        if isinstance(item, float) and not math.isfinite(item):
+            raise cv.Invalid("data numbers must be finite")
+        if isinstance(item, (str, bool, int, float)):
+            return True
+        if isinstance(item, (list, tuple)):
+            return all(check(element) for element in item)
+        if isinstance(item, dict):
+            return all(isinstance(key, str) and check(element)
+                       for key, element in item.items())
+        return False
+
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise cv.Invalid("data keys must be strings")
+        if not check(item):
+            raise cv.Invalid("data values must be scalars or lists/dicts of scalars")
+    return value
+
+def validate_service_tile(config):
+    """service: and data: belong to service.* tiles and travel together."""
+    service = config.get(CONF_SERVICE)
+    data = config.get(CONF_DATA)
+    entity_id = config.get(CONF_ENTITY_ID, "")
+    if service is not None:
+        if not entity_id.startswith("service."):
+            raise cv.Invalid("service is only valid on a service.* tile")
+        target = data.get(CONF_ENTITY_ID) if isinstance(data, dict) else None
+        if not isinstance(target, str) or not target:
+            raise cv.Invalid("data.entity_id is required for service tiles")
+    elif data is not None:
+        raise cv.Invalid("data is only valid with service")
+    return config
 
 def valid_clock_format(property_name):
     def validator(value):
@@ -394,11 +446,13 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
 
-SCHEMA_CARD_ENTITY = cv.Schema({
+SCHEMA_CARD_ENTITY = cv.All(cv.Schema({
     cv.Required(CONF_ENTITY_ID): valid_entity_id(allow_navigation=True, allow_text=True, allow_delete=True),
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
     cv.Optional(CONF_ICON): SCHEMA_ICON,
-})
+    cv.Optional(CONF_SERVICE): valid_service_name,
+    cv.Optional(CONF_DATA): valid_service_data,
+}), validate_service_tile)
 
 SCHEMA_CARD_BASE = cv.Schema({
     cv.Optional(CONF_ID): valid_uuid,
@@ -694,6 +748,25 @@ def generate_icon_config(icon_config, ctx: CodegenContext, parent_class: cg.Mock
     if parent_class is None:
         return attrs
 
+def service_data_maps(data: dict) -> tuple[dict[str, str], dict[str, str]]:
+    """Split service data into plain strings and HA-rendered literals.
+
+    HA's data_template renderer parses rendered values with literal_eval, so
+    repr() of a non-string YAML value arrives at the service as a native
+    list/number/bool instead of a string."""
+    plain = {key: value for key, value in data.items() if isinstance(value, str)}
+    templated = {key: repr(value) for key, value in data.items()
+                 if not isinstance(value, str)}
+    return plain, templated
+
+def cpp_string_map(items: dict[str, str]) -> str:
+    """C++ map initializer with quoted, escaped keys and values."""
+    entries = ", ".join(
+        "{" + str(StringLiteral(key)) + ", " + str(StringLiteral(value)) + "}"
+        for key, value in items.items()
+    )
+    return f"std::map<std::string, std::string>{{{entries}}}"
+
 def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variable: cg.MockObjClass, entity_type: cg.MockObjClass, ctx: CodegenContext):
     for i, entity_config in enumerate(entities_config):
         variable_name = card_variable.__str__() + "_item_" + str(i + 1)
@@ -718,6 +791,16 @@ def gen_card_entities(entities_config, card_class: cg.MockObjClass, card_variabl
             f"{make_shared.template(entity_type).__call__(ctx.new_uuid(), entity_id, display_name)}"))
 
         generate_icon_config(entity_config.get(CONF_ICON, None), ctx, parent_class=entity_class)
+
+        if CONF_SERVICE in entity_config:
+            entity_instance = ctx.entity(entity_config[CONF_ENTITY_ID])
+            entity_instance.op = "->"
+            data = entity_config.get(CONF_DATA, {})
+            plain, templated = service_data_maps(data)
+            cg.add(entity_instance.set_ha_service(
+                entity_config[CONF_SERVICE],
+                cg.RawExpression(cpp_string_map(plain)),
+                cg.RawExpression(cpp_string_map(templated))))
 
         cg.add(card_variable.add_item(entity_class))
 

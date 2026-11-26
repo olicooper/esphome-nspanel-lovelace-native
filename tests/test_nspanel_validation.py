@@ -682,3 +682,142 @@ def test_dangling_navigation_reports_tile_path(tmp_path: Path) -> None:
     assert re.search(
         r"navigation entity_id invalid[^\n]*\n\s*entity_id: navigate\.nonexistent", out
     ), out
+
+
+def test_service_tile_accepts_service_name_and_list_data(tmp_path: Path) -> None:
+    """A service tile with a list-valued data field must pass config validation."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          name: Power off
+          service: remote.send_command
+          data:
+            entity_id: remote.example_remote
+            command: [standby, volume_up]
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-ok")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_service_tile_rejects_invalid_service_name(tmp_path: Path) -> None:
+    """A service name must be a lowercase dotted domain.service, not arbitrary text."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: Remote.Send
+          data:
+            entity_id: remote.example_remote
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-bad-name")
+    assert result.returncode != 0, "invalid service name should be rejected"
+    assert 'service must match "domain.service_name"' in result.stdout + result.stderr
+
+
+def test_service_tile_requires_data_entity_id(tmp_path: Path) -> None:
+    """Service tiles must carry data.entity_id so a target is always supplied."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: remote.send_command
+          data:
+            command: [standby]
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-no-target")
+    assert result.returncode != 0, "missing data.entity_id should be rejected"
+    assert "data.entity_id is required for service tiles" in result.stdout + result.stderr
+
+
+def test_data_without_service_is_rejected(tmp_path: Path) -> None:
+    """data: on a regular tile has nowhere to go and must fail at config time."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.kitchen
+          data:
+            entity_id: light.kitchen
+"""
+    result = esphome_config(tmp_path, body, name="data-without-service")
+    assert result.returncode != 0, "data: without service: should be rejected"
+    assert "data is only valid with service" in result.stdout + result.stderr
+
+
+def test_service_name_on_regular_tile_is_rejected(tmp_path: Path) -> None:
+    """service: is restricted to stable service.* tile ids."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.kitchen
+          service: light.turn_on
+          data:
+            entity_id: light.kitchen
+"""
+    result = esphome_config(tmp_path, body, name="service-on-light")
+    assert result.returncode != 0, "service: on a light tile should be rejected"
+    assert "service is only valid on a service.* tile" in result.stdout + result.stderr
+
+
+def test_service_tile_rejects_unsupported_data_value(tmp_path: Path) -> None:
+    """data values must be serialisable scalars or containers of scalars."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: remote.send_command
+          data:
+            entity_id: remote.example_remote
+            nested: {bad: null}
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-bad-data")
+    assert result.returncode != 0, "null data value should be rejected"
+    assert "data values must be scalars or lists/dicts of scalars" in result.stdout + result.stderr
+
+
+def test_service_tile_rejects_trailing_newline_in_service(tmp_path: Path) -> None:
+    """'$' matches before a final newline; service names need a full match."""
+    body = """\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: "remote.send_command\\n"
+          data:
+            entity_id: remote.example_remote
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-newline")
+    assert result.returncode != 0, "service name with trailing newline should be rejected"
+    assert 'service must match "domain.service_name"' in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("bad", [".nan", ".inf", "-.inf"])
+def test_service_tile_rejects_non_finite_number(tmp_path: Path, bad: str) -> None:
+    """Python literals 'nan'/'inf' cannot be parsed by HA's literal_eval."""
+    body = f"""\
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: service.power_off
+          service: remote.send_command
+          data:
+            entity_id: remote.example_remote
+            level: {bad}
+"""
+    result = esphome_config(tmp_path, body, name="service-tile-non-finite")
+    assert result.returncode != 0, f"{bad} should be rejected"
+    assert "data numbers must be finite" in result.stdout + result.stderr

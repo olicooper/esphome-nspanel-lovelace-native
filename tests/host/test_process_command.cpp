@@ -773,8 +773,32 @@ static void test_details() {
 
 }
 
+static void test_service_tile() {
+  Panel panel;
+  auto service_tile = panel.create_entity("service.power_off");
+  service_tile->set_ha_service(
+      "remote.send_command",
+      {{"entity_id", "remote.example_remote"}},
+      {{"command", "['standby']"}});
+  panel.create_entity("service.unconfigured");
+  auto page = panel.create_page<GridCard>("service-page");
+  page->add_item(std::make_shared<GridCardEntityItem>("power", service_tile));
+
+  calls.clear();
+  panel.frame("event,buttonPress2,service.power_off,button");
+  check(calls.size() == 1 && calls.back().action == "remote.send_command" &&
+        calls.back().data == Data{{"entity_id", "remote.example_remote"}} &&
+        calls.back().data_template == Data{{"command", "['standby']"}},
+        "service tile dispatches named action with plain and templated data");
+
+  calls.clear();
+  panel.frame("event,buttonPress2,service.unconfigured,button");
+  check(calls.empty(), "service tile without configured action is ignored");
+}
+
 int main() {
   test_uart_recovery();
+  test_service_tile();
   test_wire();
   test_button_validation();
   test_popup_selection();

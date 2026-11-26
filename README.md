@@ -90,7 +90,7 @@ The power card is designed to display a home energy overview. A central home ent
 
 Each entry in `entities` supports the options `entity_id`, `name`, `icon`, and `icon_color`.
 
-> **Note:** Don't list `entity_id: delete` placeholders for `cardPower`. Unused slots around the home entity are padded automatically. (A power tile renders more fields than the `cardGrid`/`cardEntities` delete placeholder, so an explicit `delete` is misaligned — use the automatic padding instead.)
+> **Note:** Unused slots around the home entity are padded automatically. Explicit `entity_id: delete` placeholders are also supported and now render with the correct 7-field `cardPower` layout; automatic padding is still the simpler choice.
 
 ### Colours
 

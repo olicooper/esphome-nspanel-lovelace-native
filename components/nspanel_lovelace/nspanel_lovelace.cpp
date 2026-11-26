@@ -1479,6 +1479,12 @@ uint16_t NSPanelLovelace::recv_ret_string_(std::string &response, uint32_t timeo
       ff_flag = true;
 
     response += (char)c;
+    if (response.size() >= 128) {
+      // Upload acks (0x05, "comok") are tiny. A much longer frame means a noisy or
+      // wrong-baud line; stop appending so DRAM stays bounded (a no-exceptions build
+      // would abort on heap exhaustion rather than just failing the read).
+      break;
+    }
     if (recv_flag) {
       if (response.find(0x05) != std::string::npos) {
         exit_flag = true;

@@ -79,6 +79,9 @@ int NSPanelLovelace::upload_by_chunks_(esp_http_client_handle_t http_client, uin
     ESP_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
     return -1;
   }
+  // open() and fetch_headers() can each block up to timeout_ms back-to-back; feed the
+  // watchdog between them so the pair stays under the 5 s task WDT.
+  App.feed_wdt();
 
   ESP_LOGD(TAG, "Fetch content length");
   const int chunk_size = esp_http_client_fetch_headers(http_client);
@@ -323,6 +326,8 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   ESP_LOGD(TAG, "Free heap: %" PRIu32, esp_get_free_heap_size());
   int status_code = esp_http_client_get_status_code(http_client);
   if (status_code != 200 && status_code != 206) {
+    esp_http_client_close(http_client);
+    esp_http_client_cleanup(http_client);
     return this->upload_end_(false);
   }
 
@@ -402,6 +407,8 @@ bool NSPanelLovelace::upload_tft(const std::string &url /*, uint32_t baud_rate*/
   esp_err_t set_method_result = esp_http_client_set_method(http_client, HTTP_METHOD_GET);
   if (set_method_result != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set HTTP method to GET: %s", esp_err_to_name(set_method_result));
+    esp_http_client_close(http_client);
+    esp_http_client_cleanup(http_client);
     return this->upload_end_(false);
   }
 

@@ -243,6 +243,11 @@ public:
   void set_display_inactive_dim(uint8_t inactive);
   // Note: this can be used without parameters to update the display without changing the levels
   void set_display_dim(uint8_t inactive = UINT8_MAX, uint8_t active = UINT8_MAX);
+  void set_display_dim_defaults(uint8_t active, uint8_t inactive) {
+    this->display_active_dim_ = active;
+    this->display_inactive_dim_ = inactive;
+    this->display_defaults_configured_ = true;
+  }
 #ifdef USE_NSPANEL_NATIVE_WEATHER
   void set_weather_forecast_action(uint8_t slot, api::HomeAssistantServiceCallAction<> *action) {
     this->weather_forecast_actions_[slot] = action;
@@ -364,6 +369,7 @@ protected:
 
   uint8_t display_active_dim_ = 100;
   uint8_t display_inactive_dim_ = 50;
+  bool display_defaults_configured_{false};
   
   void call_ha_service_(
     const std::string& service, const std::string& entity_id);

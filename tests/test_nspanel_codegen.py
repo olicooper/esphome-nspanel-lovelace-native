@@ -72,18 +72,20 @@ time:
   - platform: homeassistant
     id: codegen_time
     timezone: America/New_York
+{extra_yaml}
 """
 
 
 def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
                        cwd: Path | None = None, esphome_extra: str = "",
-                       board: str = "esp32dev") -> str:
+                       board: str = "esp32dev", extra_yaml: str = "") -> str:
     """Write a synthetic config to tmp_path, run codegen only, and return the
     generated main.cpp source. Uuids are allocated numerically in codegen
     order, so a screensaver without an explicit id gets uuid "1". cwd runs
     esphome from a different working directory (default: repo root); the
     build output still lands under the config file's directory. esphome_extra
-    adds indented keys to the esphome: section (e.g. build_flags)."""
+    adds indented keys to the esphome: section (e.g. build_flags). extra_yaml
+    is appended at top level (e.g. sun:)."""
     cfg = tmp_path / f"{name}.yaml"
     cfg.write_text(SYNTHETIC_CONFIG.format(
         name=name,
@@ -91,6 +93,7 @@ def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
         nspanel_body=nspanel_body,
         esphome_extra=esphome_extra,
         board=board,
+        extra_yaml=extra_yaml,
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -160,6 +163,7 @@ def test_translation_legacy_cwd_fallback(tmp_path: Path) -> None:
         nspanel_body=body,
         esphome_extra="",
         board="esp32dev",
+        extra_yaml="",
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -758,3 +762,71 @@ def test_codegen_s3_board_override(tmp_path: Path) -> None:
     assert '#define ESPHOME_VARIANT "ESP32-S3"' in defines
     assert "create_page<nspanel_lovelace::GridCard>" in src
     assert_no_none_tokens(src)
+
+
+def test_display_schedule_fixed_time_codegen(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    time_id: codegen_time
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+      - at: "07:30:00"
+        inactive_brightness: 8
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    src = generate_synthetic(tmp_path, body, "disp-fixed")
+    assert "set_display_dim_defaults(100, 50)" in src
+    assert "set_display_inactive_dim(0)" in src
+    assert "set_display_inactive_dim(8)" in src
+    assert "add_hours" in src
+    assert "add_minutes" in src
+    assert "add_seconds" in src
+    # 23:00:00
+    assert "add_hours({23})" in src or "add_hours(std::vector<uint8_t>{23})" in src
+    # 07:30:00
+    assert "add_hours({7})" in src or "add_hours(std::vector<uint8_t>{7})" in src
+    assert "add_minutes({30})" in src or "add_minutes(std::vector<uint8_t>{30})" in src
+    # boot/time sync eval so reboots don't leave default until next trigger
+    assert "add_on_time_sync_callback" in src
+    assert "now.is_valid()" in src
+
+
+def test_display_schedule_sun_codegen(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    sun_id: codegen_sun
+    schedule:
+      - at: sunrise
+        inactive_brightness: 8
+      - at: sunset
+        inactive_brightness: 0
+  cards:
+    - type: cardGrid
+      id: main_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    extra = """\
+sun:
+  id: codegen_sun
+  latitude: 48.8584
+  longitude: 2.2945
+  time_id: codegen_time
+"""
+    src = generate_synthetic(tmp_path, body, "disp-sun", extra_yaml=extra)
+    assert "set_display_dim_defaults(100, 50)" in src
+    assert "set_display_inactive_dim(8)" in src
+    assert "set_display_inactive_dim(0)" in src
+    assert "set_sunrise(true)" in src
+    assert "set_sunrise(false)" in src

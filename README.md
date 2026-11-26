@@ -63,6 +63,26 @@ On-board PSRAM is used automatically and configured during code generation with 
 
 `sleep_timeout` (top-level when a screensaver is configured, and per-card) accepts `0`–`65535` seconds. Up to `65s` the TFT's own `timeout~N` command is used; above `65s` the component sends `timeout~0`, times the idle period on the ESP32, then sends `timeout~1` at the deadline so the TFT still dims and emits `sleepReached`. `0` disables the screensaver for that timeout. The long-timeout path is not hardware-verified yet: the TFT must still dim and report sleep after the one-second hand-off.
 
+### Display brightness schedule
+
+`display` sets the panel's active and inactive dim levels and can optionally apply a time-based inactive-brightness schedule. The schedule runs on the device (no Home Assistant or Node-RED automation required) and uses the existing HMI `dimmode` command. Active brightness stays unchanged.
+
+```yaml
+nspanel_lovelace:
+  display:
+    active_brightness: 100      # 0-100, default 100
+    inactive_brightness: 50     # 0-100, must be < active_brightness, default 50
+    time_id: my_time            # optional if screensaver.time_id or a single time component exists
+    sun_id: my_sun              # required for sunrise/sunset entries
+    schedule:
+      - at: sunrise             # sunrise, sunset, or HH:MM:SS
+        inactive_brightness: 8
+      - at: "23:00:00"
+        inactive_brightness: 0
+```
+
+`at` accepts `sunrise`, `sunset`, or a fixed `HH:MM:SS` local time. The current schedule entry is applied on time sync and at boot so reboots do not leave the panel at the default until the next trigger. With no `display` block, behavior is unchanged.
+
 ### Custom translations
 
 `locale.language` is a bundled language code (e.g. `en`, `de`) or a custom translation file. Custom files resolve **relative to the directory of the top-level YAML configuration** (e.g. `language: translations/custom.json` next to the config) or by absolute path. The legacy working-directory path is still tried with a warning if the file is not found there — place it next to the configuration instead. The file must be a JSON object of string keys to string values containing all the bundled keys (see `components/nspanel_lovelace/translations/en.json`); extra keys are allowed. Problems are reported at `locale.language` during `esphome config`.

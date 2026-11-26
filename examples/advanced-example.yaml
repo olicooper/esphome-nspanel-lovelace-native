@@ -28,6 +28,16 @@ external_components:
 nspanel_lovelace:
   id: nspanel
   sleep_timeout: 10
+  # display:
+  #   active_brightness: 100
+  #   inactive_brightness: 50
+  #   time_id: homeassistant_time
+  #   sun_id: sun_id
+  #   schedule:
+  #     - at: sunrise
+  #       inactive_brightness: 8
+  #     - at: "23:00:00"
+  #       inactive_brightness: 0
   # locale:
     ## This can be the ISO 639‑1 language code or a custom json file (i.e. custom.json).
     ## Currently supported languages:

@@ -172,7 +172,8 @@ static std::vector<std::string> display;
 void NSPanelLovelace::setup() {}
 void NSPanelLovelace::render_item_update_() { display.emplace_back("tile update"); }
 void NSPanelLovelace::dump_config() {}
-void NSPanelLovelace::set_display_dim(uint8_t, uint8_t) {}
+bool NSPanelLovelace::save_state_() { return true; }
+bool NSPanelLovelace::restore_state_() { return false; }
 void NSPanelLovelace::update_datetime(datetime_mode, const char *, const char *) {}
 void NSPanelLovelace::render_page_(render_page_option) {}
 void NSPanelLovelace::render_current_page_() { display.emplace_back("current page"); }

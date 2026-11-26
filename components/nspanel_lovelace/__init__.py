@@ -9,7 +9,7 @@ from typing import Union
 from pathlib import Path
 from fractions import Fraction
 
-from esphome.components import uart, time, esp32, api as esphome_api
+from esphome.components import uart, time, esp32, api as esphome_api, sun
 from esphome.components.color import hex_color
 from esphome.cpp_generator import StringLiteral
 from esphome.const import (
@@ -133,6 +133,13 @@ CONF_SCREENSAVER_STATUS_ICON_RIGHT = "status_icon_right"
 CONF_SCREENSAVER_STATUS_ICON_ALT_FONT = "alt_font" # todo: to_code
 CONF_SCREENSAVER_DOUBLE_TAP_TO_UNLOCK = "double_tap_to_unlock"
 CONF_SCREENSAVER_WEATHER_ICON_COLOR = "icon_color"
+
+CONF_DISPLAY = "display"
+CONF_ACTIVE_BRIGHTNESS = "active_brightness"
+CONF_INACTIVE_BRIGHTNESS = "inactive_brightness"
+CONF_SCHEDULE = "schedule"
+CONF_AT = "at"
+CONF_SUN_ID = "sun_id"
 
 CONF_CARDS = "cards"
 CONF_CARD_TYPE = "type"
@@ -446,6 +453,35 @@ SCHEMA_SCREENSAVER = cv.Schema({
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_RIGHT): SCHEMA_STATUS_ICON,
 })
 
+
+def valid_display_at(value):
+    """Accept 'sunrise', 'sunset', or an HH:MM:SS fixed time."""
+    if isinstance(value, str):
+        lower = value.strip().lower()
+        if lower in ("sunrise", "sunset"):
+            return lower
+    try:
+        return cv.time_of_day(value)
+    except cv.Invalid:
+        pass
+    raise cv.Invalid(
+        "display schedule 'at' must be 'sunrise', 'sunset', or an HH:MM:SS time"
+    )
+
+
+SCHEMA_DISPLAY_SCHEDULE_ITEM = cv.Schema({
+    cv.Required(CONF_AT): valid_display_at,
+    cv.Required(CONF_INACTIVE_BRIGHTNESS): cv.int_range(min=0, max=100),
+})
+
+SCHEMA_DISPLAY = cv.Schema({
+    cv.Optional(CONF_ACTIVE_BRIGHTNESS, default=100): cv.int_range(min=0, max=100),
+    cv.Optional(CONF_INACTIVE_BRIGHTNESS, default=50): cv.int_range(min=0, max=100),
+    cv.Optional(CONF_SCHEDULE, default=[]): cv.ensure_list(SCHEMA_DISPLAY_SCHEDULE_ITEM),
+    cv.Optional(CONF_TIME_ID): cv.use_id(time.RealTimeClock),
+    cv.Optional(CONF_SUN_ID): cv.use_id(sun.Sun),
+})
+
 SCHEMA_CARD_ENTITY = cv.All(cv.Schema({
     cv.Required(CONF_ENTITY_ID): valid_entity_id(allow_navigation=True, allow_text=True, allow_delete=True),
     cv.Optional(CONF_CARD_ENTITIES_NAME): cv.string,
@@ -499,6 +535,70 @@ def validate_config(config):
             f"configuration directory; using the legacy working-directory path "
             f"'{translation_path}'. Place the file next to the configuration instead.")
     load_translations(translation_path)
+
+    if CONF_DISPLAY in config:
+        display = config[CONF_DISPLAY]
+        active = display[CONF_ACTIVE_BRIGHTNESS]
+        inactive = display[CONF_INACTIVE_BRIGHTNESS]
+        if inactive >= active:
+            raise cv.Invalid(
+                f"display.inactive_brightness ({inactive}) must be less than "
+                f"display.active_brightness ({active})",
+                [CONF_DISPLAY, CONF_INACTIVE_BRIGHTNESS])
+        schedule = display.get(CONF_SCHEDULE, [])
+        has_fixed = any(not isinstance(item[CONF_AT], str) for item in schedule)
+        has_sun = any(isinstance(item[CONF_AT], str) for item in schedule)
+        if schedule:
+            time_id = display.get(CONF_TIME_ID)
+            if time_id is None and CONF_SCREENSAVER in config:
+                time_id = config[CONF_SCREENSAVER].get(CONF_TIME_ID)
+            if time_id is None:
+                for cfg_src in (getattr(core.CORE, "config", None), getattr(core.CORE, "raw_config", None)):
+                    if not isinstance(cfg_src, dict):
+                        continue
+                    time_conf = cfg_src.get("time")
+                    if isinstance(time_conf, dict):
+                        time_id = time_conf.get(CONF_ID)
+                    elif isinstance(time_conf, list) and len(time_conf) == 1 and isinstance(time_conf[0], dict):
+                        time_id = time_conf[0].get(CONF_ID)
+                    if time_id is not None:
+                        break
+            if time_id is None:
+                raise cv.Invalid(
+                    "display.schedule requires a time_id "
+                    "(set display.time_id or screensaver.time_id)",
+                    [CONF_DISPLAY, CONF_SCHEDULE])
+            if isinstance(time_id, str):
+                time_id = core.ID(time_id, is_declaration=False)
+            display[CONF_TIME_ID] = time_id
+        if has_sun and CONF_SUN_ID not in display:
+            sun_id = None
+            for cfg_src in (getattr(core.CORE, "config", None), getattr(core.CORE, "raw_config", None)):
+                if not isinstance(cfg_src, dict):
+                    continue
+                sun_conf = cfg_src.get("sun")
+                if isinstance(sun_conf, dict):
+                    sun_id = sun_conf.get(CONF_ID)
+                elif isinstance(sun_conf, list) and len(sun_conf) == 1 and isinstance(sun_conf[0], dict):
+                    sun_id = sun_conf[0].get(CONF_ID)
+                if sun_id is not None:
+                    break
+            if sun_id is None:
+                raise cv.Invalid(
+                    "display.schedule with sunrise/sunset requires a sun component "
+                    "(add sun: or set display.sun_id)",
+                    [CONF_DISPLAY, CONF_SUN_ID])
+            if isinstance(sun_id, str):
+                sun_id = core.ID(sun_id, is_declaration=False)
+            display[CONF_SUN_ID] = sun_id
+        for i, item in enumerate(schedule):
+            item_inactive = item[CONF_INACTIVE_BRIGHTNESS]
+            if item_inactive >= active:
+                raise cv.Invalid(
+                    f"display.schedule[{i}].inactive_brightness ({item_inactive}) must be "
+                    f"less than display.active_brightness ({active})",
+                    [CONF_DISPLAY, CONF_SCHEDULE, i, CONF_INACTIVE_BRIGHTNESS])
+
     # Build a local list of custom card ids (validation state never leaves
     # this function), rejecting duplicates
     card_ids: dict[str, int] = {}
@@ -568,6 +668,7 @@ CONFIG_SCHEMA = cv.All(
         cv.Optional(CONF_DEFAULT_CARD): cv.string_strict,
         cv.Optional(CONF_LOCALE, default={}): SCHEMA_LOCALE,
         cv.Optional(CONF_SCREENSAVER): SCHEMA_SCREENSAVER,
+        cv.Optional(CONF_DISPLAY): SCHEMA_DISPLAY,
         cv.Optional(CONF_INCOMING_MSG): automation.validate_automation(
             cv.Schema({
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(NSPanelLovelaceMsgIncomingTrigger),
@@ -1142,6 +1243,193 @@ def emit_cards(nspanel, config, ctx, screensaver_uuid) -> None:
 
         cg.add(cg.RawStatement("}"))
 
+def _display_schedule_eval_body(component_id, schedule, time_id, sun_id):
+    """C++ lambda body that applies the currently active schedule entry."""
+    lines = [
+        f"auto now = id({time_id}).now();",
+        "if (!now.is_valid()) return;",
+        "int now_sec = now.hour * 3600 + now.minute * 60 + now.second;",
+        "int best_sec = -1;",
+        "int best_inactive = -1;",
+    ]
+    for item in schedule:
+        inactive = item[CONF_INACTIVE_BRIGHTNESS]
+        at = item[CONF_AT]
+        if isinstance(at, str):
+            method = "sunrise" if at == "sunrise" else "sunset"
+            lines.extend([
+                "{",
+                f"  auto ev = id({sun_id}).{method}({sun.DEFAULT_ELEVATION});",
+                "  if (ev.has_value()) {",
+                "    int sec = ev->hour * 3600 + ev->minute * 60 + ev->second;",
+                "    if (sec <= now_sec && sec >= best_sec) {",
+                f"      best_sec = sec; best_inactive = {inactive};",
+                "    }",
+                "  }",
+                "}",
+            ])
+        else:
+            sec = at["hour"] * 3600 + at["minute"] * 60 + at.get("second", 0)
+            lines.extend([
+                "{",
+                f"  int sec = {sec};",
+                "  if (sec <= now_sec && sec >= best_sec) {",
+                f"    best_sec = sec; best_inactive = {inactive};",
+                "  }",
+                "}",
+            ])
+    # wrap-around: if nothing matched today, pick the latest entry overall
+    lines.extend([
+        "if (best_sec < 0) {",
+        "  int wrap_sec = -1;",
+    ])
+    for item in schedule:
+        inactive = item[CONF_INACTIVE_BRIGHTNESS]
+        at = item[CONF_AT]
+        if isinstance(at, str):
+            method = "sunrise" if at == "sunrise" else "sunset"
+            lines.extend([
+                "  {",
+                f"    auto ev = id({sun_id}).{method}({sun.DEFAULT_ELEVATION});",
+                "    if (ev.has_value()) {",
+                "      int sec = ev->hour * 3600 + ev->minute * 60 + ev->second;",
+                "      if (sec >= wrap_sec) {",
+                f"        wrap_sec = sec; best_inactive = {inactive};",
+                "      }",
+                "    }",
+                "  }",
+            ])
+        else:
+            sec = at["hour"] * 3600 + at["minute"] * 60 + at.get("second", 0)
+            lines.extend([
+                "  {",
+                f"    int sec = {sec};",
+                "    if (sec >= wrap_sec) {",
+                f"      wrap_sec = sec; best_inactive = {inactive};",
+                "    }",
+                "  }",
+            ])
+    lines.extend([
+        "}",
+        "if (best_inactive >= 0) {",
+        f"  id({component_id}).set_display_inactive_dim(static_cast<uint8_t>(best_inactive));",
+        "}",
+    ])
+    return "\n".join(lines)
+
+
+async def emit_display(nspanel, config):
+    display = config.get(CONF_DISPLAY)
+    if display is None:
+        return
+
+    cg.add(nspanel.set_display_dim_defaults(
+        display[CONF_ACTIVE_BRIGHTNESS], display[CONF_INACTIVE_BRIGHTNESS]))
+
+    schedule = display.get(CONF_SCHEDULE, [])
+    if not schedule:
+        return
+
+    time_id = display.get(CONF_TIME_ID)
+    if time_id is None and CONF_SCREENSAVER in config:
+        time_id = config[CONF_SCREENSAVER].get(CONF_TIME_ID)
+    time_var = await cg.get_variable(time_id) if time_id is not None else None
+    sun_var = await cg.get_variable(display[CONF_SUN_ID]) if CONF_SUN_ID in display else None
+
+    has_fixed = any(not isinstance(item[CONF_AT], str) for item in schedule)
+    if has_fixed:
+        cg.add_define("USE_TIME_TRIGGERS")
+
+    component_id = str(config[CONF_ID])
+    for i, item in enumerate(schedule):
+        inactive = item[CONF_INACTIVE_BRIGHTNESS]
+        at = item[CONF_AT]
+        if isinstance(at, str):
+            trigger_id = cg.unique_global_id(
+                f"nspanel_display_sun_{i}", sun.SunTrigger)
+            trigger = cg.new_Pvariable(trigger_id)
+            core.CORE.component_ids.add(str(trigger_id))
+            await cg.register_component(trigger, {CONF_ID: trigger_id})
+            await cg.register_parented(trigger, sun_var)
+            cg.add(trigger.set_sunrise(at == "sunrise"))
+            cg.add(trigger.set_elevation(sun.DEFAULT_ELEVATION))
+            conf = {
+                CONF_TRIGGER_ID: trigger_id,
+                automation.CONF_AUTOMATION_ID: cg.unique_global_id(
+                    f"nspanel_display_sun_auto_{i}", automation.Automation),
+                "then": [{
+                    "lambda": core.Lambda(
+                        f"id({component_id}).set_display_inactive_dim({inactive});"),
+                    "type_id": cg.unique_global_id(
+                        f"nspanel_display_sun_lambda_{i}", automation.LambdaAction),
+                }],
+            }
+            await automation.build_automation(trigger, [], conf)
+        else:
+            trigger_id = cg.unique_global_id(
+                f"nspanel_display_time_{i}", time.CronTrigger)
+            trigger = cg.new_Pvariable(trigger_id, time_var)
+            core.CORE.component_ids.add(str(trigger_id))
+            await cg.register_component(trigger, {CONF_ID: trigger_id})
+            cg.add(trigger.add_seconds([at.get("second", 0)]))
+            cg.add(trigger.add_minutes([at["minute"]]))
+            cg.add(trigger.add_hours([at["hour"]]))
+            cg.add(trigger.add_days_of_month(list(range(1, 32))))
+            cg.add(trigger.add_months(list(range(1, 13))))
+            cg.add(trigger.add_days_of_week(list(range(1, 8))))
+            conf = {
+                CONF_TRIGGER_ID: trigger_id,
+                automation.CONF_AUTOMATION_ID: cg.unique_global_id(
+                    f"nspanel_display_time_auto_{i}", automation.Automation),
+                "then": [{
+                    "lambda": core.Lambda(
+                        f"id({component_id}).set_display_inactive_dim({inactive});"),
+                    "type_id": cg.unique_global_id(
+                        f"nspanel_display_time_lambda_{i}", automation.LambdaAction),
+                }],
+            }
+            await automation.build_automation(trigger, [], conf)
+
+    # Apply the correct schedule entry on boot/time sync so reboots don't leave
+    # the panel at the default until the next trigger fires.
+    if time_var is not None:
+        eval_body = _display_schedule_eval_body(
+            component_id, schedule, str(time_id),
+            str(display[CONF_SUN_ID]) if CONF_SUN_ID in display else None)
+        sync_conf = {
+            CONF_TRIGGER_ID: cg.unique_global_id(
+                "nspanel_display_sync", automation.CallbackAutomation),
+            automation.CONF_AUTOMATION_ID: cg.unique_global_id(
+                "nspanel_display_sync_auto", automation.Automation),
+            "then": [{
+                "lambda": core.Lambda(eval_body),
+                "type_id": cg.unique_global_id(
+                    "nspanel_display_sync_lambda", automation.LambdaAction),
+            }],
+        }
+        await automation.build_callback_automation(
+            time_var, "add_on_time_sync_callback", [], sync_conf)
+
+        # Also apply at boot (low priority) in case time is already valid.
+        startup_trigger = cg.esphome_ns.class_(
+            "StartupTrigger", cg.Component, automation.Trigger.template())
+        boot_id = cg.unique_global_id("nspanel_display_boot", startup_trigger)
+        boot_trigger = cg.new_Pvariable(boot_id, -100.0)
+        core.CORE.component_ids.add(str(boot_id))
+        await cg.register_component(boot_trigger, {CONF_ID: boot_id})
+        boot_conf = {
+            CONF_TRIGGER_ID: boot_id,
+            automation.CONF_AUTOMATION_ID: cg.unique_global_id(
+                "nspanel_display_boot_auto", automation.Automation),
+            "then": [{
+                "lambda": core.Lambda(eval_body),
+                "type_id": cg.unique_global_id(
+                    "nspanel_display_boot_lambda", automation.LambdaAction),
+            }],
+        }
+        await automation.build_automation(boot_trigger, [], boot_conf)
+
+
 async def to_code(config):
     # One context per call: entity variables, UUIDs and custom-icon slots
     # are allocated for this configuration only (no module-level state).
@@ -1177,6 +1465,8 @@ async def to_code(config):
         cg.add(nspanel.set_global_vertical_ui(config[CONF_EXP_VERT_UI]))
 
     emit_translations(nspanel, config[CONF_LOCALE])
+
+    await emit_display(nspanel, config)
 
     for conf in config.get(CONF_INCOMING_MSG, []):
         trigger = cg.new_Pvariable(conf[CONF_TRIGGER_ID], nspanel)

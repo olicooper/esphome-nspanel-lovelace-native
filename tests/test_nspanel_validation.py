@@ -838,3 +838,208 @@ def test_service_tile_rejects_non_finite_number(tmp_path: Path, bad: str) -> Non
     result = esphome_config(tmp_path, body, name="service-tile-non-finite")
     assert result.returncode != 0, f"{bad} should be rejected"
     assert "data numbers must be finite" in result.stdout + result.stderr
+
+
+# --- display brightness schedule (issue 13) ---
+
+def test_display_schedule_fixed_time_valid(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    time_id: validation_time
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+      - at: "07:00:00"
+        inactive_brightness: 8
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-fixed")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_display_schedule_sunrise_valid(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    sun_id: validation_sun
+    schedule:
+      - at: sunrise
+        inactive_brightness: 8
+      - at: sunset
+        inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    # Need sun component in config; esphome_config uses BASE_CONFIG which has no sun.
+    # Build a custom config.
+    cfg = tmp_path / "display-sun.yaml"
+    cfg.write_text(BASE_CONFIG.format(
+        name="display-sun",
+        components=str(COMPONENTS_DIR),
+        nspanel_body=body,
+    ) + "\nsun:\n  id: validation_sun\n  latitude: 48.8584\n  longitude: 2.2945\n  time_id: validation_time\n")
+    result = subprocess.run(
+        ["esphome", "config", str(cfg)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_display_schedule_missing_sun(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: sunrise
+        inactive_brightness: 8
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-missing-sun")
+    assert result.returncode != 0, "missing sun should be rejected"
+    assert "sun" in (result.stdout + result.stderr).lower()
+
+
+def test_display_schedule_missing_time(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    cfg = tmp_path / "display-missing-time.yaml"
+    cfg.write_text(f"""\
+esphome:
+  name: display-missing-time
+  comment: "synthetic validation fixture"
+  build_path: ./build/display-missing-time
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: {COMPONENTS_DIR}
+    components: [nspanel_lovelace]
+
+nspanel_lovelace:
+{body}
+
+logger:
+  baud_rate: 115200
+
+wifi:
+  ssid: 'VALIDATION_SSID'
+  password: 'VALIDATION_PASSWORD'
+
+api: {{}}
+
+uart:
+  tx_pin: 16
+  rx_pin: 17
+  baud_rate: 115200
+""")
+    result = subprocess.run(
+        ["esphome", "config", str(cfg)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)
+    assert result.returncode != 0, "missing time_id should be rejected"
+    out = result.stdout + result.stderr
+    assert "time_id" in out or "requires component time" in out
+
+
+def test_display_inactive_ge_active_rejected(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 50
+    inactive_brightness: 50
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-inactive-ge-active")
+    assert result.returncode != 0, "inactive >= active should be rejected"
+    out = result.stdout + result.stderr
+    assert "inactive_brightness" in out
+    assert "active_brightness" in out
+
+
+def test_display_schedule_inactive_ge_active_rejected(tmp_path: Path) -> None:
+    body = """\
+  display:
+    active_brightness: 50
+    inactive_brightness: 10
+    time_id: validation_time
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: 50
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-sched-ge")
+    assert result.returncode != 0, "schedule inactive >= active should be rejected"
+    out = result.stdout + result.stderr
+    assert "inactive_brightness" in out
+
+
+@pytest.mark.parametrize("bad", [-1, 101, 200])
+def test_display_brightness_out_of_range(tmp_path: Path, bad: int) -> None:
+    body = f"""\
+  display:
+    active_brightness: {bad}
+    inactive_brightness: 0
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-brightness-range")
+    assert result.returncode != 0, f"brightness {bad} should be rejected"
+
+
+@pytest.mark.parametrize("bad", [-1, 101])
+def test_display_schedule_brightness_out_of_range(tmp_path: Path, bad: int) -> None:
+    body = f"""\
+  display:
+    active_brightness: 100
+    inactive_brightness: 50
+    time_id: validation_time
+    schedule:
+      - at: "23:00:00"
+        inactive_brightness: {bad}
+  cards:
+    - type: cardEntities
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.test_light
+"""
+    result = esphome_config(tmp_path, body, name="display-sched-range")
+    assert result.returncode != 0, f"schedule brightness {bad} should be rejected"

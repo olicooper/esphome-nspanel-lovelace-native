@@ -806,9 +806,27 @@ static void test_service_tile() {
   check(calls.empty(), "service tile without configured action is ignored");
 }
 
+static void test_single_status_icon() {
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.front_door", lock_type.c_str());
+  const auto right = std::make_shared<StatusIconItem>("status-right", lock);
+  lock->set_state("unlocked");
+
+  Screensaver screensaver("screensaver");
+  screensaver.set_icon_right(right);
+  check(screensaver.should_render_status_update(), "single status icon requests an update");
+
+  std::string buffer;
+  screensaver.render_status_update(buffer);
+  check(buffer.rfind("statusUpdate~~~", 0) == 0 &&
+        buffer.find(CHAR8_CAST(icon_t::lock_open)) != std::string::npos,
+        "single right status icon renders with a blank left side");
+}
+
 int main() {
   test_uart_recovery();
   test_service_tile();
+  test_single_status_icon();
   test_wire();
   test_button_validation();
   test_popup_selection();

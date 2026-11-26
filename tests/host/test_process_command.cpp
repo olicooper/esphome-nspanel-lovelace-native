@@ -778,7 +778,7 @@ static void test_service_tile() {
   auto service_tile = panel.create_entity("service.power_off");
   service_tile->set_ha_service(
       "remote.send_command",
-      {{"entity_id", "remote.basement_rx_v773_main_remote"}},
+      {{"entity_id", "remote.example_remote"}},
       {{"command", "['standby']"}});
   panel.create_entity("service.unconfigured");
   auto page = panel.create_page<GridCard>("service-page");
@@ -787,7 +787,7 @@ static void test_service_tile() {
   calls.clear();
   panel.frame("event,buttonPress2,service.power_off,button");
   check(calls.size() == 1 && calls.back().action == "remote.send_command" &&
-        calls.back().data == Data{{"entity_id", "remote.basement_rx_v773_main_remote"}} &&
+        calls.back().data == Data{{"entity_id", "remote.example_remote"}} &&
         calls.back().data_template == Data{{"command", "['standby']"}},
         "service tile dispatches named action with plain and templated data");
 

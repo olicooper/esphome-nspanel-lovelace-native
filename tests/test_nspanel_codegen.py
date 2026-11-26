@@ -731,7 +731,7 @@ def test_codegen_service_tile_emits_data_maps(tmp_path: Path) -> None:
         - entity_id: service.power_off
           service: remote.send_command
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
             command: [standby, volume_up]
             label: 😀
         - entity_id: light.kitchen
@@ -739,7 +739,7 @@ def test_codegen_service_tile_emits_data_maps(tmp_path: Path) -> None:
     src = generate_synthetic(tmp_path, body, "service-tile-codegen")
     assert src.count("set_ha_service(") == 1, src
     assert 'nspanel_e0->set_ha_service("remote.send_command"' in src
-    assert '{"entity_id", "remote.basement_rx_v773_main_remote"}' in src
+    assert '{"entity_id", "remote.example_remote"}' in src
     assert '{"command", "[\'standby\', \'volume_up\']"}' in src
     assert '"\\360\\237\\230\\200"' in src
     assert "\\ud83d" not in src

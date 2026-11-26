@@ -416,7 +416,7 @@ void setup() {
   //         - data:
   //             command:
   //               - standby
-  //             entity_id: remote.basement_rx_v773_main_remote
+  //             entity_id: remote.example_remote
   //           entity_id: service.power_off
   //           name: Power off
   //           service: remote.send_command
@@ -661,7 +661,7 @@ void setup() {
   nspanel_card_1_item_1->set_icon_value(CUSTOM_ICONS[0]);
   nspanel_card_1->add_item(nspanel_card_1_item_1);
   auto nspanel_card_1_item_2 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("12", nspanel_e1, "Power off");
-  nspanel_e1->set_ha_service("remote.send_command", std::map<std::string, std::string>{{"entity_id", "remote.basement_rx_v773_main_remote"}}, std::map<std::string, std::string>{{"command", "['standby']"}});
+  nspanel_e1->set_ha_service("remote.send_command", std::map<std::string, std::string>{{"entity_id", "remote.example_remote"}}, std::map<std::string, std::string>{{"command", "['standby']"}});
   nspanel_card_1->add_item(nspanel_card_1_item_2);
   auto nspanel_card_1_item_3 = std::make_shared<nspanel_lovelace::GridCardEntityItem>("13", nspanel_e2);
   nspanel_card_1->add_item(nspanel_card_1_item_3);

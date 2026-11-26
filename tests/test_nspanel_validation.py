@@ -695,7 +695,7 @@ def test_service_tile_accepts_service_name_and_list_data(tmp_path: Path) -> None
           name: Power off
           service: remote.send_command
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
             command: [standby, volume_up]
 """
     result = esphome_config(tmp_path, body, name="service-tile-ok")
@@ -712,7 +712,7 @@ def test_service_tile_rejects_invalid_service_name(tmp_path: Path) -> None:
         - entity_id: service.power_off
           service: Remote.Send
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
 """
     result = esphome_config(tmp_path, body, name="service-tile-bad-name")
     assert result.returncode != 0, "invalid service name should be rejected"
@@ -779,7 +779,7 @@ def test_service_tile_rejects_unsupported_data_value(tmp_path: Path) -> None:
         - entity_id: service.power_off
           service: remote.send_command
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
             nested: {bad: null}
 """
     result = esphome_config(tmp_path, body, name="service-tile-bad-data")
@@ -797,7 +797,7 @@ def test_service_tile_rejects_trailing_newline_in_service(tmp_path: Path) -> Non
         - entity_id: service.power_off
           service: "remote.send_command\\n"
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
 """
     result = esphome_config(tmp_path, body, name="service-tile-newline")
     assert result.returncode != 0, "service name with trailing newline should be rejected"
@@ -815,7 +815,7 @@ def test_service_tile_rejects_non_finite_number(tmp_path: Path, bad: str) -> Non
         - entity_id: service.power_off
           service: remote.send_command
           data:
-            entity_id: remote.basement_rx_v773_main_remote
+            entity_id: remote.example_remote
             level: {bad}
 """
     result = esphome_config(tmp_path, body, name="service-tile-non-finite")

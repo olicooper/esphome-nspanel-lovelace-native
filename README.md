@@ -57,6 +57,7 @@ On-board PSRAM is used automatically and configured during code generation with 
 - Icon values can be an icon name or a hex value (e.g. `hex:E549`). See the [icon cheatsheet](https://docs.nspanel.pky.eu/icon-cheatsheet.html).
 - Icon colours accept an RGB565 number (`0`–`65535`), a quoted 24-bit hex string (`"#RRGGBB"` or `"RRGGBB"`), or an `[r, g, b]` list (each `0`–`255`). An [RGB565 picker](https://chrishewett.com/blog/true-rgb565-colour-picker/) shows a 4-digit code such as `#ce79`; use its decimal value `52857` (the short hex form itself is not a colour input).
 - Screensaver weather icons use their condition's default colour. Set `screensaver.weather.icon_color` to pin all five icons to one colour; see [Screensaver weather](docs/screensaver-weather.md).
+- Screensaver `status_icon_left` / `status_icon_right` accept `sensor`, `binary_sensor`, `light`, and `lock` entities. `lock` glyphs follow the entity's locked/unlocked state; one icon is enough, and the other side renders blank. See the [advanced example](examples/advanced-example.yaml).
 
 ### Sleep timeouts
 

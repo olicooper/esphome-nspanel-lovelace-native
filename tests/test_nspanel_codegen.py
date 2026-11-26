@@ -41,7 +41,7 @@ esphome:
 {esphome_extra}
 
 esp32:
-  board: esp32dev
+  board: {board}
   framework:
     type: esp-idf
 
@@ -76,7 +76,8 @@ time:
 
 
 def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
-                       cwd: Path | None = None, esphome_extra: str = "") -> str:
+                       cwd: Path | None = None, esphome_extra: str = "",
+                       board: str = "esp32dev") -> str:
     """Write a synthetic config to tmp_path, run codegen only, and return the
     generated main.cpp source. Uuids are allocated numerically in codegen
     order, so a screensaver without an explicit id gets uuid "1". cwd runs
@@ -89,6 +90,7 @@ def generate_synthetic(tmp_path: Path, nspanel_body: str, name: str,
         components=str(REPO_ROOT / "components"),
         nspanel_body=nspanel_body,
         esphome_extra=esphome_extra,
+        board=board,
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -157,6 +159,7 @@ def test_translation_legacy_cwd_fallback(tmp_path: Path) -> None:
         components=str(REPO_ROOT / "components"),
         nspanel_body=body,
         esphome_extra="",
+        board="esp32dev",
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -251,6 +254,7 @@ def test_codegen_weather_template_sensor_default(tmp_path: Path) -> None:
         components=str(REPO_ROOT / "components"),
         nspanel_body=body,
         esphome_extra="",
+        board="esp32dev",
     ))
     result = subprocess.run(
         ["esphome", "compile", "--only-generate", str(cfg)],
@@ -679,3 +683,56 @@ def test_codegen_context_no_leftover_from_previous_config() -> None:
     assert ctx_b.entity_ids == {"light.only_in_b": "nspanel_e0"}
     assert "light.only_in_a" not in ctx_b.entity_ids
     assert ctx_a.entity_ids == {"light.only_in_a": "nspanel_e0"}
+
+
+def test_codegen_grid2_and_media_cards(tmp_path: Path) -> None:
+    """cardGrid2 and cardMedia must reach codegen, not just entity-count
+    validation: both have distinct page types/classes in generated C++."""
+    body = """\
+  cards:
+    - type: cardGrid2
+      id: grid2_card
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+    - type: cardMedia
+      id: media_card
+      media_entity_id: media_player.lounge_room
+"""
+    src = generate_synthetic(tmp_path, body, "grid2-media-cards")
+    assert 'create_page<nspanel_lovelace::GridCard>("grid2_card"' in src
+    assert "nspanel_card_1->set_render_type(nspanel_lovelace::page_type::cardGrid2)" in src
+    assert 'create_page<nspanel_lovelace::MediaCard>("media_card"' in src
+    assert 'create_entity("media_player.lounge_room")' in src
+
+
+def test_codegen_manual_card_entity_domains(tmp_path: Path) -> None:
+    """The entity domains exercised by the old manual device sample must
+    all generate entities; dropping one from the schema would break them."""
+    entity_ids = (
+        "timer.test_timer", "fan.living_room_fan", "cover.garage_door",
+        "lock.openable_lock", "vacuum.5_fifth_floor", "person.oliver",
+        "text.text", "number.pwm_1", "select.speed", "sun.sun",
+        "scene.romantic",
+    )
+    body = "  cards:\n    - type: cardGrid\n      id: main_card\n      sleep_timeout: 0\n      entities:\n"
+    body += "".join(f"        - entity_id: {eid}\n" for eid in entity_ids[:6])
+    body += "    - type: cardGrid\n      id: more_card\n      entities:\n"
+    body += "".join(f"        - entity_id: {eid}\n" for eid in entity_ids[6:])
+    src = generate_synthetic(tmp_path, body, "domain-matrix")
+    for eid in entity_ids:
+        assert f'create_entity("{eid}")' in src, eid
+
+
+def test_codegen_s3_board_override(tmp_path: Path) -> None:
+    """The S3 board override from the old manual device config must still
+    validate and generate code (a dropped board definition or ESP-IDF
+    incompatibility would fail here before any hardware is needed)."""
+    src = generate_synthetic(
+        tmp_path, _TRANSLATION_CARD, "s3-board", board="lolin_s3_mini")
+    defines = (tmp_path / ".esphome" / "build" / "s3-board" / "src"
+               / "esphome" / "core" / "defines.h").read_text()
+    assert '#define ESPHOME_BOARD "lolin_s3_mini"' in defines
+    assert '#define ESPHOME_VARIANT "ESP32-S3"' in defines
+    assert "create_page<nspanel_lovelace::GridCard>" in src
+    assert_no_none_tokens(src)

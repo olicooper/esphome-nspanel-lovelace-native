@@ -8,7 +8,7 @@ namespace nspanel_lovelace {
 ThermostatControls::ThermostatControls(const Entity *entity) {
   if (entity == nullptr) return;
 
-  const auto bound = [](const std::string &value, int fallback, bool lower, int &display) {
+  const auto bound = [](const auto &value, int fallback, bool lower, int &display) {
     double temp = 0.0;
     if (!str_to_double(value, temp)) return fallback;
     // Round toward the legal range; compare back in degrees to preserve exact tenths.
@@ -142,19 +142,7 @@ void Entity::set_state(const std::string &state) {
 }
 
 bool Entity::has_attribute(ha_attr_type attr) const {
-  auto it = attributes_.find(attr);
-  return it != attributes_.end();
-}
-
-const std::string &Entity::get_attribute(ha_attr_type attr) const {
-  static const std::string empty_value{};
-  auto it = attributes_.find(attr);
-  return it == attributes_.end() ? empty_value : it->second;
-}
-
-std::string Entity::get_attribute(ha_attr_type attr, const std::string &default_value) const {
-  auto it = attributes_.find(attr);
-  return it == attributes_.end() ? default_value : it->second;
+  return !attributes_[static_cast<size_t>(attr)].empty();
 }
 
 static bool valid_effect_utf8(const std::string &effect) {
@@ -236,25 +224,27 @@ static std::vector<std::string> parse_effects(const std::string &value) {
 
 void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
   if (attr == ha_attr_type::effect_list) effects_ = parse_effects(value);
+  auto &slot = attributes_[static_cast<size_t>(attr)];
   if (value.empty() || value == "None" || value == "none") {
-    attributes_.erase(attr);
-    this->notify_attribute_change(attr, "");
+    slot.clear();
+    this->notify_attribute_change(attr, slot);
     return;
   }
-  if (this->attributes_[attr] == value) return;
+  if (slot == value.c_str()) return;
 
   if (attr == ha_attr_type::brightness) {
     int brightness_val = 0;
     if (!str_to_int(value, brightness_val)) return;
-    this->attributes_[attr] = std::to_string(static_cast<int>(round(
-        scale_value(brightness_val, {0, 255}, {0, 100}))));
+    const int scaled = static_cast<int>(round(scale_value(brightness_val, {0, 255}, {0, 100})));
+    slot.assign(std::to_string(scaled).c_str());
   } else if (attr == ha_attr_type::color_temp) {
     const auto range = mired_range(this->get_attribute(ha_attr_type::min_mireds),
                                    this->get_attribute(ha_attr_type::max_mireds));
     int temp_val = 0;
     if (!str_to_int(value, temp_val)) return;
     const double temp = std::clamp(static_cast<double>(temp_val), range[0], range[1]);
-    this->attributes_[attr] = std::to_string(static_cast<int>(round(scale_value(temp, range, {0, 100}))));
+    const int scaled = static_cast<int>(round(scale_value(temp, range, {0, 100})));
+    slot.assign(std::to_string(scaled).c_str());
   } else if (attr == ha_attr_type::supported_color_modes ||
       attr == ha_attr_type::preset_modes ||
       attr == ha_attr_type::swing_modes ||
@@ -265,15 +255,15 @@ void Entity::set_attribute(ha_attr_type attr, const std::string &value) {
       attr == ha_attr_type::source_list ||
       attr == ha_attr_type::options) {
     // todo: remove this when esphome starts sending properly formatted array strings
-    this->attributes_[attr] = convert_python_arr_str(value);
-
-    this->attributes_[attr].shrink_to_fit();
+    auto converted = convert_python_arr_str(value);
+    slot.assign(converted.c_str(), converted.size());
+    slot.shrink_to_fit();
   } else {
-    this->attributes_[attr] = value;
+    slot.assign(value.c_str(), value.size());
   }
 
   if (this->enable_notifications_) {
-    this->notify_attribute_change(attr, this->attributes_[attr]);
+    this->notify_attribute_change(attr, slot);
   }
 }
 
@@ -289,7 +279,7 @@ void Entity::notify_state_change(const std::string &state) {
   }
 }
 
-void Entity::notify_attribute_change(ha_attr_type attr, const std::string &value) {
+void Entity::notify_attribute_change(ha_attr_type attr, const psram_string &value) {
   for (auto iter = this->targets_.begin(); iter != this->targets_.end(); ++iter) {
     (*iter)->on_entity_attribute_change(attr, value);
   }

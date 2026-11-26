@@ -80,14 +80,8 @@ Page* PageManager::find_page(
 }
 
 size_t PageManager::find_page_index(const std::string &uuid) const {
-  // shortcut if possible
-  if (pages_[current_index_]->get_uuid() == uuid) return current_index_;
-
-  for (size_t i = 0; i < pages_.size(); ++i) {
-    if (pages_[i]->get_uuid() != uuid) continue;
-    return i;
-  }
-  return SIZE_MAX;
+  auto it = uuid_index_map_.find(uuid);
+  return it != uuid_index_map_.end() ? it->second : SIZE_MAX;
 }
 
 bool PageManager::has_bookmark(uint8_t bookmark_id) {
@@ -126,7 +120,13 @@ bool PageManager::bookmark_page(
 void PageManager::delete_page(size_t index) {
   if (index >= pages_.size()) return;
 
+  auto uuid = pages_[index]->get_uuid();
   pages_.erase(pages_.begin() + index);
+  uuid_index_map_.erase(uuid);
+  for (auto &[u, idx] : uuid_index_map_) {
+    if (idx > index) --idx;
+  }
+
   if (pages_.empty()) {
     current_index_ = 0;
     bookmarks_.clear();
@@ -150,12 +150,9 @@ void PageManager::delete_page(size_t index) {
 }
 
 void PageManager::delete_page(const std::string& uuid) {
-  for (size_t i = 0; i < pages_.size(); ++i) {
-    if (pages_[i]->get_uuid() == uuid) {
-      delete_page(i);
-      return;
-    }
-  }
+  auto it = uuid_index_map_.find(uuid);
+  if (it != uuid_index_map_.end())
+    delete_page(it->second);
 }
 
 } // namespace nspanel_lovelace

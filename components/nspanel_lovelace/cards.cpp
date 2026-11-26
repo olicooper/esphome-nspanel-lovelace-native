@@ -153,7 +153,7 @@ void AlarmCard::on_entity_state_change(const std::string &state) {
   this->status_icon_->set_icon_value(icon.value);
 }
 
-void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const std::string &value) {
+void AlarmCard::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
   if (attr == ha_attr_type::code_arm_required) {
     this->set_show_keypad(value != entity_state::off);
   }
@@ -271,7 +271,7 @@ std::string &ThermoCard::render(std::string &buffer) {
   buffer.append(1, SEPARATOR);
 
   const ThermostatControls controls(this->thermo_entity_.get());
-  const auto tenths = [&controls](const std::string &value) {
+  const auto tenths = [&controls](const auto &value) {
     float parsed = 0.0f;
     if (!str_to_float(value, parsed) || controls.min > controls.max) return std::string("0");
     // Preserve float rounding, but compare in double so INT_MAX doesn't round up.
@@ -467,6 +467,140 @@ std::string &MediaCard::render(std::string &buffer) {
     buffer.append(1, SEPARATOR).append(item->render());
   }
   if (this->items_.size() > 0) buffer.append(1, SEPARATOR);
+
+  return buffer;
+}
+
+/*
+ * =============== PowerCard ===============
+ */
+
+PowerCard::PowerCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &home_entity) :
+    Card(page_type::cardPower, uuid),
+    home_entity_(home_entity) {
+  home_entity_->add_subscriber(this);
+  this->update_home_value_();
+}
+
+PowerCard::PowerCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &home_entity,
+    const std::string &title) :
+    Card(page_type::cardPower, uuid, title),
+    home_entity_(home_entity) {
+  home_entity_->add_subscriber(this);
+  this->update_home_value_();
+}
+
+PowerCard::PowerCard(const std::string &uuid,
+    const std::shared_ptr<Entity> &home_entity,
+    const std::string &title, const uint16_t sleep_timeout) :
+    Card(page_type::cardPower, uuid, title, sleep_timeout),
+    home_entity_(home_entity) {
+  home_entity_->add_subscriber(this);
+  this->update_home_value_();
+}
+
+PowerCard::~PowerCard() {
+  home_entity_->remove_subscriber(this);
+}
+
+void PowerCard::accept(PageVisitor& visitor) { visitor.visit(*this); }
+
+void PowerCard::on_entity_state_change(const std::string &state) {
+  this->update_home_value_();
+  this->set_items_render_invalid();
+}
+
+void PowerCard::on_entity_attribute_change(ha_attr_type attr, const psram_string &value) {
+  if (attr == ha_attr_type::unit_of_measurement) {
+    this->home_ha_unit_.assign(value.c_str(), value.size());
+    this->update_home_value_();
+    this->set_items_render_invalid();
+  }
+}
+
+void PowerCard::update_home_value_() {
+  const auto &state = this->home_entity_->get_state();
+  if (state == entity_state::unknown || state == entity_state::unavailable) {
+    this->home_value_str_ = "-";
+    this->home_is_active_ = false;
+    return;
+  }
+  float val = 0.0f;
+  if (!str_to_float(state, val)) {
+    // Non-numeric state (off/idle, or inf/nan from a broken sensor): show raw and
+    // treat as inactive, matching the surrounding power tiles.
+    this->home_value_str_ = state;
+    this->home_is_active_ = false;
+    return;
+  }
+  float abs_val = val < 0.0f ? -val : val;
+  this->home_is_active_ = (abs_val >= 1.0f);
+  char buf[16];
+  if (this->home_ha_unit_ == "W") {
+    if (abs_val >= 1000.0f) {
+      snprintf(buf, sizeof(buf), "%.1f", val / 1000.0f);
+      this->home_value_str_ = std::string(buf) + "kW";
+    } else {
+      snprintf(buf, sizeof(buf), "%.0f", val);
+      this->home_value_str_ = std::string(buf) + "W";
+    }
+  } else if (this->home_ha_unit_ == "kW") {
+    snprintf(buf, sizeof(buf), "%.2f", val);
+    this->home_value_str_ = std::string(buf) + "kW";
+  } else {
+    this->home_value_str_ = state;
+    if (!this->home_ha_unit_.empty()) this->home_value_str_ += this->home_ha_unit_;
+  }
+}
+
+// entityUpd~{title}~{nav}~{home_icon_item}~{home_value_item}~{item1..6 or delete placeholder}
+std::string &PowerCard::render(std::string &buffer) {
+  buffer.assign(this->get_render_instruction())
+      .append(1, SEPARATOR)
+      .append(this->get_title())
+      .append(1, SEPARATOR);
+
+  this->render_nav(buffer);
+
+  const auto &home_id = this->home_entity_->get_entity_id();
+
+  uint16_t home_display_color = this->home_is_active_ ? this->home_color_ : COLOR_INACTIVE;
+
+  // Center item 1: home icon
+  buffer.append(1, SEPARATOR);
+  buffer.append(entity_render_type::text).append(1, SEPARATOR);
+  buffer.append(home_id).append(1, SEPARATOR);
+  buffer.append(CHAR8_CAST(this->home_icon_)).append(1, SEPARATOR);
+  buffer.append(std::to_string(home_display_color)).append(1, SEPARATOR);
+  buffer.append(this->get_title().empty() ? "Home" : this->get_title()).append(1, SEPARATOR);
+  buffer.append(this->home_value_str_).append(1, SEPARATOR);
+  buffer.append("0");
+
+  // Center item 2: value display above home icon (same entity, no label)
+  buffer.append(1, SEPARATOR);
+  buffer.append(entity_render_type::text).append(1, SEPARATOR);
+  buffer.append(home_id).append(1, SEPARATOR);
+  buffer.append(CHAR8_CAST(this->home_icon_)).append(1, SEPARATOR);
+  buffer.append(std::to_string(home_display_color)).append(1, SEPARATOR);
+  buffer.append(1, SEPARATOR);  // empty display name
+  buffer.append(this->home_value_str_).append(1, SEPARATOR);
+  buffer.append("0");
+
+  // Up to 6 outer items
+  size_t item_count = this->items_.size();
+  for (auto& item : this->items_) {
+    buffer.append(1, SEPARATOR).append(item->render());
+  }
+  // Pad remaining outer slots with delete placeholders
+  // Format must match PowerCardItem::render_: text~entityId~icon~iconColor~displayName~valueStr~speed
+  // The TFT firmware hides a slot when entityId == "delete"
+  for (size_t i = item_count; i < 6; i++) {
+    buffer.append(1, SEPARATOR);
+    buffer.append(entity_render_type::text).append(1, SEPARATOR)
+          .append(entity_type::delete_).append(5, SEPARATOR).append("0");
+  }
 
   return buffer;
 }

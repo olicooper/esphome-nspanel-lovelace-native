@@ -1029,8 +1029,8 @@ void NSPanelLovelace::render_light_detail_update_(StatefulPageItem *item) {
       contains_value(supported_modes, ha_attr_color_mode::rgbw) ||
       contains_value(supported_modes, ha_attr_color_mode::rgbww));
 
-  std::string color_mode = entity->get_attribute(ha_attr_type::color_mode);
-  std::string color_temp = generic_type::disable;
+  auto &color_mode = entity->get_attribute(ha_attr_type::color_mode);
+  psram_string color_temp = generic_type::disable;
   if (contains_value(supported_modes, ha_attr_color_mode::color_temp)) {
     if (color_mode == ha_attr_color_mode::color_temp) {
       color_temp = entity->get_attribute(ha_attr_type::color_temp, generic_type::disable);
@@ -1257,8 +1257,8 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
   if(item == nullptr) return;
 
   auto state = item->get_state();
-  std::string options;
-  if (item->is_type(entity_type::input_select) || 
+  psram_string options;
+  if (item->is_type(entity_type::input_select) ||
       item->is_type(entity_type::select)) {
     options = item->get_attribute(ha_attr_type::options);
   }
@@ -1282,7 +1282,7 @@ void NSPanelLovelace::render_input_select_detail_update_(StatefulPageItem *item)
   }
   else if (item->is_type(entity_type::media_player)) {
     options = item->get_attribute(ha_attr_type::source_list);
-    state = item->get_attribute(ha_attr_type::source);
+    state = item->get_attribute(ha_attr_type::source).c_str();
   }
   if (!item->is_type(entity_type::light)) replace_all(options, ',', '?');
 
@@ -2019,7 +2019,7 @@ void NSPanelLovelace::process_button_press_(
       ha_action_type::shuffle_set,
       {{
         {to_string(ha_attr_type::entity_id), entity_id},
-        {to_string(ha_attr_type::shuffle), shuffle}
+        {to_string(ha_attr_type::shuffle), std::string(shuffle)}
       }});
   } else if (button_type == button_type::volumeSlider) {
     if (entity_type != entity_type::media_player) return;
@@ -2498,6 +2498,13 @@ void NSPanelLovelace::on_entity_attribute_update_(
     }
     else if (entity_type == entity_type::alarm_control_panel &&
         page->is_type(page_type::cardAlarm)) {
+      force_current_page_update_ = true;
+      return;
+    }
+    // PowerCard renders its home_entity_id inline (not as a tile item), so the item
+    // loop above never matches it; refresh when the home sensor updates.
+    else if (entity_type == entity_type::sensor &&
+        page->is_type(page_type::cardPower)) {
       force_current_page_update_ = true;
       return;
     }

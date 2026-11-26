@@ -44,7 +44,7 @@ nspanel_lovelace:
     - type: cardGrid
       id: main_card
       title: Main
-      sleep_timeout: 65
+      sleep_timeout: 600  # exercise the ESP32-timed path in CI builds
       entities:
         - entity_id: light.kitchen
           icon: hiking

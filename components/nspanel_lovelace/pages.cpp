@@ -32,11 +32,7 @@ std::string &Screensaver::render(std::string &buffer) {
 
 // output: statusUpdate~icon1~icon1Color~icon2~icon2Color~icon1AltFont~icon2AltFont
 std::string &Screensaver::render_status_update(std::string &buffer) {
-  if (!this->left_icon || !this->right_icon) {
-    // buffer.clear();
-    return buffer;
-  }
-
+  // A single configured icon is valid: the other side is sent as blank fields.
   std::string alt_font;
   buffer.assign("statusUpdate").append(1, SEPARATOR);
   

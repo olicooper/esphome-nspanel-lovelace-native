@@ -529,6 +529,16 @@ static void test_tile_callbacks() {
   check(grid_cover.get_icon_color() == 64909, "grid cover callback sets open color");
   cover->set_state("closed");
   check(grid_cover.get_icon_color() == 17299, "grid cover callback sets closed color");
+
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.test", lock_type.c_str());
+  StatusIconItem status_lock("status-lock", lock);
+  lock->set_state("locked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock)) == 0,
+        "lock status icon is a closed padlock while locked");
+  lock->set_state("unlocked");
+  check(std::strcmp(CHAR8_CAST(status_lock.get_icon_value()), CHAR8_CAST(icon_t::lock_open)) == 0,
+        "lock status icon opens when unlocked");
 }
 
 static void test_numeric_render() {
@@ -796,9 +806,101 @@ static void test_service_tile() {
   check(calls.empty(), "service tile without configured action is ignored");
 }
 
+static void test_long_sleep_timeout() {
+  Panel panel;
+  const uint64_t start = 10000;
+  host_millis = start;
+
+  display.clear();
+  panel.set_display_timeout(10);
+  check(display == std::vector<std::string>{"timeout~10"}, "timeout <=65 stays under TFT control");
+
+  display.clear();
+  panel.set_display_timeout(600);
+  check(display == std::vector<std::string>{"timeout~0"}, "long timeout disables the TFT timer");
+
+  display.clear();
+  host_millis = start + 599000;
+  panel.loop();
+  check(display.empty(), "ESP32 timer does not fire before the configured deadline");
+
+  // A touch restarts the idle countdown even when it does not change the page.
+  panel.frame("event,buttonPress2,none,button");
+  display.clear();
+  host_millis = start + 600000;
+  panel.loop();
+  check(display.empty(), "touch resets the ESP32 idle countdown");
+
+  host_millis = start + 1198999;
+  panel.loop();
+  check(display.empty(), "reset countdown still holds one millisecond before expiry");
+  host_millis = start + 1199000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "expiry hands sleep back to the TFT with a one-second timer");
+
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "expiry fires only once");
+
+  // A touch before sleepReached must retain the configured 600 s, not leave the TFT at 1 s.
+  display.clear();
+  panel.frame("event,buttonPress2,none,button");
+  check(display == std::vector<std::string>{"timeout~0"}, "hand-off touch stops the TFT countdown");
+  host_millis = start + 1798999;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~0"}, "hand-off touch re-arms the full timeout");
+  host_millis = start + 1799000;
+  panel.loop();
+  check(display.back() == "timeout~1", "re-armed timeout expires 600 s after the touch");
+
+  display.clear();
+  panel.set_display_timeout(600);
+  panel.frame("event,sleepReached,cardGrid");
+  host_millis = start + 2399000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~0"}, "sleepReached cancels the ESP32 timer");
+
+  // Malformed button frames are not user activity.
+  display.clear();
+  panel.set_display_timeout(600);
+  host_millis = start + 2399000;
+  panel.frame("event,buttonPress2,,");
+  display.clear();
+  host_millis = start + 2999000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~1"}, "invalid button frame does not reset the timer");
+
+  // A shorter popup timeout cancels the long one.
+  display.clear();
+  panel.set_display_timeout(600);
+  display.clear();
+  panel.set_display_timeout(10);
+  host_millis = start + 3599000;
+  panel.loop();
+  check(display == std::vector<std::string>{"timeout~10"}, "popup timeout cancels the long timer");
+}
+
+static void test_single_status_icon() {
+  const std::string lock_type = "lock";
+  const auto lock = std::make_shared<Entity>("lock.front_door", lock_type.c_str());
+  const auto right = std::make_shared<StatusIconItem>("status-right", lock);
+  lock->set_state("unlocked");
+
+  Screensaver screensaver("screensaver");
+  screensaver.set_icon_right(right);
+  check(screensaver.should_render_status_update(), "single status icon requests an update");
+
+  std::string buffer;
+  screensaver.render_status_update(buffer);
+  check(buffer.rfind("statusUpdate~~~", 0) == 0 &&
+        buffer.find(CHAR8_CAST(icon_t::lock_open)) != std::string::npos,
+        "single right status icon renders with a blank left side");
+}
+
 int main() {
   test_uart_recovery();
   test_service_tile();
+  test_long_sleep_timeout();
+  test_single_status_icon();
   test_wire();
   test_button_validation();
   test_popup_selection();

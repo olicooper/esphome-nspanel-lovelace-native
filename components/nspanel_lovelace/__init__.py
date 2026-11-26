@@ -32,11 +32,11 @@ from .resources import (
 
 DEPENDENCIES = ["uart", "time", "wifi", "api", "esp32", "json"]
 CONFLICTS_WITH = ["psram"]
-# Maximum sleep timeout in seconds. The HMI firmware protocol caps the
-# screensaver timeout at 65s, so values 66..120 (previously accepted for
-# per-card timeouts) are deliberately rejected.
+# The HMI protocol caps timeout~ at 65 seconds. Longer idle periods are timed
+# by the ESP32 instead: the component sends timeout~0 and hands sleep back to
+# the TFT with timeout~1 when the configured deadline is reached.
 # https://github.com/joBr99/nspanel-lovelace-ui/blob/22e96f2b3ad0cd3382008eac9b4d6a27982404b8/HMI/README.md?plain=1#L91
-MAX_SLEEP_TIMEOUT = 65
+MAX_SLEEP_TIMEOUT = 65535  # uint16_t payload in page_base.h
 
 def AUTO_LOAD():
     val = ["text_sensor", "json"]
@@ -376,7 +376,7 @@ SCHEMA_ICON = cv.Any(
 SCHEMA_STATUS_ICON = cv.Schema({
     # The StatusIconItem constructors all require an entity, so a provided
     # status icon block without an entity_id is a config error, not a codegen one.
-    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light']),
+    cv.Required(CONF_ENTITY_ID): valid_entity_id(['sensor','binary_sensor','light','lock']),
     cv.Optional(CONF_ICON): SCHEMA_ICON,
     cv.Optional(CONF_SCREENSAVER_STATUS_ICON_ALT_FONT): cv.boolean,
 })

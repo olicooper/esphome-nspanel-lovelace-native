@@ -57,10 +57,11 @@ On-board PSRAM is used automatically and configured during code generation with 
 - Icon values can be an icon name or a hex value (e.g. `hex:E549`). See the [icon cheatsheet](https://docs.nspanel.pky.eu/icon-cheatsheet.html).
 - Icon colours accept an RGB565 number (`0`–`65535`), a quoted 24-bit hex string (`"#RRGGBB"` or `"RRGGBB"`), or an `[r, g, b]` list (each `0`–`255`). An [RGB565 picker](https://chrishewett.com/blog/true-rgb565-colour-picker/) shows a 4-digit code such as `#ce79`; use its decimal value `52857` (the short hex form itself is not a colour input).
 - Screensaver weather icons use their condition's default colour. Set `screensaver.weather.icon_color` to pin all five icons to one colour; see [Screensaver weather](docs/screensaver-weather.md).
+- Screensaver `status_icon_left` / `status_icon_right` accept `sensor`, `binary_sensor`, `light`, and `lock` entities. `lock` glyphs follow the entity's locked/unlocked state; one icon is enough, and the other side renders blank. See the [advanced example](examples/advanced-example.yaml).
 
 ### Sleep timeouts
 
-`sleep_timeout` (top-level and per-card) is limited to `0`–`65` seconds because the HMI protocol caps the screensaver timeout at 65s. Values `66`–`120` were previously accepted for per-card timeouts but are now rejected. `0` disables the screensaver for that timeout.
+`sleep_timeout` (top-level when a screensaver is configured, and per-card) accepts `0`–`65535` seconds. Up to `65s` the TFT's own `timeout~N` command is used; above `65s` the component sends `timeout~0`, times the idle period on the ESP32, then sends `timeout~1` at the deadline so the TFT still dims and emits `sleepReached`. `0` disables the screensaver for that timeout. The long-timeout path is not hardware-verified yet: the TFT must still dim and report sleep after the one-second hand-off.
 
 ### Custom translations
 

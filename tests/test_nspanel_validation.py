@@ -575,8 +575,25 @@ def test_status_icon_requires_entity_id(tmp_path: Path) -> None:
     assert "entity_id" in out, out
 
 
+def test_status_icon_accepts_lock_entity(tmp_path: Path) -> None:
+    """Screensaver status icons can watch lock entities directly."""
+    body = """\
+  screensaver:
+    status_icon_right:
+      entity_id: lock.front_door
+      alt_font: true
+  cards:
+    - type: cardGrid
+      sleep_timeout: 0
+      entities:
+        - entity_id: light.lamp
+"""
+    result = esphome_config(tmp_path, body, name="status-icon-lock")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
-    """Top-level sleep_timeout is 0..65 (HMI protocol maximum)."""
+    """Top-level sleep_timeout is 0..65535; >65 is timed on the ESP32."""
     def body(timeout: int) -> str:
         return f"""\
   sleep_timeout: {timeout}
@@ -586,10 +603,10 @@ def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
       entities:
         - entity_id: light.lamp
 """
-    for timeout in (0, 65):
+    for timeout in (0, 65, 600, 65535):
         result = esphome_config(tmp_path, body(timeout), name=f"timeout-top-{timeout}")
         assert result.returncode == 0, result.stdout + result.stderr
-    for timeout in (-1, 66, 120):
+    for timeout in (-1, 65536):
         result = esphome_config(tmp_path, body(timeout), name=f"timeout-top-{timeout}")
         assert result.returncode != 0, (
             f"top-level sleep_timeout {timeout} should be rejected:\n{result.stdout}"
@@ -597,7 +614,7 @@ def test_sleep_timeout_top_level_bounds(tmp_path: Path) -> None:
 
 
 def test_sleep_timeout_card_bounds(tmp_path: Path) -> None:
-    """Per-card sleep_timeout is also 0..65; 66..120 is deliberately rejected."""
+    """Per-card sleep_timeout is also 0..65535; >65 is timed on the ESP32."""
     def body(timeout: int) -> str:
         return f"""\
   screensaver: {{}}
@@ -607,10 +624,10 @@ def test_sleep_timeout_card_bounds(tmp_path: Path) -> None:
       entities:
         - entity_id: light.lamp
 """
-    for timeout in (0, 65):
+    for timeout in (0, 65, 600, 65535):
         result = esphome_config(tmp_path, body(timeout), name=f"timeout-card-{timeout}")
         assert result.returncode == 0, result.stdout + result.stderr
-    for timeout in (-1, 66, 120):
+    for timeout in (-1, 65536):
         result = esphome_config(tmp_path, body(timeout), name=f"timeout-card-{timeout}")
         assert result.returncode != 0, (
             f"card sleep_timeout {timeout} should be rejected:\n{result.stdout}"

@@ -330,6 +330,15 @@ void NSPanelLovelace::loop() {
     return;
   }
 #endif
+  if (this->esp_sleep_timeout_ms_ != 0 && !this->esp_sleep_handoff_pending_ &&
+      millis() - this->esp_sleep_start_ms_ >= this->esp_sleep_timeout_ms_) {
+    // Hand the final dim and sleepReached event to the TFT. Keep the configured
+    // timeout so a touch during the hand-off can re-arm the full idle period.
+    this->esp_sleep_handoff_pending_ = true;
+    this->command_buffer_.assign("timeout").append(1, SEPARATOR)
+      .append(esphome::to_string(1));
+    this->send_buffered_command_();
+  }
 #ifdef USE_NSPANEL_NATIVE_WEATHER
   this->check_weather_forecast_();
   this->check_weather_forecast_stall_();
@@ -412,9 +421,22 @@ void NSPanelLovelace::on_page_item_added_callback(const std::shared_ptr<PageItem
 }
 
 void NSPanelLovelace::set_display_timeout(uint16_t timeout) {
+  // HMI protocol limit for the timeout command; longer idle periods use the ESP32 timer.
+  constexpr uint16_t TFT_MAX_SLEEP_TIMEOUT_S = 65;
+  // The TFT firmware only counts up to 65 seconds. Longer idle periods are
+  // timed here; the TFT gets a one-second timer at the deadline so it still
+  // performs the dim and sends sleepReached.
+  this->esp_sleep_handoff_pending_ = false;
+  if (timeout > TFT_MAX_SLEEP_TIMEOUT_S) {
+    this->esp_sleep_timeout_ms_ = static_cast<uint32_t>(timeout) * 1000U;
+    this->esp_sleep_start_ms_ = millis();
+  } else {
+    this->esp_sleep_timeout_ms_ = 0;
+  }
+
   this->command_buffer_
     .assign("timeout").append(1, SEPARATOR)
-    .append(esphome::to_string(timeout));
+    .append(esphome::to_string(this->esp_sleep_timeout_ms_ != 0 ? 0 : timeout));
   this->send_buffered_command_();
 }
 
@@ -559,6 +581,16 @@ void NSPanelLovelace::process_command_(const std::string &message) {
   // note: from luibackend/mqtt.py
   if (tokens.at(1) == action_type::buttonPress2) {
     if ((tokens.size() == 4 || tokens.size() == 5) && !tokens[2].empty() && !tokens[3].empty()) {
+      if (this->esp_sleep_timeout_ms_ != 0) {
+        if (this->esp_sleep_handoff_pending_) {
+          // Stop the TFT countdown and restore the full idle period.
+          this->esp_sleep_handoff_pending_ = false;
+          this->command_buffer_.assign("timeout").append(1, SEPARATOR)
+            .append(esphome::to_string(0));
+          this->send_buffered_command_();
+        }
+        this->esp_sleep_start_ms_ = millis();
+      }
       if (tokens.size() == 5) {
         this->process_button_press_(tokens[2], tokens[3], tokens[4]);
       } else {
@@ -572,9 +604,13 @@ void NSPanelLovelace::process_command_(const std::string &message) {
       this->render_popup_page_(tokens[2], tokens[3]);
     }
   } else if (tokens.at(1) == action_type::sleepReached) {
+    this->esp_sleep_timeout_ms_ = 0;
+    this->esp_sleep_handoff_pending_ = false;
     //std::string page = tokens.at(2);
     this->render_page_(render_page_option::screensaver_page);
   } else if (tokens.at(1) == action_type::startup) {
+    this->esp_sleep_timeout_ms_ = 0;
+    this->esp_sleep_handoff_pending_ = false;
     if (tokens.size() == 4 && !tokens[3].empty()) {
       int ver = 0;
       if (str_to_int(tokens[2], ver) && ver >= 0 && ver <= UINT16_MAX) {
